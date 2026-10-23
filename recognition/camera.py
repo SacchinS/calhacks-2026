@@ -13,6 +13,7 @@ import logging
 import time
 import urllib.request
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from typing import Any
 
 from recognition.base import FrameClassifier, FrameRecognizer
@@ -78,7 +79,8 @@ class Camera:
         rgb = self._cv2.cvtColor(bgr, self._cv2.COLOR_BGR2RGB)
         image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=rgb)
         timestamp_ms = int((time.monotonic() - self._start) * 1000)
-        return holistic_to_frame(self.landmarker.detect_for_video(image, timestamp_ms))
+        frame = holistic_to_frame(self.landmarker.detect_for_video(image, timestamp_ms))
+        return replace(frame, image=rgb)
 
     def close(self) -> None:
         self.capture.release()

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Literal, get_args
+from typing import Any, Literal, get_args
 
 Point = tuple[float, float, float]  # normalized x, y (0..1, y down) and relative depth z
 Mode = Literal["claude_code", "voice", "meet"]
@@ -41,6 +41,9 @@ class LandmarkFrame:
     hands_in_signing_space: bool = False
     # Ground-truth gloss for labeled fixture frames (replay only); None from a live camera.
     label: str | None = None
+    # The camera image for this frame (numpy uint8 array, height x width x 3, RGB), so the UI
+    # can draw the feed without opening the camera itself. None in mock and replay modes.
+    image: Any = field(default=None, compare=False, repr=False)
     ts: float = field(default_factory=_now)
 
 
