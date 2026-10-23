@@ -11,6 +11,8 @@ This is the plan for after the scaffolding (`SCAFFOLD.md`) is built. Each person
 - Cal Hacks general prizes (Overall, People-First Social Impact, Most Technically Complex, Most Creative, Hacker's Choice)
 - Commit Fellowship (opt in on the submission form)
 
+**What it is:** a native Mac app (Python + PySide6), not a web page. It has a **camera window** (webcam feed, tracking overlay, recognized signs, English, YES/NO prompt) and a **control window**. For the demo, the camera window goes fullscreen on a second display plugged into the laptop, so judges see the signing and tracking there while the laptop's own screen shows Claude Code, Siri, and Meet actually doing the work.
+
 **Who it's for:** Deaf ASL signers. Not hearing ASL learners. Don't describe the product as "giving Deaf people a voice" or call them "silent"; describe it as access to voice-only tools and parity in calls.
 
 ## What the MVP must do
@@ -41,7 +43,7 @@ Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unles
 - **Friday night:** scaffolding merged to `main`. Everyone has run `make mock` and `make test` on their own laptop.
 - **Saturday midday:** each person's first real piece works alone (A: live landmarks plus a few recognized signs; B: real Claude translation; C: speech into BlackHole heard by Siri).
 - **Saturday evening:** first full integration. A real sign goes all the way through to Claude Code and to voice. Fix what breaks.
-- **Saturday night:** all three demo moments work. Record a backup demo video.
+- **Saturday night:** all three demo moments work on the real two-screen setup. Record a backup demo video.
 - **Sunday ~3 AM:** feature freeze. Only bug fixes, README, Devpost write-up, and pitch practice after this.
 - **Sunday 8 AM:** at the venue. **9 AM:** submitted.
 
@@ -54,7 +56,7 @@ Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unles
 **Your job:** turn the webcam into a stream of `SignEvent`s that are accurate enough for the demo script.
 
 **MVP (in this order):**
-1. **Camera and landmarks.** Webcam capture with MediaPipe Holistic landmarks, published as `LandmarkFrame`s. Done when the UI's webcam preview shows landmarks at a steady frame rate.
+1. **Camera and landmarks.** Webcam capture with MediaPipe Holistic landmarks, published as `LandmarkFrame`s. Publish the camera image with each frame so the camera window can draw it. Done when the camera window shows the feed with landmarks at a steady frame rate.
 2. **Signing-space gating.** Only recognize while the hands are up in front of the chest and face, so resting hands and typing aren't read as signs. Done when putting your hands down produces no events.
 3. **Isolated signs.** Run the Kaggle ISLR 1st-place TFLite model (`sign/kaggle-asl-signs-1st-place` on Hugging Face, MIT, 250 signs). Done when every in-vocabulary sign in the demo script is recognized correctly most of the time.
 4. **Segmenter.** Turn per-frame predictions into one `SignEvent` per sign: no duplicates, no events while the hands are still, and a confidence threshold in `config.yaml`. Done when signing the demo script produces the right gloss sequence.
@@ -64,7 +66,7 @@ Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unles
 
 **Stretch:** custom signs for missing demo words, trained on landmarks you record yourself (a small classifier on top of the recorded landmarks); `CLEAR` and `MODE` as signs; better accuracy in bad lighting.
 
-**Test alone with:** `recognizer: camera` and everything else on `mock`. The UI shows the gloss you produced.
+**Test alone with:** `recognizer: camera` and everything else on `mock`. The camera window shows the gloss you produced.
 
 **Needs:** a laptop webcam and good lighting. No API keys.
 
@@ -100,14 +102,15 @@ Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unles
 1. **BlackHole setup.** Install BlackHole 2ch and write down the exact macOS audio setup in the README. Done when `tts: say` speaks into BlackHole and Siri, dictation, or Meet hears it after selecting BlackHole as the microphone.
 2. **Cartesia TTS.** `tts_cartesia.py` streams Cartesia Sonic audio into BlackHole, falling back to `say` if Cartesia fails. Done when demo moment 2 (Siri) works with typed mock signs.
 3. **Meet captions.** `captions/cartesia_stt.py` captures the Meet call's audio from a separate device (not the one our voice goes into, or we caption ourselves) and streams it to Cartesia Ink. Done when the other person's speech shows up as captions within a couple of seconds.
-4. **UI.** Large, high-contrast text; the webcam preview; the live gloss; the English preview; a clear YES/NO confirm prompt; the current mode; `CLEAR` and `MODE` buttons; captions in Meet mode; Claude Code's streamed reply in Claude Code mode. Every state must be visible, because the user gets no audio feedback.
-5. **Demo moment 3.** A real Meet call between two laptops: our side signs, the other side hears it, and their reply appears as captions.
+4. **Camera window.** The webcam feed with the landmark overlay and signing-space box, each recognized sign appearing as it lands, the English preview, and a big YES/NO confirm prompt, in large, high-contrast text. It goes fullscreen on a second display and remembers which one. Done when it looks good fullscreen on an external screen.
+5. **Control window.** Mode, status, `CLEAR` and `MODE` buttons, Claude Code's streamed reply, captions in Meet mode, and the mock sign text box. Every state must be visible, because the user gets no audio feedback.
+6. **Demo moment 3.** A real Meet call between two laptops: our side signs, the other side hears it, and their reply appears as captions.
 
-**Stretch:** choosing a voice in the UI; showing when the app is speaking; a visual cue when a sign is recognized; a polished look for judging photos.
+**Stretch:** a packaged `.app` (`make app`, PyInstaller) with a proper icon, so we can say "download and run it"; choosing a voice; showing when the app is speaking; a polished look for judging photos.
 
 **Test alone with:** `recognizer: mock`, `translator: mock`, `tts: cartesia`, `captions: cartesia`.
 
-**Needs:** `CARTESIA_API_KEY` in `.env`, BlackHole installed, and a second device for the Meet test.
+**Needs:** `CARTESIA_API_KEY` in `.env`, BlackHole installed, a second device for the Meet test, and the second display for the demo.
 
 **You also write:** the "Cartesia features we use" section of the README, which Cartesia's rules require.
 
