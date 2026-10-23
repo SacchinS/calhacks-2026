@@ -150,12 +150,12 @@ async def run(config: Config) -> None:
     it in JSON lines: commands on stdin, events on stdout. See ui/server.py."""
     from ui.server import EngineServer, protocol_stdout, stdin_reader
 
-    server = EngineServer(Bus(), config, protocol_stdout())
-    app = App(config, bus=server.bus)
-    server.send_ready(app.chosen)
+    app = App(config)
+    server = EngineServer(app, protocol_stdout())
+    server.send_ready()
     await server.start()  # before the app, so the windows see the first ModeChanged and notices
     await app.start()
-    server.send_components(app.chosen)  # a component may have fallen back while starting
+    await server.set_mode("off")  # paused until the app starts listening, like SignBridge
     try:
         await server.serve(await stdin_reader())
     finally:
