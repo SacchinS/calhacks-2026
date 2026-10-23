@@ -1,4 +1,4 @@
-.PHONY: install run mock test lint format
+.PHONY: install run mock test lint format app
 
 install:
 	uv sync
@@ -7,7 +7,8 @@ install:
 run:
 	uv run python app.py
 
-# Runs with every component forced to its mock: no webcam, API keys, or BlackHole needed.
+# Opens both windows with every component forced to its mock: no webcam, API keys, or
+# BlackHole needed.
 mock:
 	uv run python app.py --mock
 
@@ -21,3 +22,7 @@ lint:
 format:
 	uv run ruff format .
 	uv run ruff check --fix .
+
+# Builds dist/calhacks-2026.app with PyInstaller (see packaging/app.spec).
+app:
+	uv run pyinstaller packaging/app.spec --noconfirm --distpath dist --workpath build

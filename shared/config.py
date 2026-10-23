@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,8 @@ from dotenv import load_dotenv
 
 from shared.events import MODES
 
-ROOT = Path(__file__).resolve().parent.parent
+# The repo root, or the bundled resources folder when packaged as a .app with PyInstaller.
+ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
 
 # Allowed values for each component line. The first one is the mock.
 CHOICES: dict[str, tuple[str, ...]] = {
