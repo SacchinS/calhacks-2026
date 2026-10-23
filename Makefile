@@ -1,16 +1,24 @@
-.PHONY: install run mock test lint format app
+.PHONY: install swift run mock test lint format app
+
+MAC_APP = ui/macos/.build/debug/SignBridge
 
 install:
 	uv sync
 
-# Runs with whatever config.yaml selects.
-run:
-	uv run python app.py
+# Builds the Mac app's windows (SwiftUI). It launches the Python engine (app.py) itself.
+swift:
+	swift build --package-path ui/macos
 
-# Opens both windows with every component forced to its mock: no webcam, API keys, or
-# BlackHole needed.
-mock:
-	uv run python app.py --mock
+# Opens the app with whatever config.yaml selects.
+run: swift
+	uv sync -q --inexact
+	ENGINE_ROOT=$(CURDIR) $(MAC_APP)
+
+# Opens the app with every component forced to its mock: no webcam, API keys, or BlackHole
+# needed. Type mock signs in the control window or in this terminal.
+mock: swift
+	uv sync -q --inexact
+	ENGINE_ROOT=$(CURDIR) $(MAC_APP) --mock
 
 test:
 	uv run pytest -q
@@ -23,6 +31,6 @@ format:
 	uv run ruff format .
 	uv run ruff check --fix .
 
-# Builds dist/calhacks-2026.app with PyInstaller (see packaging/app.spec).
+# Builds dist/SignBridge.app: the Swift app plus a bundled Python engine (packaging/build.sh).
 app:
-	uv run pyinstaller packaging/app.spec --noconfirm --distpath dist --workpath build
+	packaging/build.sh

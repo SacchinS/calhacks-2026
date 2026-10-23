@@ -1,23 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Template merged into the .app's Info.plist by packaging/app.spec. -->
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>
-    <string>calhacks-2026</string>
-    <key>CFBundleDisplayName</key>
-    <string>calhacks-2026</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.calhacks2026.app</string>
-    <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
-    <key>NSHighResolutionCapable</key>
-    <true/>
+    <key>CFBundleName</key><string>SignBridge</string>
+    <key>CFBundleDisplayName</key><string>SignBridge</string>
+    <key>CFBundleIdentifier</key><string>com.calhacks2026.SignBridge</string>
+    <key>CFBundleExecutable</key><string>SignBridge</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>0.1.0</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>LSMinimumSystemVersion</key><string>14.0</string>
+    <key>LSUIElement</key><true/>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>NSCameraUsageDescription</key>
-    <string>The camera reads your signing so it can be turned into English.</string>
+    <string>SignBridge watches your hands to recognize sign language. Video stays on your Mac.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Audio from your call is turned into live captions for you.</string>
+    <string>SignBridge turns the audio of your call into live captions for you.</string>
 </dict>
 </plist>
