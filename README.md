@@ -75,11 +75,15 @@ Requirements:
 git clone https://github.com/SacchinS/calhacks-2026.git
 cd calhacks-2026
 make install                      # uv sync: Python 3.11 + dependencies
-make mock                         # whole app on mocks: no webcam, keys, or BlackHole needed
+make mock                         # opens both windows on mocks: no webcam, keys, or BlackHole
 ```
 
-Open http://localhost:8000 and type mock signs in the terminal or the UI's "Mock signs" box:
-`me want fix bug login page`, then `/send`, then `/yes` or `/no`. `#word` is a fingerspelled word, `/mode` switches between Claude Code, voice, and Meet, and `/clear` starts over.
+`make mock` opens two windows:
+- **Camera window:** the webcam feed with the tracking overlay, recognized signs, the English, and the YES/NO prompt. For the demo, drag it to the second display and press `F` (or right-click > Move to display) to go fullscreen there; `Esc` leaves fullscreen. It remembers which display it was on.
+- **Control window:** mode, status, `CLEAR` and `MODE` buttons, Claude Code's reply, what was spoken, and captions in Meet mode.
+
+Type mock signs in the control window's "Mock signs" box (or in the terminal):
+`me want fix bug login page`, then `/send`, then `/yes` or `/no`. `#word` is a fingerspelled word, `/mode` switches between Claude Code, voice, and Meet, and `/clear` starts over. Close the control window (or press Ctrl-C) to quit.
 
 To use the real pieces:
 
@@ -100,12 +104,13 @@ tts: mock               # mock | say | cartesia
 captions: mock          # mock | cartesia
 ```
 
-`recognizer: replay` plays `fixtures/landmarks_sample.jsonl`, so you don't need a webcam. With `tts: say` or `tts: cartesia`, select "BlackHole 2ch" as the microphone in Siri, dictation, or Meet. A component that isn't ready falls back to its mock or to the console, with a warning in the UI.
+`recognizer: replay` plays `fixtures/landmarks_sample.jsonl`, so you don't need a webcam. `recognizer: camera` asks for camera permission the first time (allow it for your terminal app). With `tts: say` or `tts: cartesia`, select "BlackHole 2ch" as the microphone in Siri, dictation, or Meet. A component that isn't ready falls back to its mock or to the console, with a warning in the control window.
 
 ```bash
 make test                         # unit, contract, and end-to-end tests (no real API calls)
 uv run pytest --live              # also run real implementations (keys, BlackHole, webcam)
 make lint                         # ruff check + format check
+make app                          # build dist/calhacks-2026.app with PyInstaller (rough for now)
 ```
 
 ## Models and data
