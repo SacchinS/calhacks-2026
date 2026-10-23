@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign to Voice</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div id="mode" class="mode" aria-live="polite">…</div>
+    <div class="buttons">
+      <button id="btn-mode" type="button">MODE</button>
+      <button id="btn-clear" type="button">CLEAR</button>
+    </div>
+    <div id="connection" class="connection">connecting…</div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Signing</h2>
+      <div id="gloss" class="gloss" aria-live="polite"><span class="muted">—</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>English</h2>
+      <div id="english" class="english" aria-live="polite"><span class="muted">—</span></div>
+    </section>
+
+    <section id="confirm" class="panel confirm" hidden aria-live="assertive">
+      <h2>Send to Claude Code?</h2>
+      <div id="confirm-text" class="english"></div>
+      <div class="confirm-hint">Sign <strong>YES</strong> to send &nbsp;·&nbsp; Sign <strong>NO</strong> to cancel</div>
+    </section>
+
+    <section id="panel-reply" class="panel" data-modes="claude_code">
+      <h2>Claude Code</h2>
+      <div id="reply" class="log"></div>
+    </section>
+
+    <section id="panel-spoken" class="panel" data-modes="voice meet">
+      <h2>Spoken</h2>
+      <div id="spoken" class="log"></div>
+    </section>
+
+    <section id="panel-captions" class="panel" data-modes="meet">
+      <h2>Captions</h2>
+      <div id="captions" class="log captions" aria-live="polite"></div>
+    </section>
+
+    <section id="panel-mock" class="panel" hidden>
+      <h2>Mock signs</h2>
+      <form id="mock-form">
+        <input id="mock-input" autocomplete="off" placeholder="me want fix bug  ·  #title  ·  /send  /yes  /no  /clear  /mode">
+        <button type="submit">Sign</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Status</h2>
+      <div id="components" class="components"></div>
+      <div id="notices" class="log notices"></div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
