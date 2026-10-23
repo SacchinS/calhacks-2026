@@ -47,7 +47,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .tint(Brand.violet)
+        .tint(Brand.accent)
         .onChange(of: [still, phraseRest, minConf]) { _, _ in saved = false }
         .onAppear {
             still = engine.config["still"] as? Double ?? 0.5

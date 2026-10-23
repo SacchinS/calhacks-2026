@@ -1,13 +1,13 @@
 import AppKit
 import SwiftUI
 
-/// SignBridge's look: a violet-to-coral gradient (the app icon), used sparingly for emphasis.
+/// SignBridge's look: native macOS. Standard dark grays and one solid accent (the system accent
+/// color, blue by default). No gradients or glows.
 enum Brand {
-    static let violet = Color(red: 0.36, green: 0.29, blue: 0.96)
-    static let magenta = Color(red: 0.71, green: 0.29, blue: 0.85)
-    static let coral = Color(red: 1.0, green: 0.48, blue: 0.35)
-    static let gradient = LinearGradient(colors: [violet, magenta, coral], startPoint: .topLeading,
-                                         endPoint: .bottomTrailing)
+    static let accent = Color.accentColor
+    static let background = Color(white: 0.118)  // #1E1E1E, a macOS dark window
+    static let stage = Color(white: 0.09)        // Demo Mode, a little darker for the projector
+    static let surface = Color(white: 0.165)     // #2A2A2A, cards on the background
 
     /// Menu bar glyph from the bundle (a template image, so it follows light and dark menu bars).
     static func menuBarImage(listening: Bool) -> NSImage? {
@@ -22,26 +22,26 @@ enum Brand {
     }
 }
 
-/// The app icon, or a gradient tile when running unbundled (swift run).
+/// The app icon, or an accent-colored tile when running unbundled (swift run).
 struct Logo: View {
     var size: CGFloat = 64
     var body: some View {
         if Bundle.main.url(forResource: "AppIcon", withExtension: "icns") != nil {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: size, height: size)
         } else {
-            RoundedRectangle(cornerRadius: size * 0.225).fill(Brand.gradient).frame(width: size * 0.8, height: size * 0.8)
+            RoundedRectangle(cornerRadius: size * 0.225).fill(Brand.accent).frame(width: size * 0.8, height: size * 0.8)
                 .overlay(Image(systemName: "hand.raised").font(.system(size: size * 0.4)).foregroundStyle(.white))
                 .frame(width: size, height: size)
         }
     }
 }
 
-/// Text filled with the brand gradient.
-struct GradientText: View {
+/// The app's name as a title.
+struct TitleText: View {
     let text: String, font: Font
     init(_ text: String, font: Font) { self.text = text; self.font = font }
     var body: some View {
-        Text(text).font(font).foregroundStyle(Brand.gradient)
+        Text(text).font(font).foregroundStyle(.primary)
     }
 }
 
@@ -49,10 +49,10 @@ struct GradientText: View {
 struct Chip: View {
     let text: String
     var body: some View {
-        Text(text).font(.system(.title3, design: .rounded).weight(.semibold))
+        Text(text).font(.system(.title3).weight(.semibold))
             .padding(.horizontal, 12).padding(.vertical, 6)
-            .background(Brand.violet.opacity(0.18), in: Capsule())
-            .overlay(Capsule().strokeBorder(Brand.violet.opacity(0.45)))
+            .background(Brand.accent.opacity(0.18), in: Capsule())
+            .overlay(Capsule().strokeBorder(Brand.accent.opacity(0.45)))
     }
 }
 

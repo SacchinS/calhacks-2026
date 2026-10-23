@@ -23,7 +23,7 @@ struct Storyboard: View {
                     HStack(spacing: 6) {
                         Text("\(i + 1)").font(.caption.weight(.bold)).foregroundStyle(.white)
                             .frame(width: 18, height: 18)
-                            .background(on ? AnyShapeStyle(Brand.gradient) : AnyShapeStyle(Color.secondary.opacity(0.4)),
+                            .background(on ? AnyShapeStyle(Brand.accent) : AnyShapeStyle(Color.secondary.opacity(0.4)),
                                         in: Circle())
                         Text(steps[i].0).font(.headline)
                     }
@@ -31,7 +31,7 @@ struct Storyboard: View {
                 }
                 .padding(10)
                 .background(.quaternary.opacity(on ? 0.7 : 0.35), in: RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Brand.gradient, lineWidth: on ? 2 : 0))
+                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Brand.accent, lineWidth: on ? 2 : 0))
                 .opacity(on ? 1 : 0.55)
                 .scaleEffect(on ? 1.0 : 0.97)
                 .onTapGesture { active = i }
@@ -50,7 +50,7 @@ struct Storyboard: View {
                 Image(systemName: "hand.raised.fill")
             }
             .font(.system(size: 40))
-            .foregroundStyle(on ? AnyShapeStyle(Brand.gradient) : AnyShapeStyle(Color.secondary))
+            .foregroundStyle(on ? AnyShapeStyle(Brand.accent) : AnyShapeStyle(Color.secondary))
             .symbolEffect(.bounce, value: on)
         case 1:
             if let hello = GuideSign.all.first(where: { $0.name == "HELLO" }) {
@@ -62,7 +62,7 @@ struct Storyboard: View {
             VStack(spacing: 8) {
                 Chip(text: "HELLO").scaleEffect(0.8)
                 Image(systemName: "arrow.down").foregroundStyle(.secondary).font(.caption)
-                Text("“Hello!”").font(.system(.title3, design: .rounded).weight(.semibold))
+                Text("“Hello!”").font(.system(.title3).weight(.semibold))
                     .opacity(on ? 1 : 0.25)
                     .animation(.easeIn(duration: 0.5).delay(on ? 0.6 : 0), value: on)
             }

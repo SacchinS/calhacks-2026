@@ -108,11 +108,11 @@ struct SignDiagram: View {
             stroke(hand: start, &ctx, p, color: .color(Color.primary.opacity(0.22)), width: 1.5, dash: [3, 3])
         }
 
-        // the hands now: the signing hand in the brand gradient
+        // the hands now: the signing hand in the accent color
         for side in 0..<2 {
             guard let hand = frame.hands[side] else { continue }
             let shading: GraphicsContext.Shading = side == sign.mover
-                ? .linearGradient(Gradient(colors: [Brand.violet, Brand.coral]), startPoint: p(hand[0]), endPoint: p(hand[12]))
+                ? .color(Brand.accent)
                 : .color(Color.primary.opacity(0.55))
             stroke(hand: hand, &ctx, p, color: shading, width: 2.4)
             for tip in [4, 8, 12, 16, 20] {
@@ -166,8 +166,8 @@ struct SignCard: View {
         VStack(alignment: .leading, spacing: 8) {
             SignDiagram(sign: sign)
                 .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
-            Text(sign.name).font(.system(.title3, design: .rounded).weight(.bold))
-            Text(sign.title).font(.subheadline.weight(.semibold)).foregroundStyle(Brand.gradient)
+            Text(sign.name).font(.system(.title3).weight(.bold))
+            Text(sign.title).font(.subheadline.weight(.semibold)).foregroundStyle(Brand.accent)
             Text(sign.how).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -209,6 +209,6 @@ struct SignGuideWindow: View {
             }
             .padding(22)
         }
-        .tint(Brand.violet)
+        .tint(Brand.accent)
     }
 }

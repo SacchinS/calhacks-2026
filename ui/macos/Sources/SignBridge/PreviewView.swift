@@ -11,40 +11,64 @@ struct PreviewView: View {
     private var live: Bool { engine.state == "listening" }
 
     var body: some View {
-        VStack(spacing: 14) {
-            topBar
-            OutputModePicker(engine: engine)
-            ZStack(alignment: .bottom) {
-                LivePreview(engine: engine, maxHeight: .infinity).frame(maxHeight: .infinity)
-                    .overlay(RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(Brand.gradient, lineWidth: live ? 3 : 0)
-                        .shadow(color: Brand.magenta.opacity(live ? 0.7 : 0), radius: 12))
-                    .animation(.easeInOut(duration: 0.3), value: live)
-                if let h = engine.holding {
-                    HStack(spacing: 10) {
-                        Image(systemName: GestureInfo.icon(h.0))
-                        Text(GestureInfo.name(h.0)).bold()
-                        ProgressView(value: h.1).frame(width: 110).tint(.white)
+        GeometryReader { geo in
+            // Wide windows (fullscreen, a big display): camera on the left, everything else beside it.
+            if geo.size.width >= 1000 && geo.size.width > geo.size.height * 1.2 {
+                VStack(spacing: 14) {
+                    topBar
+                    HStack(alignment: .top, spacing: 18) {
+                        camera
+                        VStack(spacing: 14) {
+                            OutputModePicker(engine: engine)
+                            transcript
+                            OutputPanel(engine: engine, maxHeight: .infinity)
+                            Spacer(minLength: 0)
+                            if engine.mockRecognizer { MockSignBox(engine: engine) }
+                            controls
+                        }
+                        .frame(width: min(560, geo.size.width * 0.38))
                     }
-                    .padding(.horizontal, 14).padding(.vertical, 8)
-                    .background(.ultraThinMaterial, in: Capsule()).padding(12)
-                    .transition(.opacity)
+                }
+            } else {
+                VStack(spacing: 14) {
+                    topBar
+                    OutputModePicker(engine: engine)
+                    camera
+                    transcript
+                    OutputPanel(engine: engine)
+                    if engine.mockRecognizer { MockSignBox(engine: engine) }
+                    controls
                 }
             }
-            transcript
-            OutputPanel(engine: engine)
-            if engine.mockRecognizer { MockSignBox(engine: engine) }
-            controls
         }
         .padding([.horizontal, .bottom], 18).padding(.top, 6)
         .frame(minWidth: 600, minHeight: 700)
-        .background(Color(white: 0.07))
+        .background(Brand.background)
         .environment(\.colorScheme, .dark)
-        .tint(Brand.violet)
+        .tint(Brand.accent)
         .ignoresSafeArea(.container, edges: .top)
     }
 
     // MARK: pieces
+
+    private var camera: some View {
+        ZStack(alignment: .bottom) {
+            LivePreview(engine: engine, maxHeight: .infinity).frame(maxHeight: .infinity)
+                .overlay(RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(Brand.accent, lineWidth: live ? 3 : 0))
+                .animation(.easeInOut(duration: 0.3), value: live)
+            if let h = engine.holding {
+                HStack(spacing: 10) {
+                    Image(systemName: GestureInfo.icon(h.0))
+                    Text(GestureInfo.name(h.0)).bold()
+                    ProgressView(value: h.1).frame(width: 110).tint(.white)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(.ultraThinMaterial, in: Capsule()).padding(12)
+                .transition(.opacity)
+            }
+        }
+    }
 
     private var topBar: some View {
         HStack(spacing: 12) {
@@ -84,10 +108,10 @@ struct PreviewView: View {
                         Text(g).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     }
                 }
-                Text(engine.sentence ?? "").font(.system(size: 30, weight: .semibold, design: .rounded))
+                Text(engine.sentence ?? "").font(.system(size: 30, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
                 HStack {
-                    Label(RouteInfo.label(engine.route, target: engine.target), systemImage: RouteInfo.icon(engine.route)).foregroundStyle(Brand.gradient).font(.headline)
+                    Label(RouteInfo.label(engine.route, target: engine.target), systemImage: RouteInfo.icon(engine.route)).foregroundStyle(Brand.accent).font(.headline)
                     Spacer()
                     if engine.state == "confirming" {
                         Text("👍 send   👎 cancel").foregroundStyle(.secondary)
@@ -97,7 +121,7 @@ struct PreviewView: View {
                 }
             default:
                 HStack(spacing: 10) {
-                    Image(systemName: "hand.raised").font(.title2).foregroundStyle(Brand.gradient)
+                    Image(systemName: "hand.raised").font(.title2).foregroundStyle(Brand.accent)
                     Text("Show both open palms to start.").font(.title2).foregroundStyle(.secondary)
                 }
             }
@@ -107,7 +131,7 @@ struct PreviewView: View {
         }
         .frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
         .padding(16)
-        .background(Color(white: 0.12), in: RoundedRectangle(cornerRadius: 14))
+        .background(Brand.surface, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.08)))
         .animation(.easeInOut(duration: 0.2), value: engine.state)
     }
@@ -158,7 +182,7 @@ struct StatePill: View {
          "sending": "Sending"][state] ?? state
     }
     private var color: Color {
-        ["idle": .gray, "listening": Brand.coral, "thinking": Brand.magenta, "confirming": .yellow,
+        ["idle": .gray, "listening": Brand.accent, "thinking": .purple, "confirming": .yellow,
          "sending": .green][state] ?? .gray
     }
 }
@@ -183,6 +207,7 @@ struct OutputModePicker: View {
 /// Claude Code's reply in Claude Code mode, or the other side's captions in Meet mode.
 struct OutputPanel: View {
     @ObservedObject var engine: EngineClient
+    var maxHeight: CGFloat = 130
     var body: some View {
         switch engine.outputMode {
         case "claude_code":
@@ -199,7 +224,7 @@ struct OutputPanel: View {
 
     private func panel(_ title: String, icon: String, lines: [String], empty: String, font: Font) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(title, systemImage: icon).font(.headline).foregroundStyle(Brand.gradient)
+            Label(title, systemImage: icon).font(.headline).foregroundStyle(Brand.accent)
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 4) {
@@ -213,9 +238,9 @@ struct OutputPanel: View {
                 .onChange(of: lines.count) { _, _ in proxy.scrollTo(min(lines.count, 30) - 1, anchor: .bottom) }
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 70, maxHeight: 130, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 70, maxHeight: maxHeight, alignment: .topLeading)
         .padding(16)
-        .background(Color(white: 0.12), in: RoundedRectangle(cornerRadius: 14))
+        .background(Brand.surface, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.08)))
     }
 }
@@ -227,7 +252,7 @@ struct MockSignBox: View {
     @FocusState private var focused: Bool
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "keyboard").foregroundStyle(Brand.gradient)
+            Image(systemName: "keyboard").foregroundStyle(Brand.accent)
             TextField("Type signs: me want fix bug · #title · /send /yes /no /clear", text: $text)
                 .textFieldStyle(.roundedBorder).focused($focused).onSubmit(submit)
             Button("Sign", action: submit).buttonStyle(.borderedProminent)
