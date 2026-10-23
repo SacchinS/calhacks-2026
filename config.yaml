@@ -16,6 +16,7 @@ ui:
 recognition:
   replay_file: fixtures/landmarks_sample.jsonl
   replay_fps: 30
+  replay_classifier: labels     # labels (fixture ground truth) | model (isolated + fingerspelling)
   camera_index: 0
   holistic_model_url: https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/latest/holistic_landmarker.task
   holistic_model_path: models/holistic_landmarker.task
