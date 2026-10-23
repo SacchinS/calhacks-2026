@@ -7,7 +7,7 @@ captions in Meet mode, and the mock-sign text box (when the recognizer is the mo
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QGuiApplication
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -116,6 +116,14 @@ class ControlWindow(QWidget):
         layout.addWidget(label)
         layout.addWidget(widget, stretch=stretch)
         self.sections.append(([label, widget], modes))
+
+    def show_beside(self) -> None:
+        """Show at the right edge of the main screen, next to the apps being driven."""
+        area = QGuiApplication.primaryScreen().availableGeometry()
+        width, height = min(520, area.width() // 2), min(760, area.height() - 32)
+        self.setGeometry(area.right() - width - 16, area.y() + 16, width, height)
+        self.show()
+        self.raise_()
 
     def set_components(self, components: dict[str, str]) -> None:
         self.components.setText("  ·  ".join(f"{k}: {v}" for k, v in components.items()))

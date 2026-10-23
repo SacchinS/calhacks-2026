@@ -36,6 +36,7 @@ from ui import overlay, theme
 from ui.bridge import BusBridge
 
 MAX_TOKENS = 10  # gloss tokens shown at once (newest)
+CONTROL_WIDTH = 520  # the control window's default width, kept clear on first run
 
 
 def make_settings() -> QSettings:
@@ -259,6 +260,10 @@ class CameraWindow(QWidget):
         geometry = self.settings.value("camera/geometry")
         if geometry is not None:
             self.restoreGeometry(geometry)
+        else:  # first run: the left of the main screen, leaving room for the control window
+            area = QGuiApplication.primaryScreen().availableGeometry()
+            width = max(480, area.width() - CONTROL_WIDTH - 48)
+            self.setGeometry(area.x() + 16, area.y() + 16, width, area.height() - 32)
         fullscreen = self.settings.value("camera/fullscreen", False, type=bool)
         self.place_on(self.saved_screen(), fullscreen)
 

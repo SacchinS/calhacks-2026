@@ -178,7 +178,7 @@ async def run(config: Config) -> None:
     control.closing.connect(closed.set)
     await bridge.start()  # before the app, so the windows see the first ModeChanged and notices
     camera.show_restored()
-    control.show()
+    control.show_beside()
     await app.start()
     control.set_components(app.chosen)  # a component may have fallen back while starting
     try:
