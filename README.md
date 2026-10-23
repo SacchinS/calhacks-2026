@@ -81,7 +81,7 @@ make mock                         # builds and opens the Mac app on mocks: no we
 
 The app is SignBridge's SwiftUI app (`ui/macos`); it starts the Python engine (`app.py`) itself and lives in the menu bar (the hand icon).
 - **First launch** opens the setup wizard. Click through it ("Skip for now" is fine with mocks); after that the app opens the **Preview** window.
-- **Preview:** the camera with tracking, the signs, the English, and the confirm step. Pick where English goes (Claude Code, Voice, or Meet) at the top. With the mock recognizer, type signs in the box at the bottom (or in the terminal): `me want fix bug login page`, then `/send`, then `/yes` or `/no`. `#word` is fingerspelled, `/clear` starts over. The Send / Cancel buttons do the same as signing YES / NO.
+- **Preview:** the camera with tracking, the signs, the English, and the confirm step. Pick where English goes (Claude Code, Siri, Voice, or Meet) at the top. With the mock recognizer, type signs in the box at the bottom (or in the terminal): `me want fix bug login page`, then `/send`, then `/yes` or `/no`. `#word` is fingerspelled, `/clear` starts over. The Send / Cancel buttons do the same as signing YES / NO.
 - **Demo Mode** (Preview > Demo, or the menu bar) is the fullscreen stage for the second display. Menu bar > Demo Mode On picks the display; it remembers it. Esc leaves it. Backup keys: W start, C send (YES), X cancel (NO), 1–6 test phrases.
 - Quit from the menu bar. Engine logs go to the terminal under `make mock`, and to `~/Library/Logs/calhacks-2026/engine.log` in the packaged app.
 
@@ -100,11 +100,12 @@ Choose each component in `config.yaml` (every default is the mock), then `make r
 recognizer: mock        # mock | replay | camera
 translator: mock        # mock | claude
 claude_code: mock       # mock | real
+siri: mock              # mock | real
 tts: mock               # mock | say | cartesia
 captions: mock          # mock | cartesia
 ```
 
-`recognizer: replay` plays `fixtures/landmarks_sample.jsonl`, so you don't need a webcam (its preview needs `uv sync --extra camera`). `recognizer: camera` asks for camera permission the first time (allow it for your terminal app). With `tts: say` or `tts: cartesia`, select "BlackHole 2ch" as the microphone in dictation or Meet. A component that isn't ready falls back to its mock or to the console, with a note in the Preview window.
+`recognizer: replay` plays `fixtures/landmarks_sample.jsonl`, so you don't need a webcam (its preview needs `uv sync --extra camera`). `recognizer: camera` asks for camera permission the first time (allow it for your terminal app). `siri: real` needs Siri's shortcut set to Hold Command Space, Type to Siri turned on, and Accessibility permission for the app. With `tts: say` or `tts: cartesia`, select "BlackHole 2ch" as the microphone in dictation or Meet. A component that isn't ready falls back to its mock or to the console, with a note in the Preview window.
 
 ```bash
 make test                         # unit, contract, and end-to-end tests (no real API calls)
