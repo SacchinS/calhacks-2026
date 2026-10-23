@@ -3,6 +3,7 @@
 # TODO(Person C): polish for a "download and run it" build: an app icon (icon=...),
 # code signing, and a writable place for models/ and .env outside the bundle.
 import plistlib
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_submodules
@@ -20,6 +21,8 @@ datas = [
     (str(ROOT / "language" / "prompts"), "language/prompts"),
 ]
 # app.py loads implementations by name (importlib), so PyInstaller can't see them.
+# collect_submodules imports our packages, so the repo root must be on sys.path.
+sys.path.insert(0, str(ROOT))
 hiddenimports = []
 for package in ("recognition", "language", "outputs", "captions", "ui"):
     hiddenimports += collect_submodules(package)
