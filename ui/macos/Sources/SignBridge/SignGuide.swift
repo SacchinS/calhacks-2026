@@ -14,7 +14,8 @@ struct GuideSign: Decodable, Identifiable {
 
     static let all: [GuideSign] = {
         let bundled = Bundle.main.url(forResource: "signs", withExtension: "json")
-        let dev = URL(fileURLWithPath: NSHomeDirectory() + "/code/signbridge/macos/Assets/signs.json")
+        let dev = EngineClient.devRoot()?.appendingPathComponent("ui/macos/Assets/signs.json")
+            ?? URL(fileURLWithPath: "signs.json")
         guard let data = try? Data(contentsOf: bundled ?? dev),
               let guide = try? JSONDecoder().decode([String: [GuideSign]].self, from: data) else { return [] }
         return guide["signs"] ?? []

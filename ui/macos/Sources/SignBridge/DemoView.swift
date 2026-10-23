@@ -18,6 +18,10 @@ struct DemoView: View {
                     if let target = engine.target, engine.state != "idle" {
                         Label(target, systemImage: "macwindow").font(.title3).foregroundStyle(.secondary)
                     }
+                    Label(OutputMode.label(engine.outputMode), systemImage: OutputMode.icon(engine.outputMode))
+                        .font(.title3.weight(.semibold)).foregroundStyle(Brand.gradient)
+                        .padding(.horizontal, 14).padding(.vertical, 6)
+                        .overlay(Capsule().strokeBorder(Brand.gradient, lineWidth: 1.5))
                 }
                 ZStack(alignment: .bottom) {
                     LivePreview(engine: engine, maxHeight: .infinity)
@@ -38,6 +42,17 @@ struct DemoView: View {
                     }
                 }
                 stage.frame(minHeight: 190)
+                if engine.outputMode == "meet", let caption = engine.captions.last {
+                    HStack(alignment: .firstTextBaseline, spacing: 14) {
+                        Image(systemName: "captions.bubble.fill").foregroundStyle(Brand.gradient)
+                        Text(caption).fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.system(size: 30, weight: .semibold, design: .rounded))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+                    .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 20))
+                    .transition(.opacity).id(caption)
+                }
             }
             history.frame(width: 340)
         }

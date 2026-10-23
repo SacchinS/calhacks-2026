@@ -13,6 +13,7 @@ struct PreviewView: View {
     var body: some View {
         VStack(spacing: 14) {
             topBar
+            OutputModePicker(engine: engine)
             ZStack(alignment: .bottom) {
                 LivePreview(engine: engine, maxHeight: .infinity).frame(maxHeight: .infinity)
                     .overlay(RoundedRectangle(cornerRadius: 10)
@@ -31,10 +32,12 @@ struct PreviewView: View {
                 }
             }
             transcript
+            OutputPanel(engine: engine)
+            if engine.mockRecognizer { MockSignBox(engine: engine) }
             controls
         }
         .padding([.horizontal, .bottom], 18).padding(.top, 6)
-        .frame(minWidth: 600, minHeight: 600)
+        .frame(minWidth: 600, minHeight: 700)
         .background(Color(white: 0.07))
         .environment(\.colorScheme, .dark)
         .tint(Brand.violet)
@@ -157,5 +160,84 @@ struct StatePill: View {
     private var color: Color {
         ["idle": .gray, "listening": Brand.coral, "thinking": Brand.magenta, "confirming": .yellow,
          "sending": .green][state] ?? .gray
+    }
+}
+
+// MARK: calhacks-2026 additions, in the same style
+
+/// Where English goes: Claude Code (after a signed YES), a voice for Siri and dictation, or a Meet call.
+struct OutputModePicker: View {
+    @ObservedObject var engine: EngineClient
+    var body: some View {
+        Picker("Send to", selection: Binding(get: { engine.outputMode }, set: { engine.setOutputMode($0) })) {
+            ForEach(OutputMode.all, id: \.self) { mode in
+                Label(OutputMode.label(mode), systemImage: OutputMode.icon(mode)).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.large)
+    }
+}
+
+/// Claude Code's reply in Claude Code mode, or the other side's captions in Meet mode.
+struct OutputPanel: View {
+    @ObservedObject var engine: EngineClient
+    var body: some View {
+        switch engine.outputMode {
+        case "claude_code":
+            panel("Claude Code", icon: "chevron.left.forwardslash.chevron.right",
+                  lines: engine.replies.filter { !$0.isEmpty }, empty: "Claude Code's reply shows up here.",
+                  font: .system(.callout, design: .monospaced))
+        case "meet":
+            panel("Captions", icon: "captions.bubble", lines: engine.captions,
+                  empty: "What the other side says shows up here.", font: .title3.weight(.semibold))
+        default:
+            EmptyView()
+        }
+    }
+
+    private func panel(_ title: String, icon: String, lines: [String], empty: String, font: Font) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: icon).font(.headline).foregroundStyle(Brand.gradient)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if lines.isEmpty { Text(empty).foregroundStyle(.tertiary) }
+                        ForEach(Array(lines.suffix(30).enumerated()), id: \.offset) { i, line in
+                            Text(line).font(font).textSelection(.enabled).id(i)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+                .onChange(of: lines.count) { _, _ in proxy.scrollTo(min(lines.count, 30) - 1, anchor: .bottom) }
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 70, maxHeight: 130, alignment: .topLeading)
+        .padding(16)
+        .background(Color(white: 0.12), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.08)))
+    }
+}
+
+/// Typed signs for the mock recognizer: `me want fix bug`, `#title` (fingerspelled), `/send /yes /no /clear`.
+struct MockSignBox: View {
+    @ObservedObject var engine: EngineClient
+    @State private var text = ""
+    @FocusState private var focused: Bool
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "keyboard").foregroundStyle(Brand.gradient)
+            TextField("Type signs: me want fix bug · #title · /send /yes /no /clear", text: $text)
+                .textFieldStyle(.roundedBorder).focused($focused).onSubmit(submit)
+            Button("Sign", action: submit).buttonStyle(.borderedProminent)
+        }
+        .controlSize(.large)
+        .onAppear { focused = true }
+    }
+    private func submit() {
+        engine.mockInput(text)
+        text = ""
+        focused = true
     }
 }

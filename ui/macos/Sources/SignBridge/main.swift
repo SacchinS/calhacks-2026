@@ -21,7 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // First launch: walk through setup once the engine has reported its config.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
             guard let self else { return }
-            if !self.engine.onboarded { self.showSetup() }
+            if !self.engine.onboarded { self.showSetup() } else { self.showPreview() }
         }
     }
 
@@ -49,6 +49,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(item(listening ? "Pause SignBridge" : "Start SignBridge", #selector(toggleListening), "s"))
         menu.addItem(item("Show Preview", #selector(showPreview), "p"))
         menu.addItem(item("Demo Mode", #selector(showDemo), "d"))
+        let displays = NSMenu()
+        for screen in NSScreen.screens {
+            let i = item(screen.localizedName, #selector(showDemoOnDisplay(_:)), "")
+            i.representedObject = screen.localizedName
+            i.state = screen.localizedName == UserDefaults.standard.string(forKey: demoScreenKey) ? .on : .off
+            displays.addItem(i)
+        }
+        let demoOn = NSMenuItem(title: "Demo Mode On", action: nil, keyEquivalent: "")
+        demoOn.submenu = displays
+        menu.addItem(demoOn)
         menu.addItem(item("Sign Guide…", #selector(showGuide), "g"))
         menu.addItem(.separator())
         menu.addItem(item("Run Setup…", #selector(showSetup), ""))
@@ -76,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func showPreview() {
         if !listening { startListening() }
         engine.setPreview(true)
-        open("preview", title: "SignBridge", size: NSSize(width: 720, height: 600),
+        open("preview", title: "SignBridge", size: NSSize(width: 720, height: 820),
              view: PreviewView(engine: engine, showGuide: { [weak self] in self?.showGuide() },
                                showDemo: { [weak self] in self?.showDemo() }), seamless: true) { [weak self] in self?.engine.setPreview(false) }
         windows["preview"]?.appearance = NSAppearance(named: .darkAqua)
@@ -107,8 +117,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let w = windows["demo"] {
             w.appearance = NSAppearance(named: .darkAqua)
             w.collectionBehavior.insert(.fullScreenPrimary)
-            if !w.styleMask.contains(.fullScreen) { w.toggleFullScreen(nil) }
+            watchDemo(w)
+            if !w.styleMask.contains(.fullScreen) {
+                placeOnDemoDisplay(w)
+                w.toggleFullScreen(nil)
+            }
         }
+    }
+
+    // MARK: Demo Mode display (calhacks-2026 addition): remember it, and send Demo Mode to any display.
+
+    private let demoScreenKey = "demo.screen"
+    private var demoObservers: [NSObjectProtocol] = []
+    private var demoMovePending = false
+
+    @objc func showDemoOnDisplay(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String else { return }
+        UserDefaults.standard.set(name, forKey: demoScreenKey)
+        if let w = windows["demo"], w.styleMask.contains(.fullScreen), w.screen?.localizedName != name {
+            demoMovePending = true  // a fullscreen window can't move: leave fullscreen, then move (watchDemo)
+            w.toggleFullScreen(nil)
+        } else {
+            showDemo()
+        }
+    }
+
+    /// Center the window on the remembered display (the main one if it's not connected).
+    private func placeOnDemoDisplay(_ w: NSWindow) {
+        let name = UserDefaults.standard.string(forKey: demoScreenKey)
+        guard let screen = NSScreen.screens.first(where: { $0.localizedName == name }) else { return }
+        let area = screen.visibleFrame
+        let size = NSSize(width: min(w.frame.width, area.width), height: min(w.frame.height, area.height))
+        w.setFrame(NSRect(x: area.midX - size.width / 2, y: area.midY - size.height / 2,
+                          width: size.width, height: size.height), display: true)
+    }
+
+    private func watchDemo(_ w: NSWindow) {
+        guard demoObservers.isEmpty else { return }
+        let center = NotificationCenter.default
+        let remember: @Sendable (Notification) -> Void = { note in
+            MainActor.assumeIsolated {
+                if let name = (note.object as? NSWindow)?.screen?.localizedName {
+                    UserDefaults.standard.set(name, forKey: "demo.screen")
+                }
+            }
+        }
+        demoObservers = [
+            center.addObserver(forName: NSWindow.didEnterFullScreenNotification, object: w, queue: .main, using: remember),
+            center.addObserver(forName: NSWindow.didChangeScreenNotification, object: w, queue: .main, using: remember),
+            center.addObserver(forName: NSWindow.didExitFullScreenNotification, object: w, queue: .main) { [weak self] note in
+                MainActor.assumeIsolated {
+                    guard let self, self.demoMovePending, let w = note.object as? NSWindow else { return }
+                    self.demoMovePending = false
+                    self.placeOnDemoDisplay(w)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { w.toggleFullScreen(nil) }
+                }
+            },
+            center.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.demoObservers.forEach { NotificationCenter.default.removeObserver($0) }
+                    self?.demoObservers = []
+                }
+            },
+        ]
     }
 
     @objc func showGuide() {
