@@ -20,7 +20,7 @@ This is the plan for after the scaffolding (`SCAFFOLD.md`) is built. Each person
 The MVP is three demo moments that work live, end to end, with a real webcam:
 
 1. **Claude Code.** A teammate signs a short request (for example `MAKE TITLE RED` with `TITLE` fingerspelled), the app shows the English ("Make the title red."), they sign `YES`, and Claude Code makes the change in a small demo website, visible on screen.
-2. **Siri.** A teammate signs a question (for example `TOMORROW RAIN`), the app speaks "Hey Siri, will it rain tomorrow?" through the virtual mic, and Siri answers on screen.
+2. **Siri.** A teammate signs a question (for example `TOMORROW RAIN`), the app opens Siri by holding ⌘Space and types "Will it rain tomorrow?" with Type to Siri, and Siri answers on screen. Siri can't be triggered through the virtual mic ("Hey Siri" doesn't work from one), so Siri gets text, not speech.
 3. **Google Meet.** A teammate signs a greeting (for example `HELLO`, `THANKYOU`) into a Meet call. The other side hears it in a Cartesia voice, and what they say back appears as live captions in our app.
 
 Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unless Person A adds custom signs. `docs/asl-vocab-check.md` lists which demo words are in the vocabulary. Nobody on the team knows ASL, so learn each demo sign from a reputable source (for example Lifeprint or Handspeak) and keep the demo script short and fixed.
@@ -28,7 +28,7 @@ Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unles
 **Control signs for the MVP:**
 - `YES` and `NO` are signed (both are in the vocabulary).
 - `FINISH` is signed and acts as SEND (it's in the vocabulary and is a natural end-of-thought sign).
-- `CLEAR` and `MODE` are in the UI: Cancel while signing clears, and the Claude Code / Voice / Meet picker sets the mode. Making them signs is a stretch goal.
+- `CLEAR` and `MODE` are in the UI: Cancel while signing clears, and the Claude Code / Siri / Voice / Meet picker sets the mode. Making them signs is a stretch goal.
 
 ## How we work
 
@@ -41,7 +41,7 @@ Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unles
 ## Checkpoints
 
 - **Friday night:** scaffolding merged to `main`. Everyone has run `make mock` and `make test` on their own laptop.
-- **Saturday midday:** each person's first real piece works alone (A: live landmarks plus a few recognized signs; B: real Claude translation; C: speech into BlackHole heard by Siri).
+- **Saturday midday:** each person's first real piece works alone (A: live landmarks plus a few recognized signs; B: real Claude translation; C: speech into BlackHole heard in a Meet call, and a question typed to Siri).
 - **Saturday evening:** first full integration. A real sign goes all the way through to Claude Code and to voice. Fix what breaks.
 - **Saturday night:** all three demo moments work on the real two-screen setup. Record a backup demo video.
 - **Sunday ~3 AM:** feature freeze. Only bug fixes, README, Devpost write-up, and pitch practice after this.
@@ -78,11 +78,11 @@ Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unles
 
 **MVP (in this order):**
 1. **Claude translator.** `language/claude.py` calls Claude through the Anthropic SDK with `language/prompts/gloss_to_english.md`. Done when the demo script's gloss comes back as clean English in under ~2 seconds.
-2. **Prompt and test cases.** A set of gloss-to-English examples, covering the demo script, fingerspelled words, recognition mistakes, and coding requests, in a test that can run against the real API on demand (not in `make test`). The prompt keeps the signer's meaning, adds nothing, and phrases coding requests as clear instructions. Siri requests start with "Hey Siri".
+2. **Prompt and test cases.** A set of gloss-to-English examples, covering the demo script, fingerspelled words, recognition mistakes, and coding requests, in a test that can run against the real API on demand (not in `make test`). The prompt keeps the signer's meaning, adds nothing, and phrases coding requests as clear instructions. Siri requests are plain questions, without "Hey Siri" (Siri is opened with ⌘Space, not by voice).
 3. **Confirm flow.** In Claude Code mode, nothing is sent until the signer signs `YES`; `NO` discards it. The UI shows the exact English that will be sent.
 4. **Real Claude Code output.** `outputs/claude_code.py` runs `claude -p "<text>"` in a configured demo project folder and streams Claude Code's reply back to the UI. Done when demo moment 1 works with typed mock signs.
 5. **Demo project.** A tiny website (one HTML page with a title) that Claude Code edits during the demo, open in a browser next to the app.
-6. **Router.** Sends English to Claude Code in `claude_code` mode and to Person C's voice output in `voice` and `meet` modes, falling back to console output if an output is unavailable.
+6. **Router.** Sends English to Claude Code in `claude_code` mode, to Person C's Type to Siri output in `siri` mode, and to Person C's voice output in `voice` and `meet` modes, falling back to console output if an output is unavailable.
 
 **Stretch:** low-confidence handling (when recognition confidence is low, Claude asks the signer to confirm or re-sign instead of guessing); keeping short context between utterances; the README's Claude section.
 
@@ -92,23 +92,24 @@ Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unles
 
 **You also write:** the "How we use Claude" section of the README for the Anthropic judges, covering what Claude does, where it can go wrong, and how the YES/NO confirm handles that.
 
-## Person C: Voice, Meet, and UI
+## Person C: Voice, Siri, Meet, and UI
 
-**You own:** `outputs/tts_cartesia.py`, `outputs/tts_say.py`, `outputs/mock_tts.py`, `captions/`, `ui/`, `fixtures/captions_sample.txt`. Config lines: `tts` and `captions`.
+**You own:** `outputs/tts_cartesia.py`, `outputs/tts_say.py`, `outputs/mock_tts.py`, the Siri output (`outputs/siri.py` and its mock), `captions/`, `ui/`, `fixtures/captions_sample.txt`. Config lines: `tts`, `siri`, and `captions`.
 
-**Your job:** make the app's English heard as a real microphone, show incoming speech as captions, and make the screen clear for a Deaf user. This is the core of the **Cartesia** and **Meta** tracks.
+**Your job:** make the app's English heard as a real microphone, type questions to Siri, show incoming speech as captions, and make the screen clear for a Deaf user. This is the core of the **Cartesia** and **Meta** tracks.
 
 **MVP (in this order):**
-1. **BlackHole setup.** Install BlackHole 2ch and write down the exact macOS audio setup in the README. Done when `tts: say` speaks into BlackHole and Siri, dictation, or Meet hears it after selecting BlackHole as the microphone.
-2. **Cartesia TTS.** `tts_cartesia.py` streams Cartesia Sonic audio into BlackHole, falling back to `say` if Cartesia fails. Done when demo moment 2 (Siri) works with typed mock signs.
-3. **Meet captions.** `captions/cartesia_stt.py` captures the Meet call's audio from a separate device (not the one our voice goes into, or we caption ourselves) and streams it to Cartesia Ink. Done when the other person's speech shows up as captions within a couple of seconds.
-4. **Demo Mode.** The fullscreen stage on the second display: camera with tracking, signs as they land, the English, the confirm step, captions in Meet mode, and recent phrases. It remembers its display (menu bar > Demo Mode On). Done when it looks good fullscreen on an external screen.
-5. **Preview and setup.** Preview has the output-mode picker, Claude Code's streamed reply, captions in Meet mode, and the mock-sign box. Every state must be visible, because the user gets no audio feedback. Make the setup wizard fit our engine: its Position step's "Save This Position" isn't wired up yet (the signing space is in `config.yaml`), and its Siri test plays our voice into BlackHole instead of typing to Siri.
-6. **Demo moment 3.** A real Meet call between two laptops: our side signs, the other side hears it, and their reply appears as captions.
+1. **BlackHole setup.** Install BlackHole 2ch and write down the exact macOS audio setup in the README. Done when `tts: say` speaks into BlackHole and dictation or Meet hears it after selecting BlackHole as the microphone.
+2. **Cartesia TTS.** `tts_cartesia.py` streams Cartesia Sonic audio into BlackHole, falling back to `say` if Cartesia fails. Done when the other side of a Meet call hears it with typed mock signs.
+3. **Type to Siri.** `outputs/siri.py` opens Siri by holding ⌘Space (Siri's keyboard shortcut set to Hold Command Space), types the English, and presses Return, the way SignBridge's engine did. It needs Type to Siri on (Accessibility > Siri) and Accessibility permission for the app. Done when demo moment 2 (Siri) works with typed mock signs.
+4. **Meet captions.** `captions/cartesia_stt.py` captures the Meet call's audio from a separate device (not the one our voice goes into, or we caption ourselves) and streams it to Cartesia Ink. Done when the other person's speech shows up as captions within a couple of seconds.
+5. **Demo Mode.** The fullscreen stage on the second display: camera with tracking, signs as they land, the English, the confirm step, captions in Meet mode, and recent phrases. It remembers its display (menu bar > Demo Mode On). Done when it looks good fullscreen on an external screen.
+6. **Preview and setup.** Preview has the output-mode picker (with Siri), Claude Code's streamed reply, captions in Meet mode, and the mock-sign box. Every state must be visible, because the user gets no audio feedback. Make the setup wizard fit our engine: its Position step's "Save This Position" isn't wired up yet (the signing space is in `config.yaml`), and its Siri test should go through the Type to Siri output (today it plays our voice into BlackHole).
+7. **Demo moment 3.** A real Meet call between two laptops: our side signs, the other side hears it, and their reply appears as captions.
 
 **Stretch:** a "download and run it" `.app` (`make app` builds one; it still needs a place for API keys outside the bundle); choosing a voice; showing when the app is speaking; a polished look for judging photos.
 
-**Test alone with:** `recognizer: mock`, `translator: mock`, `tts: cartesia`, `captions: cartesia`.
+**Test alone with:** `recognizer: mock`, `translator: mock`, `tts: cartesia`, `siri: real`, `captions: cartesia`.
 
 **Needs:** `CARTESIA_API_KEY` in `.env`, BlackHole installed, Xcode or its command-line tools (the app is Swift), a second device for the Meet test, and the second display for the demo.
 

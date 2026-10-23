@@ -6,7 +6,7 @@ Read `README.md` first for the product context. `MVP.md` describes what each tea
 
 ## Product in one paragraph
 
-A laptop app for Deaf ASL signers. A webcam feed is turned into hand and pose landmarks (MediaPipe). Isolated signs and fingerspelling are recognized from the landmarks, and Claude turns the resulting gloss (e.g. `ME WANT FIX BUG LOGIN PAGE`) into natural English. A router then sends that English to one of two places. The first is **Claude Code**, after the signer confirms with a signed YES/NO. The second is **text-to-speech (Cartesia) through a virtual microphone** (BlackHole on macOS), so Siri, system dictation, and Google Meet hear it as normal mic input. In Meet mode, incoming speech is also shown as live captions (Cartesia speech-to-text).
+A laptop app for Deaf ASL signers. A webcam feed is turned into hand and pose landmarks (MediaPipe). Isolated signs and fingerspelling are recognized from the landmarks, and Claude turns the resulting gloss (e.g. `ME WANT FIX BUG LOGIN PAGE`) into natural English. A router then sends that English to the active target. **Claude Code** gets it after the signer confirms with a signed YES/NO. **Siri** gets it typed in with Type to Siri (the app holds ⌘Space and types; "Hey Siri" can't be triggered through a virtual mic). **Text-to-speech (Cartesia) through a virtual microphone** (BlackHole on macOS) lets system dictation and Google Meet hear it as normal mic input. In Meet mode, incoming speech is also shown as live captions (Cartesia speech-to-text).
 
 ## How it's shown
 
