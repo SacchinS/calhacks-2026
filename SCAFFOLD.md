@@ -8,6 +8,15 @@ Read `README.md` first for the product context. `MVP.md` describes what each tea
 
 A laptop app for Deaf ASL signers. A webcam feed is turned into hand and pose landmarks (MediaPipe). Isolated signs and fingerspelling are recognized from the landmarks, and Claude turns the resulting gloss (e.g. `ME WANT FIX BUG LOGIN PAGE`) into natural English. A router then sends that English to one of two places. The first is **Claude Code**, after the signer confirms with a signed YES/NO. The second is **text-to-speech (Cartesia) through a virtual microphone** (BlackHole on macOS), so Siri, system dictation, and Google Meet hear it as normal mic input. In Meet mode, incoming speech is also shown as live captions (Cartesia speech-to-text).
 
+## How it's shown
+
+It's a Mac app with two windows, built for a two-screen demo:
+
+- **Camera window:** the webcam feed with the landmark overlay, the signing-space box, each recognized sign as it lands, the English translation, and the YES/NO confirm prompt. In the demo it's dragged onto a second display connected to the laptop, fullscreen, so judges watch the signing and tracking there. It must remember which display it was on and support fullscreen on any display.
+- **Control window:** small, stays on the main laptop screen next to the apps being driven (Claude Code, the demo website, Siri, Meet), with mode, status, buttons, Claude Code's reply, and captions.
+
+Everything the signer needs must also fit in the camera window alone, since a Deaf signer gets no audio feedback.
+
 ## Hackathon tracks this stack is built for
 
 We're entering the Anthropic and Cartesia sponsor tracks, Meta's "Bringing People Closer Together with AI," and the Cal Hacks general prizes. That's why the stack is fixed:
@@ -20,7 +29,8 @@ We're entering the Anthropic and Cartesia sponsor tracks, Meta's "Bringing Peopl
 
 - Python 3.11, managed with `uv` (fall back to `pip` + `requirements.txt` if needed).
 - Target: macOS (Apple Silicon) first. Keep the OS-specific parts behind interfaces.
-- UI: a small local web UI served by FastAPI, with a WebSocket for live updates (current gloss, English preview, confirm prompt, mode, captions). Plain HTML/JS, no frontend build step.
+- UI: a **native macOS desktop app** built with **PySide6 (Qt)**. No web server, no localhost, no browser. Bridge the asyncio event bus and the Qt event loop with `qasync`.
+- Packaging: the app must be packageable as a `.app` with PyInstaller later (keep paths relative to the package, load models and config from a resources folder, and keep an `Info.plist` template with camera and microphone usage descriptions). Add a `make app` target that tries to build it; it doesn't have to be polished in the scaffold.
 - LLM: Claude via the official `anthropic` Python SDK. Model name lives in `config.yaml` (default to a fast, low-latency Claude model).
 - Voice: Cartesia via the official `cartesia` Python SDK. Sonic for TTS, Ink for streaming STT. Check docs.cartesia.ai for current model IDs and put them in `config.yaml`.
 - Audio devices: `sounddevice` for playing TTS into the "BlackHole 2ch" device and for capturing Meet's audio for captions.
@@ -73,11 +83,15 @@ calhacks-2026/
     mock.py                 # emits lines from fixtures/captions_sample.txt on a timer
     cartesia_stt.py         # stub: Cartesia Ink streaming speech-to-text of the Meet audio
   ui/
-    server.py               # FastAPI app + WebSocket
-    static/index.html
-    static/app.js
-    static/style.css
-  app.py                    # entry point: wires bus + recognizer + translator + router + UI
+    bridge.py               # subscribes to the bus and re-emits events as Qt signals (qasync)
+    camera_window.py        # the demo window: webcam feed + landmark overlay + live signs + English + confirm prompt
+    control_window.py       # compact window: mode, status, CLEAR/MODE buttons, Claude Code reply, captions, mock sign input
+    overlay.py              # draws landmarks, the signing-space box, and recognized-sign labels onto frames
+    theme.py                # large, high-contrast fonts and colors in one place
+  packaging/
+    Info.plist              # template with NSCameraUsageDescription and NSMicrophoneUsageDescription
+    app.spec                # PyInstaller spec
+  app.py                    # entry point: wires bus + recognizer + translator + router + UI windows
   tools/
     record_landmarks.py     # records webcam landmarks to a .jsonl fixture (stub if MediaPipe won't install)
   tests/
@@ -92,7 +106,7 @@ calhacks-2026/
 
 In `shared/events.py`, as frozen dataclasses with timestamps:
 
-- `LandmarkFrame`: per-frame hand/pose/face landmarks plus a `hands_in_signing_space` flag.
+- `LandmarkFrame`: per-frame hand/pose/face landmarks, the `hands_in_signing_space` flag, and the camera image for that frame (optional, `None` in mock mode) so the UI can draw the feed and overlay without opening the camera itself.
 - `SignEvent`: `gloss: str`, `confidence: float`, `kind: "isolated" | "fingerspell" | "control"`.
 - `Utterance`: the list of `SignEvent`s between an utterance start and end.
 - `Translation`: `gloss: list[str]`, `english: str`, `provider: str`.
@@ -110,7 +124,7 @@ Interfaces:
 
 ## The mock recognizer (most important piece for the team)
 
-The team needs to build and demo everything downstream before the models work. `recognition/mock.py` reads the keyboard in the terminal (or takes input from a text box in the web UI) and publishes `SignEvent`s:
+The team needs to build and demo everything downstream before the models work. `recognition/mock.py` takes input from a text box in the control window (and from the terminal) and publishes `SignEvent`s:
 
 - Typing a word + Enter publishes an isolated sign with that gloss (uppercased).
 - `#hello` publishes a fingerspelled word.
@@ -177,7 +191,7 @@ Shared files (`shared/`, `app.py`, `config.yaml`, `Makefile`, `tests/contracts/`
 ## Definition of done
 
 - `make test` passes, including an end-to-end mock test: gloss `ME WANT FIX BUG LOGIN PAGE` + `SEND` in `claude_code` mode produces a `ConfirmRequest`, and then `YES` sends it to the console output while `NO` sends nothing.
-- `make mock` runs, and the web UI at `http://localhost:8000` updates live as you type mock signs: Claude Code mode shows the confirm prompt and then the canned mock reply, voice mode shows what was "spoken", and Meet mode shows the scripted captions.
+- `make mock` opens both app windows, and they update live as you type mock signs: Claude Code mode shows the confirm prompt and then the canned mock reply, voice mode shows what was "spoken", and Meet mode shows the scripted captions.
 - Setting `recognizer: replay` runs the app from the landmark fixture with no webcam.
 - All contract tests pass for every mock.
 - Every file `MVP.md` assigns to a person exists, and `make mock` runs with each person's config line still on `mock`.
