@@ -107,12 +107,13 @@ enum RouteInfo {
 
 /// How each output mode is shown (calhacks-2026 addition).
 enum OutputMode {
-    static let all = ["claude_code", "voice", "meet"]
+    static let all = ["claude_code", "siri", "voice", "meet"]
     static func label(_ mode: String) -> String {
-        ["claude_code": "Claude Code", "voice": "Voice", "meet": "Meet"][mode] ?? mode
+        ["claude_code": "Claude Code", "siri": "Siri", "voice": "Voice", "meet": "Meet"][mode] ?? mode
     }
     static func icon(_ mode: String) -> String {
-        ["claude_code": "chevron.left.forwardslash.chevron.right", "voice": "speaker.wave.2.fill",
+        ["claude_code": "chevron.left.forwardslash.chevron.right", "siri": "mic.circle.fill",
+         "voice": "speaker.wave.2.fill",
          "meet": "video.fill"][mode] ?? "arrow.right"
     }
 }
