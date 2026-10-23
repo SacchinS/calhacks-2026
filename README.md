@@ -19,10 +19,10 @@ flowchart LR
     CAM[Webcam] --> MP[MediaPipe landmarks]
     MP --> GATE{Hands in<br/>signing area?}
     GATE -- yes --> REC[Sign + fingerspelling<br/>recognition]
-    REC --> LLM[LLM: ASL gloss<br/>to English]
+    REC --> LLM[Claude: ASL gloss<br/>to English]
     LLM --> ROUTER{Active target}
     ROUTER --> CC[Claude Code<br/>text to CLI]
-    ROUTER --> VM[TTS to virtual mic]
+    ROUTER --> VM[Cartesia voice to<br/>virtual mic]
     VM --> SIRI[Siri]
     VM --> DICT[Dictation]
     VM --> MEET[Google Meet]
@@ -30,10 +30,10 @@ flowchart LR
 
 1. **Capture**: MediaPipe extracts hand, pose, and face landmarks from the webcam.
 2. **Gating**: only hands raised into the signing area are read, so typing or resting hands don't trigger anything.
-3. **Recognition**: an isolated-sign classifier plus a fingerspelling model turn landmarks into ASL gloss. Custom command signs switch the active app.
-4. **Language**: an LLM turns the gloss into fluent English, using facial cues like raised eyebrows for questions.
-5. **Output**: English goes to the active target. Claude Code gets text directly, after an ASL YES/NO confirm. Siri, dictation, and Meet get synthesized speech through a virtual microphone (BlackHole on macOS).
-6. **Captions in**: during Meet calls, incoming speech is shown as captions for the signer.
+3. **Recognition**: an isolated-sign classifier plus a fingerspelling model turn landmarks into ASL gloss. Control signs (YES, NO, FINISH) confirm and send.
+4. **Language**: Claude turns the gloss into fluent English.
+5. **Output**: English goes to the active target. Claude Code gets text directly, after an ASL YES/NO confirm. Siri, dictation, and Meet get speech in a Cartesia voice through a virtual microphone (BlackHole on macOS).
+6. **Captions in**: during Meet calls, incoming speech is shown as live captions for the signer (Cartesia speech-to-text).
 
 ## Features
 
@@ -70,7 +70,7 @@ Requirements (planned):
 - macOS with a webcam
 - [BlackHole](https://github.com/ExistentialAudio/BlackHole) virtual audio driver
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
-- An LLM API key (Claude or Gemini, TBD)
+- An Anthropic API key (Claude) and a Cartesia API key (voice and captions)
 
 ```bash
 git clone <repo-url>
