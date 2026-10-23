@@ -2,7 +2,7 @@
 
 > Working title. Product name TBD.
 
-A webcam app that lets Deaf ASL signers use voice-first tools by signing. Sign to your webcam, and your signing becomes natural English that goes straight into Claude Code, or is spoken through a virtual microphone so you can use Siri, dictation, and Google Meet.
+A webcam app that lets Deaf ASL signers use voice-first tools by signing. Sign to your webcam, and your signing becomes natural English that goes straight into Claude Code, is typed to Siri, or is spoken through a virtual microphone so you can use dictation and Google Meet.
 
 Built at Cal Hacks 13.0 (Oct 23–25, 2026).
 
@@ -22,8 +22,8 @@ flowchart LR
     REC --> LLM[Claude: ASL gloss<br/>to English]
     LLM --> ROUTER{Active target}
     ROUTER --> CC[Claude Code<br/>text to CLI]
+    ROUTER --> SIRI[Siri<br/>Type to Siri]
     ROUTER --> VM[Cartesia voice to<br/>virtual mic]
-    VM --> SIRI[Siri]
     VM --> DICT[Dictation]
     VM --> MEET[Google Meet]
 ```
@@ -32,7 +32,7 @@ flowchart LR
 2. **Gating**: only hands raised into the signing area are read, so typing or resting hands don't trigger anything.
 3. **Recognition**: an isolated-sign classifier plus a fingerspelling model turn landmarks into ASL gloss. Control signs (YES, NO, FINISH) confirm and send.
 4. **Language**: Claude turns the gloss into fluent English.
-5. **Output**: English goes to the active target. Claude Code gets text directly, after an ASL YES/NO confirm. Siri, dictation, and Meet get speech in a Cartesia voice through a virtual microphone (BlackHole on macOS).
+5. **Output**: English goes to the active target. Claude Code gets text directly, after an ASL YES/NO confirm. Siri gets the question typed in with Type to Siri: the app holds ⌘Space to open Siri and types it. Dictation and Meet get speech in a Cartesia voice through a virtual microphone (BlackHole on macOS).
 6. **Captions in**: during Meet calls, incoming speech is shown as live captions for the signer (Cartesia speech-to-text).
 
 ## Features
@@ -68,7 +68,7 @@ Requirements:
 - macOS 14+ (Apple Silicon) with a webcam
 - Xcode or the Xcode command-line tools (`xcode-select --install`), for the Swift app
 - [uv](https://docs.astral.sh/uv/) (`brew install uv`); it installs Python 3.11 for you
-- [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole) virtual audio driver, for speech into Siri, dictation, and Meet
+- [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole) virtual audio driver, for speech into dictation and Meet
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI, installed and logged in
 - An Anthropic API key (Claude) and a Cartesia API key (voice and captions)
 
@@ -104,7 +104,7 @@ tts: mock               # mock | say | cartesia
 captions: mock          # mock | cartesia
 ```
 
-`recognizer: replay` plays `fixtures/landmarks_sample.jsonl`, so you don't need a webcam (its preview needs `uv sync --extra camera`). `recognizer: camera` asks for camera permission the first time (allow it for your terminal app). With `tts: say` or `tts: cartesia`, select "BlackHole 2ch" as the microphone in Siri, dictation, or Meet. A component that isn't ready falls back to its mock or to the console, with a note in the Preview window.
+`recognizer: replay` plays `fixtures/landmarks_sample.jsonl`, so you don't need a webcam (its preview needs `uv sync --extra camera`). `recognizer: camera` asks for camera permission the first time (allow it for your terminal app). With `tts: say` or `tts: cartesia`, select "BlackHole 2ch" as the microphone in dictation or Meet. A component that isn't ready falls back to its mock or to the console, with a note in the Preview window.
 
 ```bash
 make test                         # unit, contract, and end-to-end tests (no real API calls)
@@ -123,7 +123,7 @@ make app                          # build dist/SignBridge.app (Swift app + bundl
 
 - Recognition covers a limited vocabulary, not all of ASL. ASL grammar, regional variation, and facial grammar are only partly handled.
 - Live webcam accuracy can be much lower than benchmark scores. We'll report what we actually measure.
-- "Hey Siri" can't be triggered through a virtual mic. Siri is started with a keyboard shortcut.
+- Siri can't be reached through a virtual mic: "Hey Siri" doesn't trigger from one. Siri uses the Type to Siri accessibility feature instead: set Siri's keyboard shortcut to Hold Command Space (Apple Intelligence & Siri settings), turn on Type to Siri (Accessibility > Siri), and give the app Accessibility permission so it can hold ⌘Space and type the question.
 - macOS only for now.
 
 ## Acknowledgments
