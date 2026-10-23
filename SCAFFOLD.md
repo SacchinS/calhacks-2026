@@ -10,12 +10,13 @@ A laptop app for Deaf ASL signers. A webcam feed is turned into hand and pose la
 
 ## How it's shown
 
-It's a Mac app with two windows, built for a two-screen demo:
+It's a Mac menu-bar app: the SwiftUI front end from our earlier SignBridge project, driving this repo's Python engine. It's built for a two-screen demo:
 
-- **Camera window:** the webcam feed with the landmark overlay, the signing-space box, each recognized sign as it lands, the English translation, and the YES/NO confirm prompt. In the demo it's dragged onto a second display connected to the laptop, fullscreen, so judges watch the signing and tracking there. It must remember which display it was on and support fullscreen on any display.
-- **Control window:** small, stays on the main laptop screen next to the apps being driven (Claude Code, the demo website, Siri, Meet), with mode, status, buttons, Claude Code's reply, and captions.
+- **Demo Mode:** a fullscreen stage with the camera and tracking, the signs as they land, the English, the confirm step, recent phrases, and captions in Meet mode. In the demo it goes fullscreen on a second display connected to the laptop, so judges watch the signing and tracking there. It remembers which display it was on and can be sent to any display (menu bar > Demo Mode On).
+- **Preview:** stays on the main laptop screen next to the apps being driven (Claude Code, the demo website, Siri, Meet). It has the same live view plus the output-mode picker (Claude Code, Voice, Meet), Claude Code's reply, captions, and the mock-sign box.
+- **Setup wizard, Settings, and Sign Guide** come from SignBridge as they were.
 
-Everything the signer needs must also fit in the camera window alone, since a Deaf signer gets no audio feedback.
+Everything the signer needs must also fit in Demo Mode alone, since a Deaf signer gets no audio feedback.
 
 ## Hackathon tracks this stack is built for
 
@@ -29,8 +30,8 @@ We're entering the Anthropic and Cartesia sponsor tracks, Meta's "Bringing Peopl
 
 - Python 3.11, managed with `uv` (fall back to `pip` + `requirements.txt` if needed).
 - Target: macOS (Apple Silicon) first. Keep the OS-specific parts behind interfaces.
-- UI: a **native macOS desktop app** built with **PySide6 (Qt)**. No web server, no localhost, no browser. Bridge the asyncio event bus and the Qt event loop with `qasync`.
-- Packaging: the app must be packageable as a `.app` with PyInstaller later (keep paths relative to the package, load models and config from a resources folder, and keep an `Info.plist` template with camera and microphone usage descriptions). Add a `make app` target that tries to build it; it doesn't have to be polished in the scaffold.
+- UI: a **native macOS app in SwiftUI**, reused from SignBridge (`ui/macos`, a Swift package; needs Xcode or its command-line tools). It launches the Python engine (`app.py`) as a child process and talks to it in JSON lines: commands on stdin, events on stdout, in SignBridge's protocol (`ui/server.py`). No web server, no localhost, no browser.
+- Packaging: `make app` runs `packaging/build.sh`, which builds `dist/SignBridge.app` with the Swift app, a bundled Python, the engine's packages, and the MediaPipe model, using `packaging/Info.plist` (camera and microphone usage descriptions). It installs to `~/Applications` only with `--install`.
 - LLM: Claude via the official `anthropic` Python SDK. Model name lives in `config.yaml` (default to a fast, low-latency Claude model).
 - Voice: Cartesia via the official `cartesia` Python SDK. Sonic for TTS, Ink for streaming STT. Check docs.cartesia.ai for current model IDs and put them in `config.yaml`.
 - Audio devices: `sounddevice` for playing TTS into the "BlackHole 2ch" device and for capturing Meet's audio for captions.
@@ -46,7 +47,7 @@ calhacks-2026/
   config.yaml
   .env.example
   .gitignore
-  Makefile                  # make run, make mock, make test, make lint
+  Makefile                  # make run, make mock, make test, make lint, make app
   MVP.md                    # exists: what Person A, B, and C each build. Don't rewrite it
   fixtures/
     landmarks_sample.jsonl  # a few seconds of fake or recorded landmark frames for replay
@@ -83,15 +84,12 @@ calhacks-2026/
     mock.py                 # emits lines from fixtures/captions_sample.txt on a timer
     cartesia_stt.py         # stub: Cartesia Ink streaming speech-to-text of the Meet audio
   ui/
-    bridge.py               # subscribes to the bus and re-emits events as Qt signals (qasync)
-    camera_window.py        # the demo window: webcam feed + landmark overlay + live signs + English + confirm prompt
-    control_window.py       # compact window: mode, status, CLEAR/MODE buttons, Claude Code reply, captions, mock sign input
-    overlay.py              # draws landmarks, the signing-space box, and recognized-sign labels onto frames
-    theme.py                # large, high-contrast fonts and colors in one place
+    server.py               # the engine side of the app: SignBridge's JSON-lines protocol on top of the bus, preview frames
+    macos/                  # SignBridge's SwiftUI app (Swift package): menu bar, setup, Preview, Demo Mode, Sign Guide, Settings
   packaging/
-    Info.plist              # template with NSCameraUsageDescription and NSMicrophoneUsageDescription
-    app.spec                # PyInstaller spec
-  app.py                    # entry point: wires bus + recognizer + translator + router + UI windows
+    Info.plist              # the .app's Info.plist: NSCameraUsageDescription and NSMicrophoneUsageDescription
+    build.sh                # builds dist/SignBridge.app: Swift app + bundled Python engine (make app)
+  app.py                    # engine entry point: wires bus + recognizer + translator + router + captions, serves the app
   tools/
     record_landmarks.py     # records webcam landmarks to a .jsonl fixture (stub if MediaPipe won't install)
   tests/
@@ -124,7 +122,7 @@ Interfaces:
 
 ## The mock recognizer (most important piece for the team)
 
-The team needs to build and demo everything downstream before the models work. `recognition/mock.py` takes input from a text box in the control window (and from the terminal) and publishes `SignEvent`s:
+The team needs to build and demo everything downstream before the models work. `recognition/mock.py` takes input from the mock-sign box in the Preview window (and from the terminal under `make mock`) and publishes `SignEvent`s:
 
 - Typing a word + Enter publishes an isolated sign with that gloss (uppercased).
 - `#hello` publishes a fingerspelled word.
@@ -191,7 +189,7 @@ Shared files (`shared/`, `app.py`, `config.yaml`, `Makefile`, `tests/contracts/`
 ## Definition of done
 
 - `make test` passes, including an end-to-end mock test: gloss `ME WANT FIX BUG LOGIN PAGE` + `SEND` in `claude_code` mode produces a `ConfirmRequest`, and then `YES` sends it to the console output while `NO` sends nothing.
-- `make mock` opens both app windows, and they update live as you type mock signs: Claude Code mode shows the confirm prompt and then the canned mock reply, voice mode shows what was "spoken", and Meet mode shows the scripted captions.
+- `make mock` builds and opens the Mac app (setup wizard on first run, then Preview), and it updates live as you type mock signs: Claude Code mode shows the confirm prompt and then the canned mock reply, voice mode shows what was "spoken", and Meet mode shows the scripted captions.
 - Setting `recognizer: replay` runs the app from the landmark fixture with no webcam.
 - All contract tests pass for every mock.
 - Every file `MVP.md` assigns to a person exists, and `make mock` runs with each person's config line still on `mock`.
