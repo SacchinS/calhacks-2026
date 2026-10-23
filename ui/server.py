@@ -12,7 +12,7 @@ it onto our bus. Commands (stdin, one JSON object per line):
   {"cmd": "test_route", "route": "siri|voice", "text": "What time is it?"}
   {"cmd": "calibrate"}
   {"cmd": "config", "values": {...}}                    saves the app's settings
-  {"cmd": "output_mode", "mode": "claude_code|voice|meet"}   (ours) where English goes
+  {"cmd": "output_mode", "mode": "claude_code|siri|voice|meet"}   (ours) where English goes
   {"cmd": "mock_input", "text": "me want #title /send"}      (ours) the mock-sign box
   {"cmd": "quit"}
 
@@ -71,8 +71,8 @@ APP_MODES = ("off", "run", "framing", "gestures")
 PRACTICE = ["wake", "confirm", "cancel"]
 UI_CONFIG = Path("~/Library/Application Support/calhacks-2026/ui.json").expanduser()
 # Where each output mode sends English, in the app's route vocabulary.
-ROUTES = {"claude_code": "text", "voice": "siri", "meet": "voice"}
-TARGETS = {"claude_code": "Claude Code", "meet": "Google Meet"}
+ROUTES = {"claude_code": "text", "siri": "siri", "voice": "voice", "meet": "voice"}
+TARGETS = {"claude_code": "Claude Code", "siri": "Siri", "meet": "Google Meet"}
 
 
 def protocol_stdout() -> TextIO:
@@ -417,7 +417,7 @@ class EngineServer:
         self.control("SEND")
 
     def set_output_mode(self, mode: str) -> None:
-        """MODE cycles claude_code -> voice -> meet; press it until we're on `mode`."""
+        """MODE cycles claude_code -> siri -> voice -> meet; press it until we're on `mode`."""
         if mode not in MODES:
             return
         steps = (MODES.index(mode) - MODES.index(self.output_mode)) % len(MODES)
@@ -450,15 +450,16 @@ class EngineServer:
         return True, f"Claude answered in {time.monotonic() - start:.1f}s: {translation.english}"
 
     async def test_route(self, route: str, text: str) -> None:
-        tts = self.app.router.tts
+        component = "siri" if route == "siri" else "tts"
+        output = self.app.router.siri if route == "siri" else self.app.router.tts
         try:
-            if not tts.available():
+            if not output.available():
                 ok, detail = (
                     False,
-                    f"The voice output ({self.app.chosen.get('tts')}) isn't available.",
+                    f"The {component} output ({self.app.chosen.get(component)}) isn't available.",
                 )
             else:
-                await tts.send(text)
+                await output.send(text)
                 ok, detail = True, ""
         except Exception as exc:
             ok, detail = False, str(exc)

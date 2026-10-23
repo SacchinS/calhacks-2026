@@ -96,7 +96,23 @@ async def test_voice_mode_speaks_without_confirming(engine):
     states = [m["state"] for m in messages(engine, "status")]
     assert "confirming" not in states and "sending" in states
     sending = next(m for m in messages(engine, "status") if m["state"] == "sending")
+    assert sending["intent"] == {"sentence": "Tomorrow rain.", "route": "voice"}
+
+
+async def test_siri_mode_types_to_siri(engine):
+    typed = []
+    engine.app.router.siri.send = lambda text: _record(typed, text)
+    await engine.handle_command({"cmd": "output_mode", "mode": "siri"})
+    await until(lambda: last_status(engine)["output_mode"] == "siri")
+    assert last_status(engine)["target"] == "Siri"
+    await engine.handle_command({"cmd": "mock_input", "text": "tomorrow rain /send"})
+    await until(lambda: typed == ["Tomorrow rain."])
+    sending = next(m for m in messages(engine, "status") if m["state"] == "sending")
     assert sending["intent"] == {"sentence": "Tomorrow rain.", "route": "siri"}
+
+
+async def _record(into, text):
+    into.append(text)
 
 
 async def test_output_mode_picks_any_mode_and_meet_shows_captions(engine):
@@ -123,9 +139,14 @@ async def test_checks_routes_and_config(engine, tmp_path):
     claude = messages(engine, "check")[0]
     assert claude["ok"] is False and "mock" in claude["detail"]  # honest: the mock isn't Claude
 
+    typed, spoken = [], []
+    engine.app.router.siri.send = lambda text: _record(typed, text)
+    engine.app.router.tts.send = lambda text: _record(spoken, text)
     await engine.handle_command({"cmd": "test_route", "route": "siri", "text": "What time is it?"})
-    await until(lambda: messages(engine, "route_tested"))
-    assert messages(engine, "route_tested")[0]["ok"] is True  # mock TTS
+    await engine.handle_command({"cmd": "test_route", "route": "voice", "text": "Voice test."})
+    await until(lambda: len(messages(engine, "route_tested")) == 2)
+    assert all(m["ok"] for m in messages(engine, "route_tested"))  # the mocks
+    assert (typed, spoken) == (["What time is it?"], ["Voice test."])
 
     await engine.handle_command({"cmd": "config", "values": {"onboarded": True}})
     assert messages(engine, "config")[-1]["config"]["onboarded"] is True
