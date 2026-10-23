@@ -13,7 +13,7 @@ A laptop app for Deaf ASL signers. A webcam feed is turned into hand and pose la
 It's a Mac menu-bar app: the SwiftUI front end from our earlier SignBridge project, driving this repo's Python engine. It's built for a two-screen demo:
 
 - **Demo Mode:** a fullscreen stage with the camera and tracking, the signs as they land, the English, the confirm step, recent phrases, and captions in Meet mode. In the demo it goes fullscreen on a second display connected to the laptop, so judges watch the signing and tracking there. It remembers which display it was on and can be sent to any display (menu bar > Demo Mode On).
-- **Preview:** stays on the main laptop screen next to the apps being driven (Claude Code, the demo website, Siri, Meet). It has the same live view plus the output-mode picker (Claude Code, Voice, Meet), Claude Code's reply, captions, and the mock-sign box.
+- **Preview:** stays on the main laptop screen next to the apps being driven (Claude Code, the demo website, Siri, Meet). It has the same live view plus the output-mode picker (Claude Code, Siri, Voice, Meet), Claude Code's reply, captions, and the mock-sign box.
 - **Setup wizard, Settings, and Sign Guide** come from SignBridge as they were.
 
 Everything the signer needs must also fit in Demo Mode alone, since a Deaf signer gets no audio feedback.
@@ -74,11 +74,13 @@ calhacks-2026/
     base.py                 # Output interface
     router.py               # chooses output by current mode; handles YES/NO confirmation
     claude_code.py          # stub: send text to Claude Code (subprocess `claude -p` or terminal paste)
+    siri.py                 # stub: Type to Siri (hold Cmd-Space, paste the question, Return)
     tts_cartesia.py         # stub: Cartesia Sonic TTS -> BlackHole virtual mic
     tts_say.py              # offline backup: macOS `say` -> BlackHole (works with no API key)
     console.py              # prints to terminal, always available, used in tests
     mock_claude_code.py     # pretends to be Claude Code: streams a canned reply back to the UI
     mock_tts.py             # logs the text it "spoke" (optionally plays it on speakers with `say`)
+    mock_siri.py            # logs the question it "typed" to Siri
   captions/
     base.py                 # CaptionSource interface (incoming speech -> Caption events)
     mock.py                 # emits lines from fixtures/captions_sample.txt on a timer
@@ -109,7 +111,7 @@ In `shared/events.py`, as frozen dataclasses with timestamps:
 - `Utterance`: the list of `SignEvent`s between an utterance start and end.
 - `Translation`: `gloss: list[str]`, `english: str`, `provider: str`.
 - `ConfirmRequest` / `ConfirmResult`: for the YES/NO step before anything is sent to Claude Code.
-- `ModeChanged`: `mode: "claude_code" | "voice" | "meet"`.
+- `ModeChanged`: `mode: "claude_code" | "siri" | "voice" | "meet"`.
 - `Caption`: incoming speech text for Meet mode (stub source for now).
 
 Control signs are ordinary `SignEvent`s with `kind="control"`: `YES`, `NO`, `SEND` (end of utterance), `CLEAR`, and `MODE` (cycle modes). They must never be sent to the translator.
@@ -137,6 +139,7 @@ The team needs to build and demo everything downstream before the models work. `
 recognizer: mock        # mock | replay | camera
 translator: mock        # mock | claude
 claude_code: mock       # mock | real
+siri: mock              # mock | real
 tts: mock               # mock | say | cartesia
 captions: mock          # mock | cartesia
 ```
@@ -150,6 +153,7 @@ captions: mock          # mock | cartesia
 3. The translator turns the utterance's gloss into English.
 4. The router checks the mode:
    - `claude_code`: publish a `ConfirmRequest` showing the English, wait for `YES` or `NO`, and only send on `YES`.
+   - `siri`: send straight to the Siri output (Type to Siri).
    - `voice` and `meet`: send straight to the TTS output.
 5. The UI shows the live gloss, the English preview, the confirm prompt, the current mode, and captions.
 
@@ -163,6 +167,7 @@ Each stub must import cleanly, have the right signature, log that it's a stub, a
 - `fingerspelling.py`: Kaggle ASL Fingerspelling competition model.
 - `claude.py`: Claude via the Anthropic SDK, using `language/prompts/gloss_to_english.md`. Write a first draft of that prompt: ASL gloss in, natural English out, keep the signer's meaning, don't add content, and when the input is a coding request, phrase it as a clear instruction.
 - `claude_code.py`: run `claude -p "<text>"` in a configured project directory and stream the output back to the UI.
+- `siri.py`: Type to Siri, ported from SignBridge's `signbridge/routes.py`: hold Cmd-Space to open Siri (its shortcut set to "Hold Command Space", Type to Siri on), paste the question, press Return. Needs Accessibility permission and pyobjc (Quartz, Cocoa).
 - `tts_cartesia.py`: stream Cartesia Sonic audio and play it into the "BlackHole 2ch" output device with `sounddevice`. If Cartesia fails at runtime, fall back to `tts_say.py` and warn in the UI.
 - `tts_say.py`: implement this one for real (it's small): macOS `say` rendered to audio and played into "BlackHole 2ch".
 - `captions/cartesia_stt.py`: capture Meet's audio from a separate capture device (not the device our TTS writes to, or we'll caption ourselves) and stream it to Cartesia Ink. The device name lives in `config.yaml`.
@@ -175,7 +180,7 @@ Each stub must import cleanly, have the right signature, log that it's a stub, a
 
 - **Person A: Recognition** owns `recognition/`, `tools/`, and `fixtures/landmarks_sample.jsonl`. Config line: `recognizer`.
 - **Person B: Language + Claude Code** owns `language/`, `outputs/claude_code.py`, `outputs/mock_claude_code.py`, and `outputs/router.py`. Config lines: `translator`, `claude_code`.
-- **Person C: Voice, Meet, and UI** owns `outputs/tts_*.py`, `outputs/mock_tts.py`, `captions/`, `ui/`, and `fixtures/captions_sample.txt`. Config lines: `tts`, `captions`.
+- **Person C: Voice, Siri, Meet, and UI** owns `outputs/tts_*.py`, `outputs/mock_tts.py`, `outputs/siri.py`, `outputs/mock_siri.py`, `captions/`, `ui/`, and `fixtures/captions_sample.txt`. Config lines: `tts`, `siri`, `captions`.
 
 Shared files (`shared/`, `app.py`, `config.yaml`, `Makefile`, `tests/contracts/`) should change rarely. Put a comment at the top of `shared/events.py` saying changes need a heads-up to the whole team. Don't create a separate `TASKS.md`.
 
@@ -189,7 +194,7 @@ Shared files (`shared/`, `app.py`, `config.yaml`, `Makefile`, `tests/contracts/`
 ## Definition of done
 
 - `make test` passes, including an end-to-end mock test: gloss `ME WANT FIX BUG LOGIN PAGE` + `SEND` in `claude_code` mode produces a `ConfirmRequest`, and then `YES` sends it to the console output while `NO` sends nothing.
-- `make mock` builds and opens the Mac app (setup wizard on first run, then Preview), and it updates live as you type mock signs: Claude Code mode shows the confirm prompt and then the canned mock reply, voice mode shows what was "spoken", and Meet mode shows the scripted captions.
+- `make mock` builds and opens the Mac app (setup wizard on first run, then Preview), and it updates live as you type mock signs: Claude Code mode shows the confirm prompt and then the canned mock reply, Siri mode shows what was "typed", voice mode shows what was "spoken", and Meet mode shows the scripted captions.
 - Setting `recognizer: replay` runs the app from the landmark fixture with no webcam.
 - All contract tests pass for every mock.
 - Every file `MVP.md` assigns to a person exists, and `make mock` runs with each person's config line still on `mock`.

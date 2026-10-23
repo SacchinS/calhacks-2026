@@ -94,7 +94,7 @@ Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unles
 
 ## Person C: Voice, Siri, Meet, and UI
 
-**You own:** `outputs/tts_cartesia.py`, `outputs/tts_say.py`, `outputs/mock_tts.py`, the Siri output (`outputs/siri.py` and its mock), `captions/`, `ui/`, `fixtures/captions_sample.txt`. Config lines: `tts`, `siri`, and `captions`.
+**You own:** `outputs/tts_cartesia.py`, `outputs/tts_say.py`, `outputs/mock_tts.py`, the Siri output (`outputs/siri.py`, `outputs/mock_siri.py`), `captions/`, `ui/`, `fixtures/captions_sample.txt`. Config lines: `tts`, `siri`, and `captions`.
 
 **Your job:** make the app's English heard as a real microphone, type questions to Siri, show incoming speech as captions, and make the screen clear for a Deaf user. This is the core of the **Cartesia** and **Meta** tracks.
 
