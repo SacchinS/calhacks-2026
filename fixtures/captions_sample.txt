@@ -1,0 +1,7 @@
+# Scripted incoming speech for Meet mode (mock captions). One caption per line.
+Hi! Great to see you.
+Can you hear me okay?
+Thanks for joining the call today.
+How was your weekend?
+Sounds good. Let's get started.
+See you next week. Bye!
