@@ -1,9 +1,4 @@
-import os
-
 import pytest
-
-# UI tests run without a display.
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
 def pytest_addoption(parser):
