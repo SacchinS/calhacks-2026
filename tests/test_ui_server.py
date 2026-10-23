@@ -1,4 +1,5 @@
-"""The engine protocol the Mac app (ui/macos) relies on. No display or Swift needed."""
+"""The engine protocol the Mac app (ui/macos, SignBridge's SwiftUI app) relies on.
+No display or Swift needed."""
 
 import asyncio
 import base64
@@ -6,91 +7,156 @@ import io
 import json
 import sys
 
-import numpy as np
 import pytest
 
-from shared.bus import Bus
+from app import App
 from shared.config import ROOT, load_config
-from shared.events import (
-    LandmarkFrame,
-    MockInput,
-    ModeChanged,
-    SignEvent,
-    Utterance,
-)
-from ui.server import EngineServer, event_to_json, frame_to_json
+from shared.events import Caption, LandmarkFrame, MockInput, OutputReply, SignEvent
+from ui.server import EngineServer, render_preview
 
 
 @pytest.fixture
-def server():
-    return EngineServer(Bus(), load_config().all_mocks(), io.StringIO())
-
-
-def lines(server):
-    return [json.loads(line) for line in server.out.getvalue().splitlines()]
-
-
-def test_ready_describes_components_and_signing_space(server):
-    server.send_ready({"recognizer": "mock"})
-    (ready,) = lines(server)
-    assert ready["type"] == "ready"
-    assert ready["components"] == {"recognizer": "mock"}
-    assert set(ready["signing_space"]) == {"x_min", "x_max", "y_min", "y_max"}
-    assert ready["mirror"] is True
-
-
-async def test_bus_events_are_forwarded_as_json(server):
+async def engine(tmp_path):
+    app = App(load_config().all_mocks())
+    app.router.claude_code.chunk_delay = 0
+    server = EngineServer(app, io.StringIO(), ui_config=tmp_path / "ui.json")
     await server.start()
-    server.bus.publish(ModeChanged("voice"))
-    server.bus.publish(Utterance((SignEvent("TITLE", 0.9, "fingerspell"),)))
-    for _ in range(20):
-        await asyncio.sleep(0.01)
+    await app.start()
+    await server.set_mode("run")
+    yield server
+    await app.stop()
     await server.stop()
-    mode, utterance = lines(server)
-    assert (mode["type"], mode["mode"]) == ("ModeChanged", "voice")
-    assert (utterance["type"], utterance["gloss"]) == ("Utterance", ["fs-TITLE"])
 
 
-def test_frame_message_has_landmarks_and_optional_jpeg():
-    hand = tuple((0.1 * i % 1, 0.5, 0.0) for i in range(21))
-    frame = LandmarkFrame(
-        right_hand=hand, pose=((0.5, 0.5, 0.0),) * 33, face=((0.5, 0.2, 0.0),) * 468
+def messages(server, kind=None):
+    out = [json.loads(line) for line in server.out.getvalue().splitlines()]
+    return [m for m in out if kind is None or m["type"] == kind]
+
+
+async def until(condition, seconds=5.0):
+    for _ in range(int(seconds / 0.02)):
+        if condition():
+            return
+        await asyncio.sleep(0.02)
+    raise AssertionError("condition not met in time")
+
+
+def last_status(server):
+    return messages(server, "status")[-1]
+
+
+async def test_ready_carries_the_apps_settings(engine):
+    engine.send_ready()
+    (ready,) = messages(engine, "ready")
+    assert ready["config"]["onboarded"] is False
+    assert {"still", "phrase_rest", "min_conf", "voice_device"} <= set(ready["config"])
+
+
+async def test_claude_code_flow_goes_through_signbridge_states(engine):
+    await engine.handle_command({"cmd": "gesture", "name": "wake"})
+    assert last_status(engine)["state"] == "listening"
+
+    await engine.handle_command({"cmd": "fake", "glosses": ["MAKE", "TITLE", "RED"]})
+    await until(lambda: last_status(engine)["state"] == "confirming")
+    status = last_status(engine)
+    assert status["glosses"] == ["MAKE", "TITLE", "RED"]
+    assert status["intent"] == {"sentence": "Make title red.", "route": "text"}
+    assert status["target"] == "Claude Code"
+
+    await engine.handle_command({"cmd": "gesture", "name": "confirm"})  # = YES
+    await until(lambda: any(m["done"] for m in messages(engine, "reply")))
+    await until(lambda: last_status(engine)["state"] == "idle")
+    assert "sent" in last_status(engine)["log"]
+
+
+async def test_cancel_while_confirming_sends_nothing(engine):
+    await engine.handle_command({"cmd": "fake", "glosses": ["HELLO"]})
+    await until(lambda: last_status(engine)["state"] == "confirming")
+    await engine.handle_command({"cmd": "gesture", "name": "cancel"})  # = NO
+    await until(lambda: last_status(engine)["state"] == "idle")
+    await asyncio.sleep(0.1)
+    assert messages(engine, "reply") == []
+    assert "cancelled" in last_status(engine)["log"]
+
+
+async def test_cancel_while_signing_clears(engine):
+    engine.bus.publish(MockInput("wrong signs"))
+    await until(lambda: last_status(engine)["glosses"] == ["WRONG", "SIGNS"])
+    await engine.handle_command({"cmd": "gesture", "name": "cancel"})  # = CLEAR
+    await until(
+        lambda: last_status(engine)["state"] == "idle" and not last_status(engine)["glosses"]
     )
-    data = frame_to_json(frame)
-    assert data["type"] == "LandmarkFrame"
-    assert len(data["right_hand"]) == 21 and data["left_hand"] == []
-    assert len(data["pose"]) == 25 and len(data["face"]) == 59
-    assert all(len(p) == 2 for p in data["right_hand"])
-    assert data["jpeg"] is None
 
-    pytest.importorskip("cv2")  # JPEGs need the camera extra
-    image = np.zeros((48, 64, 3), dtype=np.uint8)
-    jpeg = base64.b64decode(event_to_json(LandmarkFrame(image=image))["jpeg"])
+
+async def test_voice_mode_speaks_without_confirming(engine):
+    await engine.handle_command({"cmd": "output_mode", "mode": "voice"})
+    await until(lambda: last_status(engine)["output_mode"] == "voice")
+    await engine.handle_command({"cmd": "mock_input", "text": "tomorrow rain /send"})
+    await until(lambda: "sent" in last_status(engine)["log"])
+    states = [m["state"] for m in messages(engine, "status")]
+    assert "confirming" not in states and "sending" in states
+    sending = next(m for m in messages(engine, "status") if m["state"] == "sending")
+    assert sending["intent"] == {"sentence": "Tomorrow rain.", "route": "siri"}
+
+
+async def test_output_mode_picks_any_mode_and_meet_shows_captions(engine):
+    await engine.handle_command({"cmd": "output_mode", "mode": "meet"})
+    await until(lambda: last_status(engine)["output_mode"] == "meet")
+    await until(lambda: messages(engine, "caption"))
+    await engine.handle_command({"cmd": "output_mode", "mode": "claude_code"})
+    await until(lambda: last_status(engine)["output_mode"] == "claude_code")
+
+
+async def test_mode_off_pauses_the_recognizer(engine):
+    await engine.handle_command({"cmd": "mode", "mode": "off"})
+    engine.bus.publish(MockInput("hello"))
+    await asyncio.sleep(0.1)
+    assert last_status(engine)["glosses"] == []
+    await engine.handle_command({"cmd": "mode", "mode": "run"})
+    engine.bus.publish(MockInput("hello"))
+    await until(lambda: last_status(engine)["glosses"] == ["HELLO"])
+
+
+async def test_checks_routes_and_config(engine, tmp_path):
+    await engine.handle_command({"cmd": "check", "name": "claude"})
+    await until(lambda: messages(engine, "check"))
+    claude = messages(engine, "check")[0]
+    assert claude["ok"] is False and "mock" in claude["detail"]  # honest: the mock isn't Claude
+
+    await engine.handle_command({"cmd": "test_route", "route": "siri", "text": "What time is it?"})
+    await until(lambda: messages(engine, "route_tested"))
+    assert messages(engine, "route_tested")[0]["ok"] is True  # mock TTS
+
+    await engine.handle_command({"cmd": "config", "values": {"onboarded": True}})
+    assert messages(engine, "config")[-1]["config"]["onboarded"] is True
+    assert json.loads((tmp_path / "ui.json").read_text())["onboarded"] is True
+
+    await engine.handle_command({"cmd": "nonsense"})
+    assert messages(engine, "error")
+
+
+async def test_preview_frames_and_extra_events(engine):
+    pytest.importorskip("cv2")  # preview frames need the camera extra
+    await engine.handle_command({"cmd": "preview", "on": True})
+    hand = tuple((0.5 + i / 100, 0.4, 0.0) for i in range(21))
+    engine.bus.publish(LandmarkFrame(right_hand=hand, hands_in_signing_space=True))
+    await until(lambda: messages(engine, "frame"))
+    jpeg = base64.b64decode(messages(engine, "frame")[0]["jpeg"])
     assert jpeg[:2] == b"\xff\xd8"
+    assert render_preview(LandmarkFrame(), engine.space, mirror=True)[:2] == b"\xff\xd8"
 
 
-def test_commands_publish_to_the_bus(server):
-    sub = server.bus.subscribe()
-    assert server.handle_command({"cmd": "mock_input", "text": "hello /send"})
-    assert server.handle_command({"cmd": "control", "sign": "MODE"})
-    assert server.handle_command({"cmd": "control", "sign": "YES"})  # ignored: must be signed
-    assert server.handle_command({"cmd": "mock_input", "text": "  "})  # ignored: empty
-    assert not server.handle_command({"cmd": "quit"})
-    events = [sub.get_nowait() for _ in range(sub.queue.qsize())]
-    assert [type(e) for e in events] == [MockInput, SignEvent]
-    assert (events[1].gloss, events[1].kind) == ("MODE", "control")
+async def test_extra_events_for_captions_and_replies(engine):
+    engine.bus.publish(Caption("Hi there"))
+    engine.bus.publish(OutputReply("claude_code", "Done.", done=True))
+    engine.bus.publish(SignEvent("HELLO", 0.9, "isolated"))
+    await until(lambda: messages(engine, "caption") and messages(engine, "reply"))
+    assert messages(engine, "caption")[0]["text"] == "Hi there"
+    assert messages(engine, "reply")[0] == {"type": "reply", "text": "Done.", "done": True}
+    await until(lambda: "saw HELLO (90%)" in last_status(engine)["log"])
 
 
-async def test_serve_stops_on_quit_or_end_of_input(server):
-    reader = asyncio.StreamReader()
-    reader.feed_data(b'not json\n{"cmd": "control", "sign": "CLEAR"}\n{"cmd": "quit"}\n')
-    await asyncio.wait_for(server.serve(reader), 1)
-    reader = asyncio.StreamReader()
-    reader.feed_eof()
-    await asyncio.wait_for(server.serve(reader), 1)
-
-
-async def test_engine_process_speaks_the_protocol():
+async def test_engine_process_speaks_the_protocol(tmp_path):
     """`python app.py --mock`, driven the way the Mac app drives it."""
     proc = await asyncio.create_subprocess_exec(
         sys.executable, "app.py", "--mock",
@@ -98,37 +164,30 @@ async def test_engine_process_speaks_the_protocol():
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
+        env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"},  # keep ui.json out of the real home
     )  # fmt: skip
 
-    async def read_until(kind):
+    async def read_until(predicate):
         while True:
             line = await asyncio.wait_for(proc.stdout.readline(), 10)
             assert line, "engine exited early"
             message = json.loads(line)  # stdout carries nothing but protocol lines
-            if message["type"] == kind:
+            if predicate(message):
                 return message
 
     def send(command):
         proc.stdin.write((json.dumps(command) + "\n").encode())
 
     try:
-        ready = await read_until("ready")
-        assert ready["components"]["recognizer"] == "mock"
-        assert (await read_until("ModeChanged"))["mode"] == "claude_code"
-
-        send({"cmd": "mock_input", "text": "me want fix bug login page /send"})
-        request = await read_until("ConfirmRequest")
-        assert request["english"] == "I want fix bug login page."
-        send({"cmd": "mock_input", "text": "/yes"})
-        while not (await read_until("OutputReply"))["done"]:
-            pass
-
-        send({"cmd": "control", "sign": "MODE"})
-        assert (await read_until("ModeChanged"))["mode"] == "voice"
-        send({"cmd": "mock_input", "text": "tomorrow rain /send"})
-        sent = await read_until("OutputSent")  # mock TTS prints go to stderr, not the protocol
-        assert (sent["output"], sent["text"]) == ("tts", "Tomorrow rain.")
-
+        assert (await read_until(lambda m: m["type"] == "ready"))["config"]["onboarded"] is False
+        send({"cmd": "mode", "mode": "run"})
+        send({"cmd": "fake", "glosses": ["ME", "WANT", "FIX", "BUG", "LOGIN", "PAGE"]})
+        confirming = await read_until(
+            lambda m: m["type"] == "status" and m["state"] == "confirming"
+        )
+        assert confirming["intent"]["sentence"] == "I want fix bug login page."
+        send({"cmd": "gesture", "name": "confirm"})
+        await read_until(lambda m: m["type"] == "reply" and m["done"])
         send({"cmd": "quit"})
         assert await asyncio.wait_for(proc.wait(), 10) == 0
     finally:
