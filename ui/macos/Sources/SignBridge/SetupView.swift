@@ -75,7 +75,7 @@ struct SetupView: View {
                     let total = SetupStep.allCases.count - 2
                     let finished = completed.subtracting([.welcome, .done]).count
                     Text("\(finished) of \(total) done").font(.caption).foregroundStyle(.secondary)
-                    ProgressView(value: Double(finished), total: Double(total)).tint(Brand.magenta)
+                    ProgressView(value: Double(finished), total: Double(total)).tint(Brand.accent)
                 }
                 .padding(16)
             }
@@ -110,7 +110,7 @@ struct SetupView: View {
                 .padding(16)
             }
         }
-        .tint(Brand.violet)
+        .tint(Brand.accent)
         .ignoresSafeArea(.container, edges: .top)
         .onAppear { go(.welcome) }
     }
@@ -173,7 +173,7 @@ struct WelcomePage: View {
         HStack(spacing: 18) {
             Logo(size: 88)
             VStack(alignment: .leading, spacing: 4) {
-                GradientText("SignBridge", font: .system(size: 40, weight: .bold, design: .rounded))
+                TitleText("SignBridge", font: .system(size: 40, weight: .bold))
                 Text("Sign to your Mac. Ask Siri, type messages, speak in calls.")
                     .font(.title3).foregroundStyle(.secondary)
             }
@@ -334,6 +334,8 @@ struct RouteResult: View {
     }
 }
 
+/// The camera feed. With a finite maxHeight it's a 4:3 box (setup); with .infinity it fills
+/// whatever space it gets, and the video fits inside (Preview and Demo Mode, any window size).
 struct LivePreview: View {
     @ObservedObject var engine: EngineClient
     var maxHeight: CGFloat = 340
@@ -346,7 +348,7 @@ struct LivePreview: View {
             } else {
                 if let error = engine.engineError {
                     VStack(spacing: 10) {
-                        Image(systemName: "video.slash").font(.system(size: 34)).foregroundStyle(Brand.gradient)
+                        Image(systemName: "video.slash").font(.system(size: 34)).foregroundStyle(Brand.accent)
                         Text(error).foregroundStyle(.white).multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                         if error.localizedCaseInsensitiveContains("camera") {
@@ -356,7 +358,7 @@ struct LivePreview: View {
                     .padding(24)
                 } else if engine.mockRecognizer {
                     VStack(spacing: 10) {
-                        Image(systemName: "keyboard").font(.system(size: 34)).foregroundStyle(Brand.gradient)
+                        Image(systemName: "keyboard").font(.system(size: 34)).foregroundStyle(Brand.accent)
                         Text("No camera with the mock recognizer.\nType signs below.").foregroundStyle(.white)
                             .multilineTextAlignment(.center)
                     }
@@ -368,8 +370,18 @@ struct LivePreview: View {
                 }
             }
         }
-        .aspectRatio(4 / 3, contentMode: .fit)
-        .frame(maxHeight: maxHeight)
+        .modifier(CameraSizing(maxHeight: maxHeight))
+    }
+}
+
+private struct CameraSizing: ViewModifier {
+    let maxHeight: CGFloat
+    func body(content: Content) -> some View {
+        if maxHeight == .infinity {
+            content.frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            content.aspectRatio(4 / 3, contentMode: .fit).frame(maxHeight: maxHeight)
+        }
     }
 }
 
