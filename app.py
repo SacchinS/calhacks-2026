@@ -1,8 +1,9 @@
-"""Entry point: wires the bus, recognizer, utterance buffer + translator, router, captions,
-and the two UI windows (PySide6, with asyncio running inside Qt's loop via qasync).
+"""Engine entry point: wires the bus, recognizer, utterance buffer + translator, router, and
+captions, and serves them to the Mac app's windows (ui/macos) as JSON lines.
 
-    uv run python app.py           # components as chosen in config.yaml   (make run)
-    uv run python app.py --mock    # every component forced to its mock    (make mock)
+    make run     # build and open the Mac app; components as chosen in config.yaml
+    make mock    # same, with every component forced to its mock
+    uv run python app.py --mock    # the engine alone, speaking the protocol in the terminal
 
 Any component that fails to load or start falls back to its mock (or the console) with a
 warning in the UI; the app never crashes because one part isn't ready.
@@ -15,8 +16,6 @@ import asyncio
 import contextlib
 import importlib
 import logging
-import signal
-import sys
 from typing import Any
 
 from captions.base import CaptionSource
@@ -66,15 +65,13 @@ def load_class(component: str, choice: str) -> type:
 
 
 class App:
-    def __init__(self, config: Config, bus: Bus | None = None, read_stdin: bool = False):
+    def __init__(self, config: Config, bus: Bus | None = None):
         self.config = config
         self.bus = bus or Bus()
         self.notices: list[Notice] = []  # published in start(), once the UI is listening
         self.chosen = {key: getattr(config, key) for key in REGISTRY}
 
-        self.read_stdin = read_stdin
         self.recognizer: Recognizer = self._build("recognizer", self.bus, config)
-        self._attach_stdin()
         self.translator: Translator = self._build("translator", config)
         self.buffer = UtteranceBuffer(self.bus, self.translator)
         self.console = ConsoleOutput(self.bus, config)
@@ -99,10 +96,6 @@ class App:
             self.chosen[component] = mock
             return load_class(component, mock)(*args)
 
-    def _attach_stdin(self) -> None:
-        if isinstance(self.recognizer, MockRecognizer):
-            self.recognizer.read_stdin = self.read_stdin
-
     def _warn(self, message: str) -> None:
         self.notices.append(Notice("warning", message))
 
@@ -118,7 +111,6 @@ class App:
             self._warn(f"recognizer '{self.chosen['recognizer']}' failed ({exc}); using 'mock'")
             self.chosen["recognizer"] = "mock"
             self.recognizer = MockRecognizer(self.bus, self.config)
-            self._attach_stdin()
             await self.recognizer.start()
         for notice in self.notices:
             self.bus.publish(notice)
@@ -154,60 +146,36 @@ class App:
 
 
 async def run(config: Config) -> None:
-    """Run the app with both windows until the control window (or every window) closes."""
-    from PySide6.QtCore import QTimer
-    from PySide6.QtWidgets import QApplication
+    """Run as the engine of the Mac app (ui/macos), which launches this process and talks to
+    it in JSON lines: commands on stdin, events on stdout. See ui/server.py."""
+    from ui.server import EngineServer, protocol_stdout, stdin_reader
 
-    from ui.bridge import BusBridge
-    from ui.camera_window import CameraWindow
-    from ui.control_window import ControlWindow
-
-    qt_app = QApplication.instance()
-    closed = asyncio.Event()
-    qt_app.setQuitOnLastWindowClosed(False)
-    qt_app.lastWindowClosed.connect(closed.set)
-    # Ctrl-C in the terminal: Python only sees the signal when it runs, so tick regularly.
-    signal.signal(signal.SIGINT, lambda *_: closed.set())
-    tick = QTimer(interval=200, timeout=lambda: None)
-    tick.start()
-
-    app = App(config, read_stdin=True)
-    bridge = BusBridge(app.bus)
-    camera = CameraWindow(bridge, config)
-    control = ControlWindow(bridge, app.chosen)
-    control.closing.connect(closed.set)
-    await bridge.start()  # before the app, so the windows see the first ModeChanged and notices
-    camera.show_restored()
-    control.show_beside()
+    server = EngineServer(Bus(), config, protocol_stdout())
+    app = App(config, bus=server.bus)
+    server.send_ready(app.chosen)
+    await server.start()  # before the app, so the windows see the first ModeChanged and notices
     await app.start()
-    control.set_components(app.chosen)  # a component may have fallen back while starting
+    server.send_components(app.chosen)  # a component may have fallen back while starting
     try:
-        await closed.wait()
+        await server.serve(await stdin_reader())
     finally:
         await app.stop()
-        await bridge.stop()
-        camera.close()
-        control.close()
+        await server.stop()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Sign to Claude Code, Siri, and Meet.")
+    parser = argparse.ArgumentParser(description="Sign to Claude Code, Siri, and Meet (engine).")
     parser.add_argument("--mock", action="store_true", help="force every component to its mock")
     parser.add_argument("--config", help="path to config.yaml")
     args = parser.parse_args()
 
+    # Logs go to stderr: stdout carries the protocol.
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     config = load_config(args.config)
     if args.mock:
         config = config.all_mocks()
-
-    import qasync
-    from PySide6.QtWidgets import QApplication
-
-    qt_app = QApplication(sys.argv)
-    qt_app.setApplicationName("calhacks-2026")
     with contextlib.suppress(KeyboardInterrupt):
-        qasync.run(run(config))
+        asyncio.run(run(config))
 
 
 if __name__ == "__main__":
