@@ -454,10 +454,11 @@ class EngineServer:
         output = self.app.router.siri if route == "siri" else self.app.router.tts
         try:
             if not output.available():
-                ok, detail = (
-                    False,
-                    f"The {component} output ({self.app.chosen.get(component)}) isn't available.",
-                )
+                chosen = self.app.chosen.get(component)
+                detail = f"The {component} output ({chosen}) isn't available."
+                if component == "siri":
+                    detail += " Give SignBridge Accessibility permission, then try again."
+                ok = False
             else:
                 await output.send(text)
                 ok, detail = True, ""

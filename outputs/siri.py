@@ -1,20 +1,82 @@
-"""Types a question to Siri with Type to Siri. STUB: unavailable, so the router uses the console.
+"""Types a question to Siri with Type to Siri, the way SignBridge's engine did.
 
-"Hey Siri" can't be triggered through a virtual mic, so Siri gets text, not speech. Needs:
+"Hey Siri" can't be triggered through a virtual mic, so Siri gets text, not speech:
+hold Cmd-Space to open Siri, paste the question, press Return. Needs:
 - Siri's keyboard shortcut set to "Hold Command Space" (Apple Intelligence & Siri settings)
 - Type to Siri turned on (Accessibility > Siri)
-- Accessibility permission for the app, to post keystrokes
+- Accessibility permission for the app (or the terminal running `make run`), to post keystrokes
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import sys
+import time
 
 from outputs.base import Output
 from shared.bus import Bus
 from shared.config import Config
 
 log = logging.getLogger(__name__)
+
+KEY_V, KEY_RETURN, KEY_SPACE, KEY_COMMAND = 9, 36, 49, 55
+
+
+def accessibility_ok() -> bool:
+    """True if this process may post keystrokes (System Settings > Privacy > Accessibility)."""
+    if sys.platform != "darwin":
+        return False
+    try:
+        from ApplicationServices import AXIsProcessTrusted
+
+        return bool(AXIsProcessTrusted())
+    except Exception as exc:  # pyobjc missing
+        log.warning("can't check Accessibility permission: %s", exc)
+        return False
+
+
+def post_key(keycode: int, down: bool, flags: int = 0) -> None:
+    import Quartz
+
+    event = Quartz.CGEventCreateKeyboardEvent(None, keycode, down)
+    Quartz.CGEventSetFlags(event, flags)
+    Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
+    time.sleep(0.02)
+
+
+def press(keycode: int, flags: int = 0) -> None:
+    post_key(keycode, True, flags)
+    post_key(keycode, False, flags)
+
+
+def open_siri(hold_seconds: float) -> None:
+    """Hold Cmd-Space, sending real modifier key events (a flag alone doesn't open Siri)."""
+    import Quartz
+
+    cmd = Quartz.kCGEventFlagMaskCommand
+    post_key(KEY_COMMAND, True, cmd)
+    post_key(KEY_SPACE, True, cmd)
+    time.sleep(hold_seconds)
+    post_key(KEY_SPACE, False, cmd)
+    post_key(KEY_COMMAND, False, 0)
+
+
+def paste(text: str, restore_delay: float = 0.3) -> None:
+    """Paste with Cmd-V, then put the user's clipboard back."""
+    import Quartz
+    from AppKit import NSPasteboard, NSPasteboardTypeString
+
+    board = NSPasteboard.generalPasteboard()
+    saved = board.stringForType_(NSPasteboardTypeString)
+    board.clearContents()
+    board.setString_forType_(text, NSPasteboardTypeString)
+    time.sleep(0.05)
+    press(KEY_V, Quartz.kCGEventFlagMaskCommand)
+    time.sleep(restore_delay)
+    if saved is not None:
+        board.clearContents()
+        board.setString_forType_(saved, NSPasteboardTypeString)
 
 
 class SiriOutput(Output):
@@ -24,21 +86,18 @@ class SiriOutput(Output):
         super().__init__(bus, config)
         self.hold_seconds = float(config.get("type_to_siri.hold_seconds", 0.8))
         self.open_delay = float(config.get("type_to_siri.open_delay", 0.4))
-        log.warning("SiriOutput is a stub: questions go to the console")
 
     def available(self) -> bool:
-        # TODO(Person C): return sys.platform == "darwin" and AXIsProcessTrusted()
-        # (from ApplicationServices, pyobjc-framework-ApplicationServices).
-        return False
+        return accessibility_ok()
 
     async def send(self, text: str) -> None:
-        # TODO(Person C): port route_siri from SignBridge's signbridge/routes.py, in a thread
-        # (asyncio.to_thread) so the event loop keeps running:
-        #   1. Hold Cmd-Space for self.hold_seconds with Quartz CGEventCreateKeyboardEvent /
-        #      CGEventPost (key down Command 55, Space 49; wait; key up Space, Command).
-        #   2. Wait self.open_delay for the Type to Siri field to open.
-        #   3. Paste the text: save the clipboard (NSPasteboard), set it to `text`, post Cmd-V
-        #      (key 9), then restore the old clipboard.
-        #   4. Press Return (key 36).
-        # Needs pyobjc-framework-Quartz and pyobjc-framework-Cocoa. Raise on failure.
-        raise NotImplementedError("SiriOutput is a stub")
+        if not accessibility_ok():
+            raise RuntimeError("needs Accessibility permission to type to Siri")
+        log.info("typing to Siri: %s", text)
+        await asyncio.to_thread(self._type, text)
+
+    def _type(self, text: str) -> None:
+        open_siri(self.hold_seconds)
+        time.sleep(self.open_delay)
+        paste(text)
+        press(KEY_RETURN)

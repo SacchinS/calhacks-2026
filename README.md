@@ -105,7 +105,7 @@ tts: mock               # mock | say | cartesia
 captions: mock          # mock | cartesia
 ```
 
-`recognizer: replay` plays `fixtures/landmarks_sample.jsonl`, so you don't need a webcam (its preview needs `uv sync --extra camera`). `recognizer: camera` asks for camera permission the first time (allow it for your terminal app). `siri: real` needs Siri's shortcut set to Hold Command Space, Type to Siri turned on, and Accessibility permission for the app. With `tts: say` or `tts: cartesia`, select "BlackHole 2ch" as the microphone in dictation or Meet. A component that isn't ready falls back to its mock or to the console, with a note in the Preview window.
+`recognizer: replay` plays `fixtures/landmarks_sample.jsonl`, so you don't need a webcam (its preview needs `uv sync --extra camera`). `recognizer: camera` asks for camera permission the first time (allow it for your terminal app). `siri: real` types the English into Siri. It needs Siri's keyboard shortcut set to Hold Command Space (System Settings > Apple Intelligence & Siri), Type to Siri turned on (Accessibility > Siri), and Accessibility permission for the app (or your terminal, with `make run`). Check the shortcut first: with the default shortcut, Cmd-Space opens Spotlight instead. With `tts: say` or `tts: cartesia`, select "BlackHole 2ch" as the microphone in dictation or Meet. A component that isn't ready falls back to its mock or to the console, with a note in the Preview window.
 
 ```bash
 make test                         # unit, contract, and end-to-end tests (no real API calls)
