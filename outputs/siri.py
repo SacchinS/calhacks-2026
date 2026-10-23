@@ -1,7 +1,9 @@
 """Types a question to Siri with Type to Siri, the way SignBridge's engine did.
 
 "Hey Siri" can't be triggered through a virtual mic, so Siri gets text, not speech:
-hold Cmd-Space to open Siri, paste the question, press Return. Needs:
+hold Cmd-Space to open Siri, wait, paste the question, press Return (SignBridge's route, 10/10
+in its tests). Run it with another app in front, not a terminal: a terminal catches the Cmd-V.
+Needs:
 - Siri's keyboard shortcut set to "Hold Command Space" (Apple Intelligence & Siri settings)
 - Type to Siri turned on (Accessibility > Siri)
 - Accessibility permission for the app (or the terminal running `make run`), to post keystrokes
@@ -11,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import subprocess
 import sys
 import time
 
@@ -62,6 +65,20 @@ def open_siri(hold_seconds: float) -> None:
     post_key(KEY_COMMAND, False, 0)
 
 
+def type_to_siri_enabled() -> bool:
+    """Type to Siri must be on, or holding the shortcut opens voice Siri and the paste is lost."""
+    try:
+        out = subprocess.run(
+            ["defaults", "read", "com.apple.Siri", "TypeToSiriEnabled"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return out.stdout.strip() == "1"
+
+
 def paste(text: str, restore_delay: float = 0.3) -> None:
     """Paste with Cmd-V, then put the user's clipboard back."""
     import Quartz
@@ -93,6 +110,8 @@ class SiriOutput(Output):
     async def send(self, text: str) -> None:
         if not accessibility_ok():
             raise RuntimeError("needs Accessibility permission to type to Siri")
+        if not type_to_siri_enabled():
+            raise RuntimeError("turn on Type to Siri (System Settings > Accessibility > Siri)")
         log.info("typing to Siri: %s", text)
         await asyncio.to_thread(self._type, text)
 
