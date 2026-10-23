@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, get_args
 
 Point = tuple[float, float, float]  # normalized x, y (0..1, y down) and relative depth z
-Mode = Literal["claude_code", "voice", "meet"]
+Mode = Literal["claude_code", "siri", "voice", "meet"]
 SignKind = Literal["isolated", "fingerspell", "control"]
 NoticeLevel = Literal["info", "warning", "error"]
 

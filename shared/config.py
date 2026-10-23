@@ -19,6 +19,7 @@ CHOICES: dict[str, tuple[str, ...]] = {
     "recognizer": ("mock", "replay", "camera"),
     "translator": ("mock", "claude"),
     "claude_code": ("mock", "real"),
+    "siri": ("mock", "real"),
     "tts": ("mock", "say", "cartesia"),
     "captions": ("mock", "cartesia"),
 }
@@ -29,6 +30,7 @@ class Config:
     recognizer: str = "mock"
     translator: str = "mock"
     claude_code: str = "mock"
+    siri: str = "mock"
     tts: str = "mock"
     captions: str = "mock"
     mode: str = "claude_code"

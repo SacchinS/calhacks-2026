@@ -47,8 +47,9 @@ def setup():
     claude_code = RecordingOutput("claude_code")
     tts = RecordingOutput("tts")
     console = RecordingOutput("console")
-    router = Router(bus, claude_code=claude_code, tts=tts, console=console)
-    return bus, events, router, claude_code, tts, console
+    siri = RecordingOutput("siri")
+    router = Router(bus, claude_code=claude_code, tts=tts, console=console, siri=siri)
+    return bus, events, router, claude_code, tts, console, siri
 
 
 def drain(sub):
@@ -59,7 +60,7 @@ def drain(sub):
 
 
 async def test_yes_sends_to_claude_code(setup):
-    bus, events, router, claude_code, tts, console = setup
+    bus, events, router, claude_code, tts, console, _ = setup
     await router.handle(translation())
     (request,) = [e for e in drain(events) if isinstance(e, ConfirmRequest)]
     assert request.english == "Fix the login page."
@@ -74,7 +75,7 @@ async def test_yes_sends_to_claude_code(setup):
 
 
 async def test_no_discards(setup):
-    bus, events, router, claude_code, tts, console = setup
+    bus, events, router, claude_code, tts, console, _ = setup
     await router.handle(translation())
     await router.handle(control("NO"))
     await router.handle(control("YES"))  # nothing pending any more
@@ -83,22 +84,40 @@ async def test_no_discards(setup):
     assert [r.approved for r in results] == [False]
 
 
-async def test_voice_mode_speaks_without_confirm(setup):
-    bus, events, router, claude_code, tts, console = setup
+async def test_siri_mode_types_to_siri_without_confirm(setup):
+    bus, events, router, claude_code, tts, console, siri = setup
     await router.handle(control("MODE"))
-    assert router.mode == "voice"
+    assert router.mode == "siri"
+    await router.handle(translation("Will it rain tomorrow?"))
+    assert siri.sent == ["Will it rain tomorrow?"]
+    assert tts.sent == [] and claude_code.sent == []
+    assert not any(isinstance(e, ConfirmRequest) for e in drain(events))
+
+
+async def test_siri_mode_without_a_siri_output_uses_the_console():
+    console = RecordingOutput("console")
+    router = Router(Bus(), claude_code=console, tts=console, console=console, mode="siri")
+    await router.handle(translation("Hi."))
+    assert console.sent == ["Hi."]
+
+
+async def test_voice_mode_speaks_without_confirm(setup):
+    bus, events, router, claude_code, tts, console, siri = setup
+    router.set_mode("voice")
     await router.handle(translation("Hello."))
     assert tts.sent == ["Hello."]
+    assert siri.sent == []
     assert not any(isinstance(e, ConfirmRequest) for e in drain(events))
 
 
 async def test_mode_cycles_and_cancels_pending(setup):
     bus, events, router, *_ = setup
     await router.handle(translation())
-    for _ in range(3):
+    for _ in range(4):
         await router.handle(control("MODE"))
     published = drain(events)
     assert [e.mode for e in published if isinstance(e, ModeChanged)] == [
+        "siri",
         "voice",
         "meet",
         "claude_code",

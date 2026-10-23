@@ -88,11 +88,23 @@ async def test_clear_empties_the_utterance(app):
     assert translation.gloss == ["HELLO"]
 
 
-async def test_voice_mode_speaks_without_confirm(app):
+async def test_siri_mode_types_without_confirm(app):
     events = app.bus.subscribe()
     await app.start()
     app.bus.publish(MockInput("/mode"))
     assert (await next_of(events, ModeChanged)).mode == "claude_code"  # initial mode
+    assert (await next_of(events, ModeChanged)).mode == "siri"
+    app.bus.publish(MockInput("tomorrow rain /send"))
+    sent = await next_of(events, OutputSent)
+    assert (sent.output, sent.text) == ("siri", "Tomorrow rain.")
+
+
+async def test_voice_mode_speaks_without_confirm(app):
+    events = app.bus.subscribe()
+    await app.start()
+    app.bus.publish(MockInput("/mode /mode"))
+    assert (await next_of(events, ModeChanged)).mode == "claude_code"  # initial mode
+    assert (await next_of(events, ModeChanged)).mode == "siri"
     assert (await next_of(events, ModeChanged)).mode == "voice"
     app.bus.publish(MockInput("tomorrow rain /send"))
     sent = await next_of(events, OutputSent)
@@ -104,7 +116,7 @@ async def test_meet_mode_shows_captions_only_in_meet(app):
     await app.start()
     await settle()
     assert not any(isinstance(e, Caption) for e in drain(events))
-    app.bus.publish(MockInput("/mode /mode"))
+    app.bus.publish(MockInput("/mode /mode /mode"))  # claude_code -> siri -> voice -> meet
     caption = await next_of(events, Caption)
     assert caption.text
     app.bus.publish(MockInput("/mode"))  # back to claude_code: captions stop

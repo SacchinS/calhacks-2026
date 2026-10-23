@@ -46,6 +46,10 @@ REGISTRY: dict[str, dict[str, str]] = {
         "mock": "outputs.mock_claude_code:MockClaudeCodeOutput",
         "real": "outputs.claude_code:ClaudeCodeOutput",
     },
+    "siri": {
+        "mock": "outputs.mock_siri:MockSiriOutput",
+        "real": "outputs.siri:SiriOutput",
+    },
     "tts": {
         "mock": "outputs.mock_tts:MockTTSOutput",
         "say": "outputs.tts_say:SayTTSOutput",
@@ -78,6 +82,7 @@ class App:
         self.router = Router(
             self.bus,
             claude_code=self._build("claude_code", self.bus, config),
+            siri=self._build("siri", self.bus, config),
             tts=self._build("tts", self.bus, config),
             console=self.console,
             mode=config.mode,  # type: ignore[arg-type]
