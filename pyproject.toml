@@ -1,0 +1,48 @@
+[project]
+name = "calhacks-2026"
+version = "0.1.0"
+description = "Sign to your webcam; your signing becomes English for Claude Code, Siri, dictation, and Google Meet."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "anthropic>=2.1.0",
+    "cartesia>=4.2.0",
+    "fastapi>=0.161.1",
+    "numpy>=2.4.6",
+    "python-dotenv>=1.2.4",
+    "pyyaml>=6.0.3",
+    "sounddevice>=0.5.6",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.optional-dependencies]
+# Person A: live webcam + MediaPipe landmarks (`uv sync --extra camera`).
+camera = [
+    "mediapipe>=1.1.1",
+    "opencv-python>=5.0.0.93",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.2",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["live: needs real hardware or API keys; run with `pytest --live`"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "ASYNC"]
