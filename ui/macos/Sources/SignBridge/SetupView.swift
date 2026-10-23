@@ -354,6 +354,12 @@ struct LivePreview: View {
                         }
                     }
                     .padding(24)
+                } else if engine.mockRecognizer {
+                    VStack(spacing: 10) {
+                        Image(systemName: "keyboard").font(.system(size: 34)).foregroundStyle(Brand.gradient)
+                        Text("No camera with the mock recognizer.\nType signs below.").foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                    }
                 } else {
                     VStack {
                         ProgressView()

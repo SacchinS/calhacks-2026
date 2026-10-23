@@ -7,7 +7,7 @@ struct HistoryItem: Identifiable {
     let glosses: [String], sentence: String, route: String, sent: Bool, date: Date
 }
 
-/// Launches the Python engine (signbridge.server) and talks JSON lines with it.
+/// Launches the Python engine (app.py, protocol in ui/server.py) and talks JSON lines with it.
 /// Inside the app bundle it uses the bundled Python; in development it uses the repo's .venv.
 @MainActor
 final class EngineClient: ObservableObject {
@@ -33,7 +33,15 @@ final class EngineClient: ObservableObject {
     @Published var lastCalibration: String?
     @Published var lastRouteTest: (route: String, ok: Bool, detail: String)?
     @Published var history: [HistoryItem] = []  // newest first
+    // calhacks-2026 additions: where English goes, Meet captions, Claude Code's reply, mock signs
+    @Published var outputMode = "claude_code"
+    @Published var components: [String: String] = [:]
+    @Published var mockRecognizer = false
+    @Published var captions: [String] = []
+    @Published var replies: [String] = []
     private var pending: (glosses: [String], sentence: String, route: String)?
+    /// Arguments for the engine, e.g. --mock (everything after the app's own binary path).
+    let engineArguments = Array(CommandLine.arguments.dropFirst())
 
     private var process: Process?
     private var input: FileHandle?
@@ -49,17 +57,26 @@ final class EngineClient: ObservableObject {
         if let res = Bundle.main.resourceURL {
             let py = res.appendingPathComponent("python/bin/python3")
             if fm.isExecutableFile(atPath: py.path) {
-                let path = [res.appendingPathComponent("engine").path, res.appendingPathComponent("site-packages").path]
-                return (py, res, path.joined(separator: ":"))
+                let engine = res.appendingPathComponent("engine")
+                let path = [engine.path, res.appendingPathComponent("site-packages").path]
+                return (py, engine, path.joined(separator: ":"))
             }
         }
-        // Development: SIGNBRIDGE_DEV_ROOT or ~/code/signbridge
-        let root = ProcessInfo.processInfo.environment["SIGNBRIDGE_DEV_ROOT"]
-            .map { URL(fileURLWithPath: $0) }
-            ?? fm.homeDirectoryForCurrentUser.appendingPathComponent("code/signbridge")
+        guard let root = devRoot() else { return nil }
         let py = root.appendingPathComponent(".venv/bin/python")
         guard fm.isExecutableFile(atPath: py.path) else { return nil }
         return (py, root, root.path)
+    }
+
+    /// Development: ENGINE_ROOT (set by the Makefile), or the first folder above this binary with app.py.
+    nonisolated static func devRoot() -> URL? {
+        if let root = ProcessInfo.processInfo.environment["ENGINE_ROOT"] { return URL(fileURLWithPath: root) }
+        var dir = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath().deletingLastPathComponent()
+        while dir.path != "/" {
+            if FileManager.default.fileExists(atPath: dir.appendingPathComponent("app.py").path) { return dir }
+            dir = dir.deletingLastPathComponent()
+        }
+        return nil
     }
 
     func start() {
@@ -70,10 +87,9 @@ final class EngineClient: ObservableObject {
         }
         let p = Process()
         p.executableURL = loc.python
-        p.arguments = ["-m", "signbridge.server"]
+        p.arguments = ["app.py"] + engineArguments
         p.currentDirectoryURL = loc.resources
         var env = ProcessInfo.processInfo.environment
-        env["SIGNBRIDGE_RESOURCES"] = loc.resources.path
         env["PYTHONPATH"] = loc.pythonPath
         env["PYTHONUNBUFFERED"] = "1"
         env["PATH"] = (env["PATH"] ?? "/usr/bin:/bin") + ":/opt/homebrew/bin:/usr/local/bin:" +
@@ -82,7 +98,10 @@ final class EngineClient: ObservableObject {
         let inPipe = Pipe(), outPipe = Pipe()
         p.standardInput = inPipe
         p.standardOutput = outPipe
-        p.standardError = FileHandle(forWritingAtPath: Self.logPath()) ?? FileHandle.standardError
+        // Engine logs: the terminal in development (make mock), a log file in the app bundle.
+        let bundled = Bundle.main.resourceURL.map { loc.resources.path.hasPrefix($0.path) } ?? false
+        p.standardError = bundled ? (FileHandle(forWritingAtPath: Self.logPath()) ?? FileHandle.standardError)
+            : FileHandle.standardError
         outPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             Task { @MainActor in self?.receive(data) }
@@ -100,11 +119,26 @@ final class EngineClient: ObservableObject {
         input = inPipe.fileHandleForWriting
         running = true
         engineError = nil
+        if !bundled { forwardTerminalInput() }
+    }
+
+    /// `make mock` in a terminal: lines typed there are mock signs, like the mock-sign box.
+    private func forwardTerminalInput() {
+        guard isatty(STDIN_FILENO) == 1, FileHandle.standardInput.readabilityHandler == nil else { return }
+        FileHandle.standardError.write(Data("Mock signs: type gloss + Enter (#word = fingerspell, /yes /no /send ...)\n".utf8))
+        let splitter = LineSplitter()
+        FileHandle.standardInput.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            if data.isEmpty { handle.readabilityHandler = nil; return }
+            for line in splitter.lines(adding: data) {
+                Task { @MainActor in self?.mockInput(line) }
+            }
+        }
     }
 
     static func logPath() -> String {
         let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Logs/SignBridge")
+            .appendingPathComponent("Library/Logs/calhacks-2026")  // not SignBridge's: that's the earlier app's log
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let file = dir.appendingPathComponent("engine.log")
         FileManager.default.createFile(atPath: file.path, contents: nil)
@@ -122,7 +156,7 @@ final class EngineClient: ObservableObject {
         input = nil
         running = false
         if !stopping {
-            engineError = "The engine stopped (code \(code)). Restarting… Details: ~/Library/Logs/SignBridge/engine.log"
+            engineError = "The engine stopped (code \(code)). Restarting… Details: ~/Library/Logs/calhacks-2026/engine.log"
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.start() }
         }
     }
@@ -151,6 +185,10 @@ final class EngineClient: ObservableObject {
     }
     func calibrate() { send(["cmd": "calibrate"]) }
     func saveConfig(_ values: [String: Any]) { send(["cmd": "config", "values": values]) }
+    func setOutputMode(_ mode: String) { send(["cmd": "output_mode", "mode": mode]) }
+    func mockInput(_ text: String) {
+        if !text.trimmingCharacters(in: .whitespaces).isEmpty { send(["cmd": "mock_input", "text": text]) }
+    }
 
     // MARK: events
 
@@ -174,8 +212,9 @@ final class EngineClient: ObservableObject {
             config = e["config"] as? [String: Any] ?? config
         case "status":
             let newState = e["state"] as? String ?? "idle"
-            if newState == "confirming", let intent = e["intent"] as? [String: Any],
-               let text = intent["sentence"] as? String {
+            // Voice and Meet send without confirming, so remember the phrase while sending too.
+            if newState == "confirming" || (newState == "sending" && pending == nil),
+               let intent = e["intent"] as? [String: Any], let text = intent["sentence"] as? String {
                 pending = (e["glosses"] as? [String] ?? [], text, intent["route"] as? String ?? "")
             }
             if newState == "idle", state == "sending" || state == "confirming", let p = pending {
@@ -205,6 +244,9 @@ final class EngineClient: ObservableObject {
             let practice = e["practice"] as? [String: Any]
             practiceDone = practice?["done"] as? [String] ?? []
             practiceTodo = practice?["todo"] as? [String] ?? []
+            outputMode = e["output_mode"] as? String ?? outputMode
+            components = e["components"] as? [String: String] ?? components
+            mockRecognizer = e["mock"] as? Bool ?? mockRecognizer
         case "frame":
             if let b64 = e["jpeg"] as? String, let data = Data(base64Encoded: b64) {
                 frame = NSImage(data: data)
@@ -217,10 +259,28 @@ final class EngineClient: ObservableObject {
             lastCalibration = e["message"] as? String
         case "route_tested":
             lastRouteTest = (e["route"] as? String ?? "", e["ok"] as? Bool ?? false, e["detail"] as? String ?? "")
+        case "caption":
+            captions = Array((captions + [e["text"] as? String ?? ""]).suffix(30))
+        case "reply":
+            replies = Array((replies + [e["text"] as? String ?? ""]).suffix(60))
         case "error":
             engineError = e["message"] as? String
         default:
             break
         }
+    }
+}
+
+/// Splits incoming bytes into lines. Used from one serial file-handle queue only.
+final class LineSplitter: @unchecked Sendable {
+    private var pending = Data()
+    func lines(adding data: Data) -> [String] {
+        pending.append(data)
+        var lines: [String] = []
+        while let nl = pending.firstIndex(of: 0x0A) {
+            lines.append(String(decoding: pending[pending.startIndex..<nl], as: UTF8.self))
+            pending.removeSubrange(pending.startIndex...nl)
+        }
+        return lines
     }
 }
