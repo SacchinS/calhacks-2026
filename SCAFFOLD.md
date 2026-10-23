@@ -1,0 +1,173 @@
+# Scaffolding brief for `calhacks-2026`
+
+You're setting up the skeleton of a hackathon project (Cal Hacks 13.0, 3-person team, ~36 hours). **This task is scaffolding only.** The goal: every component exists behind an interface, every component has a working mock, the whole app runs end to end on mocks, and the remaining work splits cleanly across 3 teammates who can each swap their mocks for real implementations without touching anyone else's code. Don't implement real ML models, real LLM calls, or real audio routing yet. Leave clear `TODO` stubs where they'll go.
+
+Read `README.md` first for the product context.
+
+## Product in one paragraph
+
+A laptop app for Deaf ASL signers. A webcam feed is turned into hand and pose landmarks (MediaPipe). Isolated signs and fingerspelling are recognized from the landmarks, and a language model turns the resulting gloss (e.g. `ME WANT FIX BUG LOGIN PAGE`) into natural English. A router then sends that English to one of two places. The first is **Claude Code**, after the signer confirms with a signed YES/NO. The second is **text-to-speech through a virtual microphone** (BlackHole on macOS), so Siri, system dictation, and Google Meet hear it as normal mic input. In Meet mode, incoming speech is also shown as captions.
+
+## Tech defaults (change only if there's a strong reason, and say why)
+
+- Python 3.11, managed with `uv` (fall back to `pip` + `requirements.txt` if needed).
+- Target: macOS (Apple Silicon) first. Keep the OS-specific parts behind interfaces.
+- UI: a small local web UI served by FastAPI, with a WebSocket for live updates (current gloss, English preview, confirm prompt, mode, captions). Plain HTML/JS, no frontend build step.
+- Config: one `config.yaml` plus `.env` for secrets (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`). Commit a `.env.example`, never `.env`.
+- Tests: `pytest`. Lint/format: `ruff`.
+
+## Repo structure to create
+
+```
+calhacks-2026/
+  README.md                 # exists, don't rewrite. Only fill in "Getting started" at the end
+  pyproject.toml
+  config.yaml
+  .env.example
+  .gitignore
+  Makefile                  # make run, make mock, make test, make lint
+  TASKS.md                  # per-teammate task lists (see "Team split" below)
+  fixtures/
+    landmarks_sample.jsonl  # a few seconds of fake or recorded landmark frames for replay
+    captions_sample.txt     # scripted incoming-speech lines for Meet mode
+  shared/
+    events.py               # dataclasses for every message passed between modules
+    bus.py                  # tiny in-process pub/sub (asyncio queues)
+    config.py               # loads config.yaml + .env
+  recognition/
+    base.py                 # Recognizer interface
+    mock.py                 # keyboard-driven mock recognizer (see below)
+    replay.py               # replays fixtures/landmarks_sample.jsonl as LandmarkFrames (no webcam needed)
+    camera.py               # webcam capture + MediaPipe landmarks (stub OK, but runnable if easy)
+    gating.py               # signing-area gating: only recognize when hands are in the signing space
+    isolated.py             # stub: isolated sign model (Kaggle ISLR 1st place, TFLite)
+    fingerspelling.py       # stub: fingerspelling model
+    segmenter.py            # turns a stream of per-frame predictions into discrete SignEvents
+  language/
+    base.py                 # Translator interface: list[gloss] -> English
+    mock.py                 # rule-based mock (join tokens, light cleanup) for offline demo
+    llm.py                  # stub: Claude / Gemini translator, provider chosen in config
+    prompts/gloss_to_english.md
+  outputs/
+    base.py                 # Output interface
+    router.py               # chooses output by current mode; handles YES/NO confirmation
+    claude_code.py          # stub: send text to Claude Code (subprocess `claude -p` or terminal paste)
+    tts_virtual_mic.py      # stub: TTS -> BlackHole virtual mic
+    console.py              # prints to terminal, always available, used in tests
+    mock_claude_code.py     # pretends to be Claude Code: streams a canned reply back to the UI
+    mock_tts.py             # logs the text it "spoke" (optionally plays it on speakers with `say`)
+  captions/
+    base.py                 # CaptionSource interface (incoming speech -> Caption events)
+    mock.py                 # emits lines from fixtures/captions_sample.txt on a timer
+    live.py                 # stub: real speech-to-text of the Meet audio
+  ui/
+    server.py               # FastAPI app + WebSocket
+    static/index.html
+    static/app.js
+    static/style.css
+  app.py                    # entry point: wires bus + recognizer + translator + router + UI
+  tools/
+    record_landmarks.py     # records webcam landmarks to a .jsonl fixture (stub if MediaPipe won't install)
+  tests/
+    contracts/              # one contract test per interface; mocks AND real implementations must pass them
+    test_bus.py
+    test_segmenter.py
+    test_router_confirm.py
+    test_end_to_end_mock.py
+```
+
+## Core interfaces (define these precisely, everything else depends on them)
+
+In `shared/events.py`, as frozen dataclasses with timestamps:
+
+- `LandmarkFrame`: per-frame hand/pose/face landmarks plus a `hands_in_signing_space` flag.
+- `SignEvent`: `gloss: str`, `confidence: float`, `kind: "isolated" | "fingerspell" | "control"`.
+- `Utterance`: the list of `SignEvent`s between an utterance start and end.
+- `Translation`: `gloss: list[str]`, `english: str`, `provider: str`.
+- `ConfirmRequest` / `ConfirmResult`: for the YES/NO step before anything is sent to Claude Code.
+- `ModeChanged`: `mode: "claude_code" | "voice" | "meet"`.
+- `Caption`: incoming speech text for Meet mode (stub source for now).
+
+Control signs are ordinary `SignEvent`s with `kind="control"`: `YES`, `NO`, `SEND` (end of utterance), `CLEAR`, and `MODE` (cycle modes). They must never be sent to the translator.
+
+Interfaces:
+
+- `Recognizer`: async, `start()`, `stop()`, publishes `SignEvent`s to the bus.
+- `Translator`: `async translate(gloss: list[str]) -> Translation`.
+- `Output`: `async send(text: str) -> None`, plus `name` and `available()`.
+
+## The mock recognizer (most important piece for the team)
+
+The team needs to build and demo everything downstream before the models work. `recognition/mock.py` reads the keyboard in the terminal (or takes input from a text box in the web UI) and publishes `SignEvent`s:
+
+- Typing a word + Enter publishes an isolated sign with that gloss (uppercased).
+- `#hello` publishes a fingerspelled word.
+- `/yes`, `/no`, `/send`, `/clear`, `/mode` publish control signs.
+- `make mock` runs the whole app with the mock recognizer, mock translator, and console output, so it works with no webcam, no API keys, and no BlackHole.
+
+## Every component has a mock, chosen in config
+
+`config.yaml` picks the implementation for each component independently, and every default is the mock:
+
+```yaml
+recognizer: mock        # mock | replay | camera
+translator: mock        # mock | claude | gemini
+claude_code: mock       # mock | real
+tts: mock               # mock | blackhole
+captions: mock          # mock | live
+```
+
+`make mock` uses all mocks. Each teammate flips only their own line while developing, so one person's half-finished code never breaks anyone else's run. Add a contract test in `tests/contracts/` for each interface (`Recognizer`, `Translator`, `Output`, `CaptionSource`) that the mock passes now and the real implementation must pass later.
+
+## Flow to wire up end to end
+
+1. The recognizer publishes `SignEvent`s.
+2. An utterance buffer collects them until `SEND`. `CLEAR` empties it.
+3. The translator turns the utterance's gloss into English.
+4. The router checks the mode:
+   - `claude_code`: publish a `ConfirmRequest` showing the English, wait for `YES` or `NO`, and only send on `YES`.
+   - `voice` and `meet`: send straight to the TTS output.
+5. The UI shows the live gloss, the English preview, the confirm prompt, the current mode, and captions.
+
+If an output isn't available (e.g. BlackHole isn't installed), fall back to `console` and show a warning in the UI. Never crash.
+
+## Stubs: what "done" looks like for each
+
+Each stub must import cleanly, have the right signature, log that it's a stub, and contain a `TODO` comment that says exactly what to implement and which model or library to use:
+
+- `isolated.py`: Kaggle ISLR 1st-place model (`sign/kaggle-asl-signs-1st-place` on Hugging Face, MIT license), 250-sign vocabulary, TFLite.
+- `fingerspelling.py`: Kaggle ASL Fingerspelling competition model.
+- `llm.py`: Claude or Gemini, using `language/prompts/gloss_to_english.md`. Write a first draft of that prompt: ASL gloss in, natural English out, keep the signer's meaning, don't add content, and when the input is a coding request, phrase it as a clear instruction.
+- `claude_code.py`: run `claude -p "<text>"` in a configured project directory and stream the output back to the UI.
+- `tts_virtual_mic.py`: TTS (macOS `say` for now) routed to the "BlackHole 2ch" output device.
+
+`camera.py` and `gating.py`: if MediaPipe installs cleanly, make the camera actually run and publish `LandmarkFrame`s with a simple signing-space box. If not, stub them.
+
+## Team split (write this into `TASKS.md`)
+
+Create `TASKS.md` with three owner sections. Under each, list concrete tasks with a one-line "done when" for each, the files they own, and the config line they flip. Leave the owner names as `Teammate A/B/C` for the team to fill in.
+
+- **Teammate A: Recognition** (`recognition/`, `tools/`). Real camera + MediaPipe landmarks, signing-space gating, isolated sign model, fingerspelling model, segmenter tuning, and the control signs (YES, NO, SEND, CLEAR, MODE), plus custom signs for coding words via MediaPipe Model Maker as a stretch.
+- **Teammate B: Language + Claude Code** (`language/`, `outputs/claude_code.py`, `outputs/router.py`). Real LLM gloss-to-English translation, prompt tuning with test cases, real Claude Code integration with streamed output, and the YES/NO confirm flow.
+- **Teammate C: Voice, Meet, and UI** (`outputs/tts_virtual_mic.py`, `captions/`, `ui/`). TTS into the BlackHole virtual mic, testing with Siri, dictation, and Google Meet, live captions of incoming speech, and the UI design (big readable text, clear confirm prompt, mode indicator, webcam preview).
+
+Shared files (`shared/`, `app.py`, `config.yaml`) should change rarely. Note in `TASKS.md` that changes to `shared/events.py` need a heads-up to the whole team.
+
+## Constraints
+
+- Keep modules independent: they talk only through the bus and the interfaces above, so the three owners in the Team split can work in parallel without conflicts.
+- No real API calls in tests.
+- Don't edit the README beyond filling in "Getting started" with the real commands.
+- Don't add features that aren't listed here.
+
+## Definition of done
+
+- `make test` passes, including an end-to-end mock test: gloss `ME WANT FIX BUG LOGIN PAGE` + `SEND` in `claude_code` mode produces a `ConfirmRequest`, and then `YES` sends it to the console output while `NO` sends nothing.
+- `make mock` runs, and the web UI at `http://localhost:8000` updates live as you type mock signs: Claude Code mode shows the confirm prompt and then the canned mock reply, voice mode shows what was "spoken", and Meet mode shows the scripted captions.
+- Setting `recognizer: replay` runs the app from the landmark fixture with no webcam.
+- All contract tests pass for every mock.
+- `TASKS.md` exists with the three-way split.
+- `make lint` is clean.
+- Commit in small logical commits and push to `main`.
+
+When you're done, reply with a short summary: what runs, what's stubbed, and the 3 to 5 next tasks you'd suggest, one set per teammate in the Team split.
