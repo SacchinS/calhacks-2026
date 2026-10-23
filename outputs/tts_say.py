@@ -1,7 +1,7 @@
 """Offline backup voice: macOS `say` rendered to audio and played into the virtual mic.
 
 Works with no API key. Needs macOS and the device in `audio.virtual_mic_device`
-(BlackHole 2ch). Select that device as the microphone in Siri / dictation / Meet.
+(BlackHole 2ch). Select that device as the microphone in dictation / Meet.
 """
 
 from __future__ import annotations

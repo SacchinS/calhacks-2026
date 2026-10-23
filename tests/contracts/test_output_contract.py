@@ -1,6 +1,7 @@
 """Contract for Output: every implementation must pass this.
 
-Real outputs (Claude Code, `say` into BlackHole, Cartesia) only run with `pytest --live`.
+Real outputs (Claude Code, Type to Siri, `say` into BlackHole, Cartesia) only run with
+`pytest --live`.
 """
 
 import time
@@ -15,8 +16,10 @@ from tests.contracts.conftest import live
 
 OUTPUTS = [
     ("claude_code", "mock"),
+    ("siri", "mock"),
     ("tts", "mock"),
     live("claude_code", "real"),
+    live("siri", "real"),
     live("tts", "say"),
     live("tts", "cartesia"),
 ]
