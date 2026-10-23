@@ -65,7 +65,8 @@ The mock recognizer turns keyboard input into sign events, so the language, outp
 ## Getting started
 
 Requirements:
-- macOS (Apple Silicon) with a webcam
+- macOS 14+ (Apple Silicon) with a webcam
+- Xcode or the Xcode command-line tools (`xcode-select --install`), for the Swift app
 - [uv](https://docs.astral.sh/uv/) (`brew install uv`); it installs Python 3.11 for you
 - [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole) virtual audio driver, for speech into Siri, dictation, and Meet
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI, installed and logged in
@@ -75,15 +76,14 @@ Requirements:
 git clone https://github.com/SacchinS/calhacks-2026.git
 cd calhacks-2026
 make install                      # uv sync: Python 3.11 + dependencies
-make mock                         # opens both windows on mocks: no webcam, keys, or BlackHole
+make mock                         # builds and opens the Mac app on mocks: no webcam, keys, or BlackHole
 ```
 
-`make mock` opens two windows:
-- **Camera window:** the webcam feed with the tracking overlay, recognized signs, the English, and the YES/NO prompt. For the demo, drag it to the second display and press `F` (or right-click > Move to display) to go fullscreen there; `Esc` leaves fullscreen. It remembers which display it was on.
-- **Control window:** mode, status, `CLEAR` and `MODE` buttons, Claude Code's reply, what was spoken, and captions in Meet mode.
-
-Type mock signs in the control window's "Mock signs" box (or in the terminal):
-`me want fix bug login page`, then `/send`, then `/yes` or `/no`. `#word` is a fingerspelled word, `/mode` switches between Claude Code, voice, and Meet, and `/clear` starts over. Close the control window (or press Ctrl-C) to quit.
+The app is SignBridge's SwiftUI app (`ui/macos`); it starts the Python engine (`app.py`) itself and lives in the menu bar (the hand icon).
+- **First launch** opens the setup wizard. Click through it ("Skip for now" is fine with mocks); after that the app opens the **Preview** window.
+- **Preview:** the camera with tracking, the signs, the English, and the confirm step. Pick where English goes (Claude Code, Voice, or Meet) at the top. With the mock recognizer, type signs in the box at the bottom (or in the terminal): `me want fix bug login page`, then `/send`, then `/yes` or `/no`. `#word` is fingerspelled, `/clear` starts over. The Send / Cancel buttons do the same as signing YES / NO.
+- **Demo Mode** (Preview > Demo, or the menu bar) is the fullscreen stage for the second display. Menu bar > Demo Mode On picks the display; it remembers it. Esc leaves it. Backup keys: W start, C send (YES), X cancel (NO), 1–6 test phrases.
+- Quit from the menu bar. Engine logs go to the terminal under `make mock`, and to `~/Library/Logs/calhacks-2026/engine.log` in the packaged app.
 
 To use the real pieces:
 
@@ -104,13 +104,13 @@ tts: mock               # mock | say | cartesia
 captions: mock          # mock | cartesia
 ```
 
-`recognizer: replay` plays `fixtures/landmarks_sample.jsonl`, so you don't need a webcam. `recognizer: camera` asks for camera permission the first time (allow it for your terminal app). With `tts: say` or `tts: cartesia`, select "BlackHole 2ch" as the microphone in Siri, dictation, or Meet. A component that isn't ready falls back to its mock or to the console, with a warning in the control window.
+`recognizer: replay` plays `fixtures/landmarks_sample.jsonl`, so you don't need a webcam (its preview needs `uv sync --extra camera`). `recognizer: camera` asks for camera permission the first time (allow it for your terminal app). With `tts: say` or `tts: cartesia`, select "BlackHole 2ch" as the microphone in Siri, dictation, or Meet. A component that isn't ready falls back to its mock or to the console, with a note in the Preview window.
 
 ```bash
 make test                         # unit, contract, and end-to-end tests (no real API calls)
 uv run pytest --live              # also run real implementations (keys, BlackHole, webcam)
 make lint                         # ruff check + format check
-make app                          # build dist/calhacks-2026.app with PyInstaller (rough for now)
+make app                          # build dist/SignBridge.app (Swift app + bundled Python engine)
 ```
 
 ## Models and data
