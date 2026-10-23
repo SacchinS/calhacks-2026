@@ -64,18 +64,48 @@ The mock recognizer turns keyboard input into sign events, so the language, outp
 
 ## Getting started
 
-> TODO: fill in once the stack is set up.
-
-Requirements (planned):
-- macOS with a webcam
-- [BlackHole](https://github.com/ExistentialAudio/BlackHole) virtual audio driver
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
+Requirements:
+- macOS (Apple Silicon) with a webcam
+- [uv](https://docs.astral.sh/uv/) (`brew install uv`); it installs Python 3.11 for you
+- [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole) virtual audio driver, for speech into Siri, dictation, and Meet
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI, installed and logged in
 - An Anthropic API key (Claude) and a Cartesia API key (voice and captions)
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/SacchinS/calhacks-2026.git
 cd calhacks-2026
-# install + run steps TBD
+make install                      # uv sync: Python 3.11 + dependencies
+make mock                         # whole app on mocks: no webcam, keys, or BlackHole needed
+```
+
+Open http://localhost:8000 and type mock signs in the terminal or the UI's "Mock signs" box:
+`me want fix bug login page`, then `/send`, then `/yes` or `/no`. `#word` is a fingerspelled word, `/mode` switches between Claude Code, voice, and Meet, and `/clear` starts over.
+
+To use the real pieces:
+
+```bash
+brew install blackhole-2ch                  # then restart, or log out and back in
+npm install -g @anthropic-ai/claude-code    # then run `claude` once to log in
+cp .env.example .env                        # fill in ANTHROPIC_API_KEY and CARTESIA_API_KEY
+uv sync --extra camera                      # MediaPipe + OpenCV for the webcam (Person A)
+```
+
+Choose each component in `config.yaml` (every default is the mock), then `make run`:
+
+```yaml
+recognizer: mock        # mock | replay | camera
+translator: mock        # mock | claude
+claude_code: mock       # mock | real
+tts: mock               # mock | say | cartesia
+captions: mock          # mock | cartesia
+```
+
+`recognizer: replay` plays `fixtures/landmarks_sample.jsonl`, so you don't need a webcam. With `tts: say` or `tts: cartesia`, select "BlackHole 2ch" as the microphone in Siri, dictation, or Meet. A component that isn't ready falls back to its mock or to the console, with a warning in the UI.
+
+```bash
+make test                         # unit, contract, and end-to-end tests (no real API calls)
+uv run pytest --live              # also run real implementations (keys, BlackHole, webcam)
+make lint                         # ruff check + format check
 ```
 
 ## Models and data
