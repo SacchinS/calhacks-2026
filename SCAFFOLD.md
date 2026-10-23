@@ -74,7 +74,7 @@ calhacks-2026/
     base.py                 # Output interface
     router.py               # chooses output by current mode; handles YES/NO confirmation
     claude_code.py          # stub: send text to Claude Code (subprocess `claude -p` or terminal paste)
-    siri.py                 # stub: Type to Siri (hold Cmd-Space, paste the question, Return)
+    siri.py                 # real: Type to Siri (hold Cmd-Space, paste the question, Return)
     tts_cartesia.py         # stub: Cartesia Sonic TTS -> BlackHole virtual mic
     tts_say.py              # offline backup: macOS `say` -> BlackHole (works with no API key)
     console.py              # prints to terminal, always available, used in tests
@@ -167,7 +167,7 @@ Each stub must import cleanly, have the right signature, log that it's a stub, a
 - `fingerspelling.py`: Kaggle ASL Fingerspelling competition model.
 - `claude.py`: Claude via the Anthropic SDK, using `language/prompts/gloss_to_english.md`. Write a first draft of that prompt: ASL gloss in, natural English out, keep the signer's meaning, don't add content, and when the input is a coding request, phrase it as a clear instruction.
 - `claude_code.py`: run `claude -p "<text>"` in a configured project directory and stream the output back to the UI.
-- `siri.py`: Type to Siri, ported from SignBridge's `signbridge/routes.py`: hold Cmd-Space to open Siri (its shortcut set to "Hold Command Space", Type to Siri on), paste the question, press Return. Needs Accessibility permission and pyobjc (Quartz, Cocoa).
+- `siri.py`: implement this one for real (it's small): Type to Siri, ported from SignBridge's `signbridge/routes.py`. Hold Cmd-Space to open Siri (its shortcut set to "Hold Command Space", Type to Siri on), paste the question, press Return. Needs Accessibility permission and pyobjc (Quartz, Cocoa, ApplicationServices).
 - `tts_cartesia.py`: stream Cartesia Sonic audio and play it into the "BlackHole 2ch" output device with `sounddevice`. If Cartesia fails at runtime, fall back to `tts_say.py` and warn in the UI.
 - `tts_say.py`: implement this one for real (it's small): macOS `say` rendered to audio and played into "BlackHole 2ch".
 - `captions/cartesia_stt.py`: capture Meet's audio from a separate capture device (not the device our TTS writes to, or we'll caption ourselves) and stream it to Cartesia Ink. The device name lives in `config.yaml`.
