@@ -1,0 +1,54 @@
+# Which implementation each component uses. Every default is the mock.
+# Flip ONLY your own line while developing; `make mock` ignores these and forces all mocks.
+recognizer: mock        # mock | replay | camera        (Person A)
+translator: mock        # mock | claude                 (Person B)
+claude_code: mock       # mock | real                   (Person B)
+tts: mock               # mock | say | cartesia         (Person C)
+captions: mock          # mock | cartesia               (Person C)
+
+# Starting output mode: claude_code | voice | meet
+mode: claude_code
+
+ui:
+  host: 127.0.0.1
+  port: 8000
+
+recognition:
+  replay_file: fixtures/landmarks_sample.jsonl
+  replay_fps: 30
+  camera_index: 0
+  holistic_model_url: https://storage.googleapis.com/mediapipe-models/holistic_landmarker/holistic_landmarker/float16/latest/holistic_landmarker.task
+  holistic_model_path: models/holistic_landmarker.task
+  # Signing space in normalized image coords (0..1, y grows downward).
+  signing_space: {x_min: 0.1, x_max: 0.9, y_min: 0.05, y_max: 0.8}
+  # Segmenter: a sign is emitted after this many consecutive frames above the threshold.
+  min_frames: 5
+  confidence_threshold: 0.6
+
+language:
+  claude_model: claude-haiku-5-5
+  prompt_file: language/prompts/gloss_to_english.md
+  max_tokens: 200
+
+claude_code:
+  project_dir: ../demo-site      # folder Claude Code edits during the demo
+  command: claude
+
+audio:
+  # Our TTS plays into this device; select it as the microphone in Siri / dictation / Meet.
+  virtual_mic_device: BlackHole 2ch
+  # Meet's audio is captured from a DIFFERENT device, or we'd caption ourselves.
+  meet_capture_device: BlackHole 16ch
+
+cartesia:
+  tts_model: sonic-3.6
+  stt_model: ink-2
+  voice_id: ""                    # TODO(Person C): pick a Sonic voice ID
+  sample_rate: 44100
+
+mock_tts:
+  say_aloud: false                # true: also speak mock TTS on your speakers with `say`
+
+captions_mock:
+  file: fixtures/captions_sample.txt
+  interval_seconds: 3.0
