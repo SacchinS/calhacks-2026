@@ -56,7 +56,7 @@ flowchart LR
 recognition/   MediaPipe capture, signing-area gating, sign + fingerspelling models, mock recognizer
 language/      Gloss-to-English with the LLM
 outputs/       Router, Claude Code output, TTS + virtual mic, Meet captions
-ui/            Native Mac app windows (PySide6): camera window with tracking overlay, and control window
+ui/            Mac menu-bar app (SwiftUI, from SignBridge): Demo Mode, Preview, setup; server.py bridges it to the engine
 shared/        SignEvent and Utterance types, event bus
 ```
 
