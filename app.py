@@ -1,5 +1,5 @@
 """Entry point: wires the bus, recognizer, utterance buffer + translator, router, captions,
-and the UI.
+and the two UI windows (PySide6, with asyncio running inside Qt's loop via qasync).
 
     uv run python app.py           # components as chosen in config.yaml   (make run)
     uv run python app.py --mock    # every component forced to its mock    (make mock)
@@ -15,6 +15,8 @@ import asyncio
 import contextlib
 import importlib
 import logging
+import signal
+import sys
 from typing import Any
 
 from captions.base import CaptionSource
@@ -152,17 +154,40 @@ class App:
 
 
 async def run(config: Config) -> None:
-    from ui.server import UIServer
+    """Run the app with both windows until the control window (or every window) closes."""
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QApplication
+
+    from ui.bridge import BusBridge
+    from ui.camera_window import CameraWindow
+    from ui.control_window import ControlWindow
+
+    qt_app = QApplication.instance()
+    closed = asyncio.Event()
+    qt_app.setQuitOnLastWindowClosed(False)
+    qt_app.lastWindowClosed.connect(closed.set)
+    # Ctrl-C in the terminal: Python only sees the signal when it runs, so tick regularly.
+    signal.signal(signal.SIGINT, lambda *_: closed.set())
+    tick = QTimer(interval=200, timeout=lambda: None)
+    tick.start()
 
     app = App(config, read_stdin=True)
-    ui = UIServer(app.bus, config, components=app.chosen)
-    await ui.start()  # before the app, so the UI sees the first ModeChanged and notices
+    bridge = BusBridge(app.bus)
+    camera = CameraWindow(bridge, config)
+    control = ControlWindow(bridge, app.chosen)
+    control.closing.connect(closed.set)
+    await bridge.start()  # before the app, so the windows see the first ModeChanged and notices
+    camera.show_restored()
+    control.show()
     await app.start()
+    control.set_components(app.chosen)  # a component may have fallen back while starting
     try:
-        await ui.serve()
+        await closed.wait()
     finally:
         await app.stop()
-        await ui.stop()
+        await bridge.stop()
+        camera.close()
+        control.close()
 
 
 def main() -> None:
@@ -175,8 +200,14 @@ def main() -> None:
     config = load_config(args.config)
     if args.mock:
         config = config.all_mocks()
+
+    import qasync
+    from PySide6.QtWidgets import QApplication
+
+    qt_app = QApplication(sys.argv)
+    qt_app.setApplicationName("calhacks-2026")
     with contextlib.suppress(KeyboardInterrupt):
-        asyncio.run(run(config))
+        qasync.run(run(config))
 
 
 if __name__ == "__main__":

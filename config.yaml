@@ -10,8 +10,7 @@ captions: mock          # mock | cartesia               (Person C)
 mode: claude_code
 
 ui:
-  host: 127.0.0.1
-  port: 8000
+  mirror_camera: true           # show the camera window like a mirror (selfie view)
 
 recognition:
   replay_file: fixtures/landmarks_sample.jsonl
