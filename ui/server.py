@@ -25,6 +25,7 @@ Events (stdout):
   {"type": "frame", "seq": n, "jpeg": "<base64>"}   while the preview is on (mirrored, drawn)
   {"type": "check" | "route_tested" | "calibrated" | "config" | "error", ...}
   {"type": "caption", "text": ...}, {"type": "reply", "text": ..., "done": bool}   (ours)
+  {"type": "sent", "mode": ..., "output": ..., "text": ...}   (ours) what each output was given
 
 Run by hand to see the protocol: uv run python app.py --mock
 """
@@ -317,6 +318,8 @@ class EngineServer:
         elif isinstance(event, OutputSent):
             self.sending = False
             self.log.append("sent" if event.output != "console" else "printed to the console")
+            sent = {"mode": self.output_mode, "output": event.output, "text": event.text}
+            self.emit({"type": "sent", **sent})
         elif isinstance(event, OutputReply):
             self.emit({"type": "reply", "text": event.text, "done": event.done})
         elif isinstance(event, Caption):

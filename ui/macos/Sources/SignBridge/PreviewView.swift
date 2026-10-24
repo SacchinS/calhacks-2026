@@ -214,6 +214,15 @@ struct OutputPanel: View {
             panel("Claude Code", icon: "chevron.left.forwardslash.chevron.right",
                   lines: engine.replies.filter { !$0.isEmpty }, empty: "Claude Code's reply shows up here.",
                   font: .system(.callout, design: .monospaced))
+        case "siri":
+            panel("Typed to Siri" + mock("siri"), icon: "mic.circle.fill", lines: sent("siri"),
+                  empty: "Questions typed to Siri show up here.", font: .title3.weight(.semibold),
+                  note: "Siri answers in its own window, top right of the screen.")
+        case "voice":
+            panel("Spoken" + mock("tts"), icon: "speaker.wave.2.fill", lines: sent("voice"),
+                  empty: "What SignBridge says into the virtual mic shows up here.",
+                  font: .title3.weight(.semibold),
+                  note: "Pick BlackHole 2ch as the mic in the app you're using, then start its dictation.")
         case "meet":
             panel("Captions", icon: "captions.bubble", lines: engine.captions,
                   empty: "What the other side says shows up here.", font: .title3.weight(.semibold))
@@ -222,7 +231,16 @@ struct OutputPanel: View {
         }
     }
 
-    private func panel(_ title: String, icon: String, lines: [String], empty: String, font: Font) -> some View {
+    private func sent(_ mode: String) -> [String] {
+        engine.sent.filter { $0.mode == mode }.map(\.text)
+    }
+
+    private func mock(_ component: String) -> String {
+        engine.components[component] == "mock" ? " (mock)" : ""
+    }
+
+    private func panel(_ title: String, icon: String, lines: [String], empty: String, font: Font,
+                       note: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(title, systemImage: icon).font(.headline).foregroundStyle(Brand.accent)
             ScrollViewReader { proxy in
@@ -237,6 +255,7 @@ struct OutputPanel: View {
                 }
                 .onChange(of: lines.count) { _, _ in proxy.scrollTo(min(lines.count, 30) - 1, anchor: .bottom) }
             }
+            if let note { Text(note).font(.caption).foregroundStyle(.secondary) }
         }
         .frame(maxWidth: .infinity, minHeight: 70, maxHeight: maxHeight, alignment: .topLeading)
         .padding(16)

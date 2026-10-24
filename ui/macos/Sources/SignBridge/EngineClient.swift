@@ -39,6 +39,7 @@ final class EngineClient: ObservableObject {
     @Published var mockRecognizer = false
     @Published var captions: [String] = []
     @Published var replies: [String] = []
+    @Published var sent: [(mode: String, text: String)] = []
     private var pending: (glosses: [String], sentence: String, route: String)?
     /// Arguments for the engine, e.g. --mock (everything after the app's own binary path).
     let engineArguments = Array(CommandLine.arguments.dropFirst())
@@ -263,6 +264,8 @@ final class EngineClient: ObservableObject {
             captions = Array((captions + [e["text"] as? String ?? ""]).suffix(30))
         case "reply":
             replies = Array((replies + [e["text"] as? String ?? ""]).suffix(60))
+        case "sent":
+            sent = Array((sent + [(e["mode"] as? String ?? "", e["text"] as? String ?? "")]).suffix(60))
         case "error":
             engineError = e["message"] as? String
         default:
