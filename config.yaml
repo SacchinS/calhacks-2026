@@ -61,9 +61,9 @@ meet:
   review_before_speaking: false   # true: Meet and Voice wait for YES / NO, like Claude Code
 
 cartesia:
-  tts_model: sonic-3.6
+  tts_model: sonic-latest        # or pin one, e.g. sonic-3.5
   stt_model: ink-2
-  voice_id: ""                    # TODO(Person C): pick a Sonic voice ID
+  voice_id: ""                    # a Sonic voice ID (play.cartesia.ai); empty = the first voice listed
   sample_rate: 44100
 
 mock_tts:
