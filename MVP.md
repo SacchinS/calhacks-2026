@@ -13,15 +13,20 @@ This is the plan for after the scaffolding (`SCAFFOLD.md`) is built. Each person
 
 **What it is:** a native Mac menu-bar app, not a web page: SignBridge's SwiftUI front end (`ui/macos`) driving our Python engine. Its **Preview** window shows the webcam feed with tracking, the recognized signs, the English, the confirm step, the output-mode picker, Claude Code's reply, and captions. **Demo Mode** is the same live view as a fullscreen stage with recent phrases. For the demo, Demo Mode goes fullscreen on a second display plugged into the laptop, so judges see the signing and tracking there while the laptop's own screen shows Claude Code, Siri, and Meet actually doing the work.
 
-**Who it's for:** Deaf ASL signers. Not hearing ASL learners. Don't describe the product as "giving Deaf people a voice" or call them "silent"; describe it as access to voice-only tools and parity in calls.
+**Who it's for:** Deaf ASL signers. Not hearing ASL learners. Don't describe the product as "giving Deaf people a voice" or call them "silent"; describe it as access to voice-only tools and parity in calls. Don't claim it replaces interpreters.
+
+**What Deaf users told us:** Professor Lance Forshay (UW, Deaf ASL faculty) answered our survey. He'd use this for **video calls only**. His biggest frustrations with calls are interpreter quality and hearing people hanging up because they don't know who's calling. What would stop him from trusting it: **"accuracy, government recording, privacy."** His full answers and what we changed are in `docs/user-research.md`. They set three rules for everyone:
+- **Meet first.** It's demo moment 1 and gets the most polish.
+- **Video never leaves the laptop.** Tracking and recognition run on the device. Only recognized sign words go to Claude (text), only the final English goes to Cartesia, nothing is recorded or saved to disk, and the app always shows whether the camera is on. Don't add logging that saves frames or transcripts.
+- **The signer sees the English before anyone hears it** wherever we can manage it (YES/NO for Claude Code, an optional review step in Meet).
 
 ## What the MVP must do
 
-The MVP is three demo moments that work live, end to end, with a real webcam:
+The MVP is three demo moments that work live, end to end, with a real webcam. **The Meet call comes first:** it's the one use the Deaf ASL professor who answered our survey said he'd actually want (see `docs/user-research.md`).
 
-1. **Claude Code.** A teammate signs a short request (for example `MAKE TITLE RED` with `TITLE` fingerspelled), the app shows the English ("Make the title red."), they sign `YES`, and Claude Code makes the change in a small demo website, visible on screen.
-2. **Siri.** A teammate signs a question (for example `TOMORROW RAIN`), the app opens Siri by holding ⌘Space and types "Will it rain tomorrow?" with Type to Siri, and Siri answers on screen. Siri can't be triggered through the virtual mic ("Hey Siri" doesn't work from one), so Siri gets text, not speech.
-3. **Google Meet.** A teammate signs a greeting (for example `HELLO`, `THANKYOU`) into a Meet call. The other side hears it in a Cartesia voice, and what they say back appears as live captions in our app.
+1. **Google Meet.** A teammate starts a Meet call. As soon as they switch to Meet mode, the app introduces them in a Cartesia voice ("Hi, this is <name>. I'm Deaf and signing through <app>, so there may be a short pause before I answer."), because hearing people hang up on relay calls when they don't know who's calling. The teammate signs a greeting (for example `HELLO`, `THANKYOU`), the other side hears it in the Cartesia voice, and what they say back appears as live captions in our app.
+2. **Claude Code.** A teammate signs a short request (for example `MAKE TITLE RED` with `TITLE` fingerspelled), the app shows the English ("Make the title red."), they sign `YES`, and Claude Code makes the change in a small demo website, visible on screen.
+3. **Siri.** A teammate signs a question (for example `TOMORROW RAIN`), the app opens Siri by holding ⌘Space and types "Will it rain tomorrow?" with Type to Siri, and Siri answers on screen. Siri can't be triggered through the virtual mic ("Hey Siri" doesn't work from one), so Siri gets text, not speech.
 
 Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unless Person A adds custom signs. `docs/asl-vocab-check.md` lists which demo words are in the vocabulary. Nobody on the team knows ASL, so learn each demo sign from a reputable source (for example Lifeprint or Handspeak) and keep the demo script short and fixed.
 
@@ -80,9 +85,10 @@ Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unles
 1. **Claude translator.** `language/claude.py` calls Claude through the Anthropic SDK with `language/prompts/gloss_to_english.md`. Done when the demo script's gloss comes back as clean English in under ~2 seconds.
 2. **Prompt and test cases.** A set of gloss-to-English examples, covering the demo script, fingerspelled words, recognition mistakes, and coding requests, in a test that can run against the real API on demand (not in `make test`). The prompt keeps the signer's meaning, adds nothing, and phrases coding requests as clear instructions. Siri requests are plain questions, without "Hey Siri" (Siri is opened with ⌘Space, not by voice).
 3. **Confirm flow.** In Claude Code mode, nothing is sent until the signer signs `YES`; `NO` discards it. The UI shows the exact English that will be sent.
-4. **Real Claude Code output.** `outputs/claude_code.py` runs `claude -p "<text>"` in a configured demo project folder and streams Claude Code's reply back to the UI. Done when demo moment 1 works with typed mock signs.
+4. **Real Claude Code output.** `outputs/claude_code.py` runs `claude -p "<text>"` in a configured demo project folder and streams Claude Code's reply back to the UI. Done when demo moment 2 (Claude Code) works with typed mock signs.
 5. **Demo project.** A tiny website (one HTML page with a title) that Claude Code edits during the demo, open in a browser next to the app.
 6. **Router.** Sends English to Claude Code in `claude_code` mode, to Person C's Type to Siri output in `siri` mode, and to Person C's voice output in `voice` and `meet` modes, falling back to console output if an output is unavailable.
+7. **Review before speaking (Meet).** An option, off by default for the demo, that makes Meet and Voice mode wait for `YES` like Claude Code does, so a misrecognized sign isn't spoken in the signer's name. Accuracy was the first thing our Deaf respondent said would stop him trusting the tool. Adding its config line touches `config.yaml`, so give the team a heads-up.
 
 **Stretch:** low-confidence handling (when recognition confidence is low, Claude asks the signer to confirm or re-sign instead of guessing); keeping short context between utterances; the README's Claude section.
 
@@ -90,7 +96,7 @@ Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unles
 
 **Needs:** `ANTHROPIC_API_KEY` in `.env`, and the Claude Code CLI installed and logged in.
 
-**You also write:** the "How we use Claude" section of the README for the Anthropic judges, covering what Claude does, where it can go wrong, and how the YES/NO confirm handles that.
+**You also write:** the "How we use Claude" section of the README for the Anthropic judges, covering what Claude does, where it can go wrong (a mistranslation spoken in a Deaf person's name), how the YES/NO confirm and review-before-speaking handle that, and that Claude only ever sees sign words as text, never video.
 
 ## Person C: Voice, Siri, Meet, and UI
 
@@ -101,11 +107,13 @@ Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unles
 **MVP (in this order):**
 1. **BlackHole setup.** Install BlackHole 2ch and write down the exact macOS audio setup in the README. Done when `tts: say` speaks into BlackHole and dictation or Meet hears it after selecting BlackHole as the microphone.
 2. **Cartesia TTS.** `tts_cartesia.py` streams Cartesia Sonic audio into BlackHole, falling back to `say` if Cartesia fails. Done when the other side of a Meet call hears it with typed mock signs.
-3. **Type to Siri.** *(Done: `siri: real` works, tested on macOS 26.2.)* `outputs/siri.py` opens Siri by holding ⌘Space (Siri's keyboard shortcut set to Hold Command Space), types the English, and presses Return, the way SignBridge's engine did. It needs Type to Siri on (Accessibility > Siri) and Accessibility permission for the app. Done when demo moment 2 (Siri) works with typed mock signs.
+3. **Type to Siri.** *(Done: `siri: real` works, tested on macOS 26.2.)* `outputs/siri.py` opens Siri by holding ⌘Space (Siri's keyboard shortcut set to Hold Command Space), types the English, and presses Return, the way SignBridge's engine did. It needs Type to Siri on (Accessibility > Siri) and Accessibility permission for the app. Done when demo moment 3 (Siri) works with typed mock signs.
 4. **Meet captions.** `captions/cartesia_stt.py` captures the Meet call's audio from a separate device (not the one our voice goes into, or we caption ourselves) and streams it to Cartesia Ink. Done when the other person's speech shows up as captions within a couple of seconds.
 5. **Demo Mode.** The fullscreen stage on the second display: camera with tracking, signs as they land, the English, the confirm step, captions in Meet mode, and recent phrases. It remembers its display (menu bar > Demo Mode On). Done when it looks good fullscreen on an external screen.
 6. **Preview and setup.** Preview has the output-mode picker (with Siri), Claude Code's streamed reply, captions in Meet mode, and the mock-sign box. Every state must be visible, because the user gets no audio feedback. Make the setup wizard fit our engine: its Position step's "Save This Position" isn't wired up yet (the signing space is in `config.yaml`), and its Siri test goes through the Type to Siri output *(done)*.
-7. **Demo moment 3.** A real Meet call between two laptops: our side signs, the other side hears it, and their reply appears as captions.
+7. **Demo moment 1 (Meet).** A real Meet call between two laptops: our side signs, the other side hears it, and their reply appears as captions.
+8. **Call intro and signing cue.** When Meet mode starts, speak a short introduction once in the Cartesia voice, built from the signer's name in Settings ("Hi, this is <name>. I'm Deaf and signing through <app>, so there may be a short pause before I answer."), plus an "Introduce me" button to replay it. If the signer has been signing for more than a few seconds without sending, say "One moment, I'm signing." at most once per utterance. Done when the other side of a test call hears both.
+9. **Privacy on screen.** A camera-on indicator that's always visible in Preview and Demo Mode, and a short line in Settings and the README: video stays on this Mac, only sign words go to Claude and only the English goes to Cartesia, nothing is recorded.
 
 **Stretch:** a "download and run it" `.app` (`make app` builds one; it still needs a place for API keys outside the bundle); choosing a voice; showing when the app is speaking; a polished look for judging photos.
 
@@ -119,4 +127,4 @@ Demo signs must come from the Kaggle 250-sign vocabulary or fingerspelling unles
 
 - The README is complete: setup steps, how it works, the Claude and Cartesia sections, and honest limitations (small vocabulary, no facial grammar).
 - Devpost submission with the repo link, an image, the demo video, and all our tracks selected, plus the Commit Fellowship opt-in.
-- The pitch tells the real story: who it's for, the UW Deaf faculty input and survey, the three demo moments, and the YES/NO confirm as our answer to "where can this go wrong."
+- The pitch tells the real story and leads with the Meet call: "A Deaf ASL professor told us the only place he'd use this is video calls, so we built for that." Quote him on hang-ups and on privacy, show the three demo moments with Meet first, and give the YES/NO confirm and on-device video as our answers to "where can this go wrong." Close with the plan to test with him after Cal Hacks.
