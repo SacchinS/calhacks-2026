@@ -23,7 +23,7 @@ Events (stdout):
    "glosses": [...], "intent": {"sentence": ..., "route": "text|siri|voice"} | null,
    "target": ..., "log": [...], "holding": null, "fps": ..., "error": null,
    "output_mode": ..., "components": {...}, "mock": bool,
-   "claude_code_working": bool, "camera_on": bool}                                 on change, and every second
+   "claude_code_working": bool, "camera_on": bool}       on change, and every second
   {"type": "frame", "seq": n, "jpeg": "<base64>"}   while the preview is on (mirrored, drawn)
   {"type": "check" | "route_tested" | "calibrated" | "config" | "error", ...}
   {"type": "caption", "text": ...}, {"type": "reply", "text": ..., "done": bool}   (ours)
