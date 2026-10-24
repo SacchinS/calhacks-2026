@@ -297,3 +297,27 @@ async def test_settings_set_the_intro_name_and_review(engine):
     assert engine.app.router.review_before_speaking
     await engine.handle_command({"cmd": "introduce"})
     await until(lambda: any("this is Sam" in m["text"] for m in messages(engine, "sent")))
+
+
+def shoulders_pose(nose=(0.5, 0.3), left=(0.6, 0.5), right=(0.4, 0.5)):
+    pose = [(0.5, 0.5, 0.0)] * 33
+    pose[0] = (*nose, 0.0)
+    pose[11] = (*left, 0.0)
+    pose[12] = (*right, 0.0)
+    return tuple(pose)
+
+
+async def test_save_this_position_fits_the_signing_space(engine, tmp_path):
+    await engine.handle_command({"cmd": "calibrate"})
+    assert not messages(engine, "calibrated")[-1]["ok"]  # no frame yet
+
+    engine.on_event(LandmarkFrame(pose=shoulders_pose()))
+    await engine.handle_command({"cmd": "calibrate"})
+    assert messages(engine, "calibrated")[-1]["ok"]
+    box = engine.ui_config["signing_space"]
+    assert box["x_min"] < 0.4 and box["x_max"] > 0.6 and box["y_min"] < 0.3 < 0.5 < box["y_max"]
+    assert engine.space.x_min == box["x_min"]
+
+    # The saved position is used again next time.
+    again = EngineServer(engine.app, io.StringIO(), ui_config=engine.ui_config_path)
+    assert again.space == engine.space

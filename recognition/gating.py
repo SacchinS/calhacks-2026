@@ -42,3 +42,26 @@ class SigningSpace:
     def apply(self, frame: LandmarkFrame) -> LandmarkFrame:
         """The same frame with hands_in_signing_space computed from its landmarks."""
         return replace(frame, hands_in_signing_space=self.hands_in_space(frame))
+
+
+def space_from_pose(pose: tuple[Point, ...]) -> SigningSpace | None:
+    """A signing space fitted to the signer: from above the face to the lower chest, a
+    little wider than the shoulders. None without shoulders and a nose."""
+    if len(pose) < 13:
+        return None
+    nose, left, right = pose[0], pose[11], pose[12]
+    width = abs(left[0] - right[0])
+    if width < 0.03:
+        return None
+    center = (left[0] + right[0]) / 2
+    shoulders_y = (left[1] + right[1]) / 2
+
+    def clamp(v: float) -> float:
+        return round(min(1.0, max(0.0, v)), 3)
+
+    return SigningSpace(
+        x_min=clamp(center - 1.4 * width),
+        x_max=clamp(center + 1.4 * width),
+        y_min=clamp(nose[1] - 0.9 * width),
+        y_max=clamp(shoulders_y + 1.1 * width),
+    )
