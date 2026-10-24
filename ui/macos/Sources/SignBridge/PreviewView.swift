@@ -5,8 +5,7 @@ struct PreviewView: View {
     @ObservedObject var engine: EngineClient
     var showGuide: () -> Void = {}
     var showDemo: () -> Void = {}
-    private let fakePhrases: [[String]] = [["RAIN", "TOMORROW"], ["HUNGRY", "PIZZA"], ["HELLO"], ["WAIT"],
-                                           ["CALLONPHONE", "MOM"], ["TIME", "NOW"]]
+    private let fakePhrases = DemoScript.phrases
 
     private var live: Bool { engine.state == "listening" }
 
@@ -77,6 +76,7 @@ struct PreviewView: View {
             Text("SignBridge").font(.headline)
             StatePill(state: engine.state)
             Spacer()
+            if engine.claudeCodeWorking { ClaudeCodeWorking() }
             if let target = engine.target, engine.state != "idle" {
                 Label(target, systemImage: "macwindow").foregroundStyle(.secondary)
             }
@@ -155,7 +155,7 @@ struct PreviewView: View {
                 .buttonStyle(.borderless)
             Menu {
                 ForEach(fakePhrases, id: \.self) { p in
-                    Button(p.joined(separator: " ")) { engine.fake(p) }
+                    Button(DemoScript.label(p)) { engine.fake(p) }
                 }
             } label: {
                 Label("Test phrases", systemImage: "text.badge.plus")
@@ -163,6 +163,19 @@ struct PreviewView: View {
             .menuStyle(.borderlessButton).fixedSize()
         }
         .controlSize(.large)
+    }
+}
+
+/// Shown in every mode while Claude Code builds in the background.
+struct ClaudeCodeWorking: View {
+    var body: some View {
+        HStack(spacing: 7) {
+            ProgressView().controlSize(.small)
+            Text("Claude Code is working").font(.subheadline.weight(.semibold))
+        }
+        .padding(.horizontal, 11).padding(.vertical, 5)
+        .background(Color.purple.opacity(0.16), in: Capsule())
+        .foregroundStyle(.purple)
     }
 }
 
@@ -211,9 +224,10 @@ struct OutputPanel: View {
     var body: some View {
         switch engine.outputMode {
         case "claude_code":
-            panel("Claude Code", icon: "chevron.left.forwardslash.chevron.right",
+            panel("Claude Code" + mock("claude_code"), icon: "chevron.left.forwardslash.chevron.right",
                   lines: engine.replies.filter { !$0.isEmpty }, empty: "Claude Code's reply shows up here.",
-                  font: .system(.callout, design: .monospaced))
+                  font: .system(.callout, design: .monospaced),
+                  note: engine.claudeCodeWorking ? "Still working. Siri, Voice, and Meet keep working meanwhile." : nil)
         case "siri":
             panel("Typed to Siri" + mock("siri"), icon: "mic.circle.fill", lines: sent("siri"),
                   empty: "Questions typed to Siri show up here.", font: .title3.weight(.semibold),
@@ -224,7 +238,7 @@ struct OutputPanel: View {
                   font: .title3.weight(.semibold),
                   note: "Pick BlackHole 2ch as the mic in the app you're using, then start its dictation.")
         case "meet":
-            panel("Captions", icon: "captions.bubble", lines: engine.captions,
+            panel("Captions" + mock("captions"), icon: "captions.bubble", lines: engine.captions,
                   empty: "What the other side says shows up here.", font: .title3.weight(.semibold))
         default:
             EmptyView()
@@ -264,7 +278,8 @@ struct OutputPanel: View {
     }
 }
 
-/// Typed signs for the mock recognizer: `me want fix bug`, `#title` (fingerspelled), `/send /yes /no /clear`.
+/// Typed signs for the mock recognizer: `food store /\ ww make`, `#sarah` (fingerspelled), face markers
+/// after the signs they cover (`/\`, `[q]`, `[wh]`, `[neg]`, `[nod]`), and `/send /yes /no /clear`.
 struct MockSignBox: View {
     @ObservedObject var engine: EngineClient
     @State private var text = ""
@@ -272,7 +287,7 @@ struct MockSignBox: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "keyboard").foregroundStyle(Brand.accent)
-            TextField("Type signs: me want fix bug · #title · /send /yes /no /clear", text: $text)
+            TextField("Type signs: food store /\\ ww make · #sarah · [q] [wh] [neg] · /send /yes /no /clear", text: $text)
                 .textFieldStyle(.roundedBorder).focused($focused).onSubmit(submit)
             Button("Sign", action: submit).buttonStyle(.borderedProminent)
         }

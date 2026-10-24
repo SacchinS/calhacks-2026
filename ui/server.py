@@ -44,8 +44,8 @@ from collections import deque
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO
 
-from recognition.base import make_sign_event
 from recognition.gating import SigningSpace
+from recognition.mock import parse_line
 from shared.events import (
     MODES,
     Caption,
@@ -145,6 +145,7 @@ class EngineServer:
         self.pending_id: str | None = None
         self.thinking = False
         self.sending = False
+        self.claude_code_jobs: list[str] = []  # approved requests Claude Code is still working on
         self.log: deque[str] = deque(["ready: sign, then FINISH"], maxlen=3)
         self.practice = list(PRACTICE)
         self.frame: LandmarkFrame | None = None
@@ -194,6 +195,7 @@ class EngineServer:
             "fps": float(len(recent)),
             "error": None,
             "output_mode": self.output_mode,
+            "claude_code_working": bool(self.claude_code_jobs),
             "components": self.app.chosen,
             "mock": self.app.chosen.get("recognizer") == "mock",
         }
@@ -310,15 +312,23 @@ class EngineServer:
         elif isinstance(event, ConfirmResult):
             if event.request_id == self.pending_id:
                 self.pending_id = None
-                self.sending = event.approved
-                if not event.approved:
+                if event.approved and self.english:
+                    # Claude Code builds in the background: don't hold the app on "Sending".
+                    self.claude_code_jobs.append(self.english)
+                    self.log.append("Claude Code is working")
+                else:
                     self.log.append("cancelled")
         elif isinstance(event, ModeChanged):
             self.output_mode = event.mode
         elif isinstance(event, OutputSent):
-            self.sending = False
+            mode = self.output_mode
+            if event.output in ("claude_code", "console") and event.text in self.claude_code_jobs:
+                self.claude_code_jobs.remove(event.text)
+                mode = "claude_code"
+            else:
+                self.sending = False
             self.log.append("sent" if event.output != "console" else "printed to the console")
-            sent = {"mode": self.output_mode, "output": event.output, "text": event.text}
+            sent = {"mode": mode, "output": event.output, "text": event.text}
             self.emit({"type": "sent", **sent})
         elif isinstance(event, OutputReply):
             self.emit({"type": "reply", "text": event.text, "done": event.done})
@@ -410,11 +420,18 @@ class EngineServer:
                 self.log.append("cancelled")
 
     def fake(self, glosses: list[str]) -> None:
-        """Inject signs as if recognized, then SEND (test phrases and backup keys)."""
+        """Inject signs as if recognized, then SEND (test phrases and backup keys).
+
+        Tokens use the mock-sign syntax, so face markers work: ["TITLE", "/\\", "RED"].
+        """
+        try:
+            events = parse_line(" ".join(glosses))
+        except ValueError as exc:
+            self.log.append(f"bad test phrase: {exc}")
+            return
         if self.state() == "idle":
             self.gesture("wake")
-        for gloss in glosses:
-            event = make_sign_event(gloss, 1.0)
+        for event in events:
             if event.kind != "control":
                 self.bus.publish(event)
         self.control("SEND")

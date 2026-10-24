@@ -15,6 +15,7 @@ struct DemoView: View {
                     TitleText("SignBridge", font: .system(size: 30, weight: .bold))
                     StatePill(state: engine.state).scaleEffect(1.25).padding(.leading, 10)
                     Spacer()
+                    if engine.claudeCodeWorking { ClaudeCodeWorking().font(.title3) }
                     if let target = engine.target, engine.state != "idle" {
                         Label(target, systemImage: "macwindow").font(.title3).foregroundStyle(.secondary)
                     }
@@ -67,9 +68,9 @@ struct DemoView: View {
         }
     }
 
-    /// Backup keys for a live demo: W start, C send, X cancel, 1-6 test phrases (as in dev_app.py).
+    /// Backup keys for a live demo: W start, C send, X cancel, 1-6 the demo script's phrases, in order.
     private var shortcuts: some View {
-        let phrases = [["RAIN", "TOMORROW"], ["HUNGRY", "PIZZA"], ["HELLO"], ["WAIT"], ["CALLONPHONE", "MOM"], ["TIME", "NOW"]]
+        let phrases = DemoScript.phrases
         return ZStack {
             Button("") { engine.gesture("wake") }.keyboardShortcut("w", modifiers: [])
             Button("") { engine.gesture("confirm") }.keyboardShortcut("c", modifiers: [])

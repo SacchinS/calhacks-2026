@@ -36,6 +36,7 @@ final class EngineClient: ObservableObject {
     // calhacks-2026 additions: where English goes, Meet captions, Claude Code's reply, mock signs
     @Published var outputMode = "claude_code"
     @Published var components: [String: String] = [:]
+    @Published var claudeCodeWorking = false
     @Published var mockRecognizer = false
     @Published var captions: [String] = []
     @Published var replies: [String] = []
@@ -247,6 +248,7 @@ final class EngineClient: ObservableObject {
             practiceTodo = practice?["todo"] as? [String] ?? []
             outputMode = e["output_mode"] as? String ?? outputMode
             components = e["components"] as? [String: String] ?? components
+            claudeCodeWorking = e["claude_code_working"] as? Bool ?? false
             mockRecognizer = e["mock"] as? Bool ?? mockRecognizer
         case "frame":
             if let b64 = e["jpeg"] as? String, let data = Data(base64Encoded: b64) {

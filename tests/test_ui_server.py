@@ -227,3 +227,52 @@ async def test_engine_process_speaks_the_protocol(tmp_path):
         if proc.returncode is None:
             proc.kill()
             await proc.wait()
+
+
+async def test_claude_code_works_in_the_background_while_siri_sends(engine):
+    release = asyncio.Event()
+    mock = engine.app.router.claude_code
+    original = mock.send
+
+    async def slow_send(text):
+        await release.wait()
+        await original(text)
+
+    mock.send = slow_send
+    await engine.handle_command({"cmd": "fake", "glosses": ["FOOD", "STORE", "WW", "MAKE"]})
+    await until(lambda: last_status(engine)["state"] == "confirming")
+    await engine.handle_command({"cmd": "gesture", "name": "confirm"})
+    await until(lambda: last_status(engine)["claude_code_working"])
+    assert last_status(engine)["state"] == "idle"  # not stuck on "Sending" for minutes
+
+    await engine.handle_command({"cmd": "output_mode", "mode": "siri"})
+    await engine.handle_command({"cmd": "mock_input", "text": "tomorrow rain /send"})
+    await until(lambda: any(m["mode"] == "siri" for m in messages(engine, "sent")))
+    assert last_status(engine)["claude_code_working"]
+
+    release.set()
+    await until(lambda: not last_status(engine)["claude_code_working"])
+    (built,) = [m for m in messages(engine, "sent") if m["output"] == "claude_code"]
+    assert built["mode"] == "claude_code"  # filed under Claude Code even though we're in Siri
+
+
+def test_demo_script_phrases_in_the_app_all_parse():
+    """Demo Mode's backup keys and Preview's test phrases (Theme.swift, DemoScript) must parse."""
+    import re
+
+    from recognition.mock import parse_line
+
+    swift = (ROOT / "ui/macos/Sources/SignBridge/Theme.swift").read_text()
+    block = swift.split("enum DemoScript", 1)[1].split("]\n    static func", 1)[0]
+    phrases = re.findall(r"^\s*\[(.+?)\],", block, re.M)
+    assert len(phrases) == 6
+    for phrase in phrases:
+        tokens = [t.replace("\\\\", "\\") for t in re.findall(r'"((?:[^"\\]|\\.)*)"', phrase)]
+        events = parse_line(" ".join(tokens))
+        assert events and all(e.kind != "control" for e in events), phrase
+
+
+async def test_fake_phrases_carry_face_markers(engine):
+    await engine.handle_command({"cmd": "fake", "glosses": ["TITLE", "/\\", "RED"]})
+    await until(lambda: last_status(engine)["state"] == "confirming")
+    assert last_status(engine)["glosses"] == ["TITLE", "/\\", "RED"]
