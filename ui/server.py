@@ -26,7 +26,8 @@ Events (stdout):
    "claude_code_working": bool, "camera_on": bool}       on change, and every second
   {"type": "frame", "seq": n, "jpeg": "<base64>"}   while the preview is on (mirrored, drawn)
   {"type": "check" | "route_tested" | "calibrated" | "config" | "error", ...}
-  {"type": "caption", "text": ...}, {"type": "reply", "text": ..., "done": bool}   (ours)
+  {"type": "caption", "text": ..., "final": bool}   (ours) a partial caption is replaced
+  {"type": "reply", "text": ..., "done": bool}       (ours) Claude Code's streamed reply
   {"type": "sent", "mode": ..., "output": ..., "text": ...}   (ours) what each output was given
 
 Run by hand to see the protocol: uv run python app.py --mock
@@ -343,7 +344,7 @@ class EngineServer:
         elif isinstance(event, OutputReply):
             self.emit({"type": "reply", "text": event.text, "done": event.done})
         elif isinstance(event, Caption):
-            self.emit({"type": "caption", "text": event.text})
+            self.emit({"type": "caption", "text": event.text, "final": event.is_final})
         elif isinstance(event, Notice):
             self.log.append(event.message)
         self.emit_status()

@@ -40,6 +40,7 @@ final class EngineClient: ObservableObject {
     @Published var cameraOn = false
     /// The Meet call so far: what the signer said ("you") and the other side's captions ("them").
     @Published var meetLog: [(who: String, text: String)] = []
+    private var captionPartial = false
     @Published var mockRecognizer = false
     @Published var captions: [String] = []
     @Published var replies: [String] = []
@@ -268,8 +269,13 @@ final class EngineClient: ObservableObject {
         case "route_tested":
             lastRouteTest = (e["route"] as? String ?? "", e["ok"] as? Bool ?? false, e["detail"] as? String ?? "")
         case "caption":
-            captions = Array((captions + [e["text"] as? String ?? ""]).suffix(30))
-            meetLog = Array((meetLog + [("them", e["text"] as? String ?? "")]).suffix(60))
+            // A partial caption (still being spoken) is replaced by the next one for that turn.
+            let text = e["text"] as? String ?? ""
+            if captionPartial, !captions.isEmpty { captions.removeLast() }
+            if captionPartial, meetLog.last?.who == "them" { meetLog.removeLast() }
+            captions = Array((captions + [text]).suffix(30))
+            meetLog = Array((meetLog + [("them", text)]).suffix(60))
+            captionPartial = !(e["final"] as? Bool ?? true)
         case "reply":
             replies = Array((replies + [e["text"] as? String ?? ""]).suffix(60))
         case "sent":
