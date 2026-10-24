@@ -11,7 +11,7 @@ import contextlib
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from shared.bus import Bus
 from shared.config import Config
@@ -98,11 +98,14 @@ class FrameRecognizer(Recognizer):
 
     def __init__(self, bus: Bus, config: Config) -> None:
         super().__init__(bus, config)
+        from recognition.face_markers import FaceMarkerDetector, MarkerTally
         from recognition.gating import SigningSpace
         from recognition.segmenter import Segmenter
 
         self.gate = SigningSpace.from_config(config)
         self.segmenter = Segmenter.from_config(config)
+        self.faces = FaceMarkerDetector(config)
+        self.markers = MarkerTally()
         self._task: asyncio.Task[None] | None = None
 
     @abstractmethod
@@ -131,12 +134,17 @@ class FrameRecognizer(Recognizer):
             self.bus.publish(frame)
             prediction = None
             if frame.hands_in_signing_space:
-                for classifier in classifiers:
-                    prediction = classifier.predict(frame)
-                    if prediction is not None:
-                        break
+                # Every classifier sees every frame (they keep windows); the first answer wins.
+                answers = [classifier.predict(frame) for classifier in classifiers]
+                prediction = next((a for a in answers if a is not None), None)
+                self.markers.add(self.faces.update(frame))
+            else:
+                self.faces.update(frame)  # resting frames teach the neutral face
             event = self.segmenter.push(prediction)
             if event is not None:
+                markers = self.markers.take()
+                if event.kind != "control" and markers:
+                    event = replace(event, markers=markers)
                 log.debug(
                     "%s recognized %s (%s, %.2f)",
                     self.name,

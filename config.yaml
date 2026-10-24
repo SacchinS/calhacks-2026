@@ -39,6 +39,13 @@ recognition:
   # Custom signs recorded with tools/record_signs.py (tried before the Kaggle model).
   custom_signs_dir: models/custom_signs
   custom_threshold_scale: 1.0    # lower = stricter matching
+  # Facial grammar (brows, head shake / nod) set on each sign as markers. Off until a Deaf
+  # signer has checked it: a wrong [negation] flips the meaning.
+  face_markers: false
+  brow_raise_ratio: 1.15         # brows this much higher than your resting face = raised
+  brow_furrow_ratio: 0.92
+  head_shake_amplitude: 0.05
+  head_nod_amplitude: 0.04
 
 language:
   claude_model: claude-haiku-5-5
