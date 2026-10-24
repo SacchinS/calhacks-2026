@@ -29,9 +29,12 @@ class ClaudeCodeOutput(Output):
         # TODO(Person B): run Claude Code headless in the demo project and stream its reply:
         #   proc = await asyncio.create_subprocess_exec(
         #       self.command, "-p", text, "--output-format", "stream-json", "--verbose",
+        #       "--permission-mode", "acceptEdits", "--allowedTools", "Read,Edit,Write,Glob,Grep",
         #       cwd=self.project_dir, stdout=PIPE, stderr=PIPE)
         #   for each line of stdout: parse the JSON, pull out assistant text, and
         #   self.bus.publish(OutputReply(self.name, chunk)); finish with done=True.
-        # Raise if the exit code is non-zero. Pick the --permission-mode / --allowedTools
-        # the demo needs so edits don't stop for an approval prompt nobody can answer.
+        # Raise if the exit code is non-zero. acceptEdits + a short --allowedTools list keeps
+        # edits from stopping for an approval nobody can answer; keep the list to what the
+        # demo site needs. Never --dangerously-skip-permissions, and no --add-dir: Claude Code
+        # stays inside project_dir. Re-prompts continue the session with --resume <session id>.
         raise NotImplementedError("ClaudeCodeOutput is a stub")
