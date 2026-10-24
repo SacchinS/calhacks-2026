@@ -44,10 +44,11 @@ import os
 import sys
 import time
 from collections import deque
+from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO
 
-from recognition.gating import SigningSpace
+from recognition.gating import SigningSpace, space_from_pose
 from recognition.mock import parse_line
 from shared.events import (
     MODES,
@@ -134,9 +135,9 @@ class EngineServer:
         self.config = app.config
         self.out = out
         self.ui_config_path = ui_config
+        self.space = SigningSpace.from_config(self.config)
         self.ui_config = self._load_ui_config()
         self._apply_settings()
-        self.space = SigningSpace.from_config(self.config)
         self.mirror = bool(self.config.get("ui.mirror_camera", True))
 
         self.mode = "off"  # the app's mode: off | run | framing | gestures
@@ -374,13 +375,7 @@ class EngineServer:
                 self.test_route(str(msg.get("route")), msg.get("text", "What time is it?"))
             )
         elif cmd == "calibrate":
-            self.emit(
-                {
-                    "type": "calibrated",
-                    "ok": False,
-                    "message": "Not available yet: the signing space is set in config.yaml.",
-                }
-            )
+            self.calibrate()
         elif cmd == "config":
             self.ui_config.update(msg.get("values") or {})
             self._save_ui_config()
@@ -529,10 +524,30 @@ class EngineServer:
             cfg.update(json.loads(self.ui_config_path.read_text()))
         return cfg
 
+    def calibrate(self) -> None:
+        """Setup's "Save This Position": fit the signing space to where the signer sits."""
+        space = space_from_pose(self.frame.pose) if self.frame is not None else None
+        if space is None:
+            message = "I can't see your shoulders and face. Sit back so they show, then try again."
+            self.emit({"type": "calibrated", "ok": False, "message": message})
+            return
+        self.ui_config["signing_space"] = asdict(space)
+        self._save_ui_config()
+        self._apply_settings()
+        message = "Saved. Signs are read when your hands are up in the green box."
+        self.emit({"type": "calibrated", "ok": True, "message": message})
+
     def _apply_settings(self) -> None:
         """Settings the app's Settings window changes that the engine uses."""
         self.app.call_host.name = str(self.ui_config.get("signer_name") or "").strip()
         self.app.router.review_before_speaking = bool(self.ui_config.get("review_before_speaking"))
+        box = self.ui_config.get("signing_space")
+        if isinstance(box, dict):
+            with contextlib.suppress(TypeError, ValueError):
+                self.space = SigningSpace(**{k: float(v) for k, v in box.items()})
+                gate = getattr(self.app.recognizer, "gate", None)
+                if gate is not None:
+                    self.app.recognizer.gate = self.space
 
     def _save_ui_config(self) -> None:
         self.ui_config_path.parent.mkdir(parents=True, exist_ok=True)
