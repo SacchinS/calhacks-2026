@@ -99,7 +99,7 @@ enum RouteInfo {
         switch route {
         case "siri": "Ask Siri"
         case "text": "Type into \(target ?? "the active app")"
-        case "voice": "Say it in the call"
+        case "voice": target.map { "Say it in \($0)" } ?? "Send to the virtual mic"
         default: ""
         }
     }

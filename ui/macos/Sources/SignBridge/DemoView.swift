@@ -115,14 +115,14 @@ struct DemoView: View {
                         .font(.title2.weight(.semibold)).foregroundStyle(Brand.accent)
                     Spacer()
                     if engine.state == "confirming" {
-                        Text("👍 send    👎 cancel").font(.title2).foregroundStyle(.secondary)
+                        Text("Sign YES to send, NO to cancel").font(.title2).foregroundStyle(.secondary)
                     } else {
                         ProgressView()
                         Text("Sending…").font(.title2).foregroundStyle(.secondary)
                     }
                 }
             default:
-                hint("hand.raised", "Show both open palms to start")
+                hint("hand.raised", "Start signing")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
