@@ -7,6 +7,9 @@ struct SettingsView: View {
     @State private var phraseRest = 1.5
     @State private var minConf = 0.6
     @State private var saved = false
+    @State private var signerName = ""
+    @State private var review = false
+    @State private var callSaved = false
 
     var body: some View {
         Form {
@@ -45,14 +48,43 @@ struct SettingsView: View {
                 }
                 .padding(.top, 8)
             }
+            Section {
+                TextField("Your name", text: $signerName, prompt: Text("e.g. Sam"))
+                Toggle("Review before speaking", isOn: $review)
+                Text("When a Meet call starts, SignBridge says: \"Hi, this is \(signerName.isEmpty ? "<name>" : signerName). I'm Deaf and signing through SignBridge, so there may be a short pause before I answer.\" With review on, Meet and Voice wait for you to sign YES before speaking, like Claude Code.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Calls")
+            } footer: {
+                HStack {
+                    if callSaved { Label("Saved", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
+                    Spacer()
+                    Button("Save") {
+                        engine.saveConfig(["signer_name": signerName.trimmingCharacters(in: .whitespaces),
+                                           "review_before_speaking": review])
+                        withAnimation { callSaved = true }
+                    }
+                }
+                .padding(.top, 8)
+            }
+            Section("Privacy") {
+                Label("Video never leaves this Mac. Hand tracking and sign recognition run here.", systemImage: "video.slash")
+                Label("Claude gets only the recognized sign words, as text. Cartesia gets only the English to speak, plus the other side's call audio for captions.", systemImage: "text.bubble")
+                Label("Nothing is recorded or saved: no video, no transcripts.", systemImage: "externaldrive.badge.xmark")
+            }
+            .font(.callout)
         }
         .formStyle(.grouped)
         .tint(Brand.accent)
         .onChange(of: [still, phraseRest, minConf]) { _, _ in saved = false }
+        .onChange(of: signerName) { _, _ in callSaved = false }
+        .onChange(of: review) { _, _ in callSaved = false }
         .onAppear {
             still = engine.config["still"] as? Double ?? 0.5
             phraseRest = engine.config["phrase_rest"] as? Double ?? 1.5
             minConf = engine.config["min_conf"] as? Double ?? 0.6
+            signerName = engine.config["signer_name"] as? String ?? ""
+            review = engine.config["review_before_speaking"] as? Bool ?? false
         }
     }
 

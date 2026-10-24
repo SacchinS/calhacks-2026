@@ -276,3 +276,24 @@ async def test_fake_phrases_carry_face_markers(engine):
     await engine.handle_command({"cmd": "fake", "glosses": ["TITLE", "/\\", "RED"]})
     await until(lambda: last_status(engine)["state"] == "confirming")
     assert last_status(engine)["glosses"] == ["TITLE", "/\\", "RED"]
+
+
+async def test_review_before_speaking_in_meet(engine):
+    engine.app.router.review_before_speaking = True
+    await engine.handle_command({"cmd": "output_mode", "mode": "meet"})
+    await engine.handle_command({"cmd": "mock_input", "text": "hello /send"})
+    await until(lambda: last_status(engine)["state"] == "confirming")
+    assert [m["text"] for m in messages(engine, "sent")] == [engine.app.call_host.intro_text()]
+    await engine.handle_command({"cmd": "gesture", "name": "confirm"})
+    await until(lambda: any(m["text"] == "Hello." for m in messages(engine, "sent")))
+    await until(lambda: last_status(engine)["state"] == "idle")
+    assert not last_status(engine)["claude_code_working"]
+
+
+async def test_settings_set_the_intro_name_and_review(engine):
+    values = {"signer_name": "Sam", "review_before_speaking": True}
+    await engine.handle_command({"cmd": "config", "values": values})
+    assert engine.app.call_host.intro_text().startswith("Hi, this is Sam.")
+    assert engine.app.router.review_before_speaking
+    await engine.handle_command({"cmd": "introduce"})
+    await until(lambda: any("this is Sam" in m["text"] for m in messages(engine, "sent")))

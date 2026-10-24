@@ -80,6 +80,7 @@ struct PreviewView: View {
             if let target = engine.target, engine.state != "idle" {
                 Label(target, systemImage: "macwindow").foregroundStyle(.secondary)
             }
+            CameraIndicator(on: engine.cameraOn)
             if engine.fps > 0 {
                 Text("\(Int(engine.fps)) fps").font(.caption.monospacedDigit()).foregroundStyle(.tertiary)
             }
@@ -166,6 +167,62 @@ struct PreviewView: View {
     }
 }
 
+/// The Meet call as a conversation: what the signer said (spoken for them) and the other side's
+/// captions, plus the call intro button.
+struct MeetPanel: View {
+    @ObservedObject var engine: EngineClient
+    var maxHeight: CGFloat
+    var title: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label(title, systemImage: "captions.bubble").font(.headline).foregroundStyle(Brand.accent)
+                Spacer()
+                Button { engine.introduce() } label: { Label("Introduce me", systemImage: "person.wave.2") }
+                    .help("Say who's calling and that you sign through SignBridge")
+            }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if engine.meetLog.isEmpty {
+                            Text("Your words and the other side's captions show up here.").foregroundStyle(.tertiary)
+                        }
+                        ForEach(Array(engine.meetLog.suffix(40).enumerated()), id: \.offset) { i, line in
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                Text(line.who == "you" ? "You" : "Them").font(.caption.weight(.bold))
+                                    .foregroundStyle(line.who == "you" ? Brand.accent : .secondary)
+                                    .frame(width: 40, alignment: .leading)
+                                Text(line.text).font(.title3.weight(line.who == "you" ? .regular : .semibold))
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .id(i)
+                        }
+                    }
+                }
+                .onChange(of: engine.meetLog.count) { _, n in proxy.scrollTo(min(n, 40) - 1, anchor: .bottom) }
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 70, maxHeight: maxHeight, alignment: .topLeading)
+        .padding(16)
+        .background(Brand.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.08)))
+    }
+}
+
+/// Always visible: whether the webcam is on. Video never leaves the Mac.
+struct CameraIndicator: View {
+    let on: Bool
+    var body: some View {
+        Label(on ? "Camera on" : "Camera off", systemImage: on ? "video.fill" : "video.slash")
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background((on ? Color.red : Color.gray).opacity(0.18), in: Capsule())
+            .foregroundStyle(on ? .red : .secondary)
+            .help("Video stays on this Mac: only the recognized sign words leave it, as text.")
+    }
+}
+
 /// Shown in every mode while Claude Code builds in the background.
 struct ClaudeCodeWorking: View {
     var body: some View {
@@ -238,8 +295,7 @@ struct OutputPanel: View {
                   font: .title3.weight(.semibold),
                   note: "Pick BlackHole 2ch as the mic in the app you're using, then start its dictation.")
         case "meet":
-            panel("Captions" + mock("captions"), icon: "captions.bubble", lines: engine.captions,
-                  empty: "What the other side says shows up here.", font: .title3.weight(.semibold))
+            MeetPanel(engine: engine, maxHeight: maxHeight, title: "Call" + mock("captions"))
         default:
             EmptyView()
         }
