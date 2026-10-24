@@ -67,6 +67,7 @@ async def test_yes_sends_to_claude_code(setup):
     assert claude_code.sent == []  # nothing goes out before YES
 
     await router.handle(control("YES"))
+    await router.wait_for_claude_code()
     assert claude_code.sent == ["Fix the login page."]
     published = drain(events)
     results = [e for e in published if isinstance(e, ConfirmResult)]
@@ -154,3 +155,44 @@ async def test_started_router_publishes_mode_and_processes_bus():
     await router.stop()
     assert claude_code.sent == ["Fix the login page."]
     assert isinstance(events.get_nowait(), ModeChanged)
+
+
+class SlowOutput(RecordingOutput):
+    def __init__(self, name):
+        super().__init__(name)
+        self.release = asyncio.Event()
+
+    async def send(self, text):
+        await self.release.wait()
+        self.sent.append(text)
+
+
+async def test_a_long_claude_code_build_does_not_hold_up_siri():
+    bus = Bus()
+    claude_code, siri = SlowOutput("claude_code"), RecordingOutput("siri")
+    router = Router(bus, claude_code=claude_code, tts=RecordingOutput("tts"), siri=siri)
+    await router.handle(translation("Build a website for a grocery store."))
+    await router.handle(control("YES"))
+    assert router.claude_code_busy
+
+    router.set_mode("siri")
+    await router.handle(translation("Remind me tomorrow morning to buy milk."))
+    assert siri.sent == ["Remind me tomorrow morning to buy milk."]
+    assert claude_code.sent == []
+
+    claude_code.release.set()
+    await router.wait_for_claude_code()
+    assert claude_code.sent == ["Build a website for a grocery store."]
+    assert not router.claude_code_busy
+
+
+async def test_claude_code_requests_run_one_at_a_time_in_order():
+    bus = Bus()
+    claude_code = SlowOutput("claude_code")
+    router = Router(bus, claude_code=claude_code, tts=RecordingOutput("tts"))
+    for text in ("Build the site.", "Make the title red."):
+        await router.handle(translation(text))
+        await router.handle(control("YES"))
+    claude_code.release.set()
+    await router.wait_for_claude_code()
+    assert claude_code.sent == ["Build the site.", "Make the title red."]

@@ -5,6 +5,9 @@
 - voice / meet: send straight to the TTS output (the virtual mic).
 - MODE cycles claude_code -> siri -> voice -> meet.
 
+Claude Code runs in the background: a build takes minutes, and Siri, Voice, and Meet keep
+working meanwhile. Approved requests run one at a time, in order.
+
 If an output is unavailable or fails, the text goes to the console and the UI gets a
 warning. The router never raises.
 """
@@ -52,6 +55,7 @@ class Router:
         self.mode: Mode = mode
         self.pending: ConfirmRequest | None = None
         self._task: asyncio.Task[None] | None = None
+        self._claude_code_job: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
         if self._task is None:
@@ -60,6 +64,11 @@ class Router:
             self._task = asyncio.create_task(self._run(sub), name="router")
 
     async def stop(self) -> None:
+        if self._claude_code_job is not None:
+            self._claude_code_job.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._claude_code_job
+            self._claude_code_job = None
         if self._task is not None:
             self._task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -109,7 +118,26 @@ class Router:
         request, self.pending = self.pending, None
         self.bus.publish(ConfirmResult(request.request_id, approved))
         if approved:
-            await self.deliver(self.claude_code, request.english)
+            self._claude_code_job = asyncio.create_task(
+                self._after(self._claude_code_job, request.english), name="claude-code"
+            )
+
+    @property
+    def claude_code_busy(self) -> bool:
+        return self._claude_code_job is not None and not self._claude_code_job.done()
+
+    async def wait_for_claude_code(self) -> None:
+        """Wait until every approved Claude Code request has finished (for tests)."""
+        while self._claude_code_job is not None and not self._claude_code_job.done():
+            await asyncio.wait([self._claude_code_job])
+
+    async def _after(self, previous: asyncio.Task[None] | None, text: str) -> None:
+        if previous is not None:
+            await asyncio.wait([previous])
+        try:
+            await self.deliver(self.claude_code, text)
+        except Exception:  # deliver never raises, but a background task must not die loudly
+            log.exception("Claude Code request failed")
 
     def set_mode(self, mode: Mode) -> None:
         if self.pending is not None:
