@@ -59,6 +59,7 @@ claude_code_cli:
   allowed_tools: Read,Edit,Write,Glob,Grep
   model: ""                      # empty = Claude Code's default model
   timeout_seconds: 900
+  use_api_key: false             # true: Claude Code bills .env's ANTHROPIC_API_KEY, not your login
 
 type_to_siri:
   # Siri's keyboard shortcut must be "Hold Command Space", with Type to Siri turned on.
