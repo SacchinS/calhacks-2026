@@ -114,7 +114,7 @@ struct PreviewView: View {
                     Label(RouteInfo.label(engine.route, target: engine.target), systemImage: RouteInfo.icon(engine.route)).foregroundStyle(Brand.accent).font(.headline)
                     Spacer()
                     if engine.state == "confirming" {
-                        Text("👍 send   👎 cancel").foregroundStyle(.secondary)
+                        Text("Sign YES to send, NO to cancel").foregroundStyle(.secondary)
                     } else {
                         ProgressView().controlSize(.small)
                     }
@@ -122,7 +122,7 @@ struct PreviewView: View {
             default:
                 HStack(spacing: 10) {
                     Image(systemName: "hand.raised").font(.title2).foregroundStyle(Brand.accent)
-                    Text("Show both open palms to start.").font(.title2).foregroundStyle(.secondary)
+                    Text(engine.mockRecognizer ? "Type signs below to start." : "Start signing.").font(.title2).foregroundStyle(.secondary)
                 }
             }
             if engine.state == "idle", let last = engine.log.last {  // e.g. what was just sent, or an error

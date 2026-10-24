@@ -32,8 +32,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Rebuild the menu each time it opens so it shows the current state.
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        let states = ["idle": "Watching for open palms", "listening": "Listening to your signs",
-                      "thinking": "Writing your sentence", "confirming": "Waiting for your thumbs up",
+        let states = ["idle": "Watching for signs", "listening": "Listening to your signs",
+                      "thinking": "Writing your sentence", "confirming": "Waiting for YES or NO",
                       "sending": "Sending"]
         let state = engine.running ? (listening ? states[engine.state] ?? engine.state : "Paused") : "Starting…"
         let header = NSMenuItem(title: "", action: nil, keyEquivalent: "")
