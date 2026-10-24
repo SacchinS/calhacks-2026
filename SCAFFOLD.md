@@ -107,8 +107,8 @@ calhacks-2026/
 In `shared/events.py`, as frozen dataclasses with timestamps:
 
 - `LandmarkFrame`: per-frame hand/pose/face landmarks, the `hands_in_signing_space` flag, and the camera image for that frame (optional, `None` in mock mode) so the UI can draw the feed and overlay without opening the camera itself.
-- `SignEvent`: `gloss: str`, `confidence: float`, `kind: "isolated" | "fingerspell" | "control"`.
-- `Utterance`: the list of `SignEvent`s between an utterance start and end.
+- `SignEvent`: `gloss: str`, `confidence: float`, `kind: "isolated" | "fingerspell" | "control"`, and `markers`: the facial grammar seen during the sign (`brows_raised`, `brows_furrowed`, `head_shake`, `head_nod`; empty by default).
+- `Utterance`: the list of `SignEvent`s between an utterance start and end. Its `gloss` is what the translator gets: fingerspelled words as `fs-WORD`, and after each run of signs sharing a marker, a tag: `/\` (raised brows, topic), `[yes/no question]` (raised brows that run to the end), `[wh-question]`, `[negation]`, `[affirmation]`. Example: `TITLE /\ RED`.
 - `Translation`: `gloss: list[str]`, `english: str`, `provider: str`.
 - `ConfirmRequest` / `ConfirmResult`: for the YES/NO step before anything is sent to Claude Code.
 - `ModeChanged`: `mode: "claude_code" | "siri" | "voice" | "meet"`.
@@ -128,6 +128,7 @@ The team needs to build and demo everything downstream before the models work. `
 
 - Typing a word + Enter publishes an isolated sign with that gloss (uppercased).
 - `#hello` publishes a fingerspelled word.
+- Face markers go after the signs they cover (back to the line start, a comma, or the previous marker): `title /\ red` (topic), `tomorrow rain [q]` (yes/no question), `[wh]`, `[neg]`, `[nod]`. Commas and question marks on signs are dropped.
 - `/yes`, `/no`, `/send`, `/clear`, `/mode` publish control signs.
 - `make mock` runs the whole app with the mock recognizer, mock translator, and console output, so it works with no webcam, no API keys, and no BlackHole.
 

@@ -84,7 +84,7 @@ make mock                         # builds and opens the Mac app on mocks: no we
 
 The app is SignBridge's SwiftUI app (`ui/macos`); it starts the Python engine (`app.py`) itself and lives in the menu bar (the hand icon).
 - **First launch** opens the setup wizard. Click through it ("Skip for now" is fine with mocks); after that the app opens the **Preview** window.
-- **Preview:** the camera with tracking, the signs, the English, and the confirm step. Pick where English goes (Claude Code, Siri, Voice, or Meet) at the top. With the mock recognizer, type signs in the box at the bottom (or in the terminal): `me want fix bug login page`, then `/send`, then `/yes` or `/no`. `#word` is fingerspelled, `/clear` starts over. The Send / Cancel buttons do the same as signing YES / NO.
+- **Preview:** the camera with tracking, the signs, the English, and the confirm step. Pick where English goes (Claude Code, Siri, Voice, or Meet) at the top. With the mock recognizer, type signs in the box at the bottom (or in the terminal): `me want fix bug login page`, then `/send`, then `/yes` or `/no`. `#word` is fingerspelled, `/clear` starts over. Face markers go after the signs they cover: `title /\ red` (raised brows, topic), `tomorrow rain [q]` (yes/no question), `[wh]`, `[neg]`, `[nod]`. The Send / Cancel buttons do the same as signing YES / NO.
 - **Demo Mode** (Preview > Demo, or the menu bar) is the fullscreen stage for the second display. Menu bar > Demo Mode On picks the display; it remembers it. Esc leaves it. Backup keys: W start, C send (YES), X cancel (NO), 1–6 test phrases.
 - Quit from the menu bar. Engine logs go to the terminal under `make mock`, and to `~/Library/Logs/calhacks-2026/engine.log` in the packaged app.
 
