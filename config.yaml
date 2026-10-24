@@ -3,7 +3,7 @@
 recognizer: mock        # mock | replay | camera        (Person A)
 translator: mock        # mock | claude                 (Person B)
 claude_code: mock       # mock | real                   (Person B)
-siri: real              # mock | real                   (Person C)
+siri: mock              # mock | real                   (Person C)
 tts: mock               # mock | say | cartesia         (Person C)
 captions: mock          # mock | cartesia               (Person C)
 
