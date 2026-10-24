@@ -21,6 +21,7 @@ from typing import Any
 from captions.base import CaptionSource
 from language.base import Translator
 from language.utterance import UtteranceBuffer
+from outputs.call_host import CallHost
 from outputs.console import ConsoleOutput
 from outputs.router import Router
 from recognition.base import Recognizer
@@ -86,7 +87,9 @@ class App:
             tts=self._build("tts", self.bus, config),
             console=self.console,
             mode=config.mode,  # type: ignore[arg-type]
+            review_before_speaking=bool(config.get("meet.review_before_speaking", False)),
         )
+        self.call_host = CallHost(self.bus, config, self.router)
         self.captions: CaptionSource = self._build("captions", self.bus, config)
         self._captions_task: asyncio.Task[None] | None = None
 
@@ -109,6 +112,7 @@ class App:
         self._captions_task = asyncio.create_task(self._captions_follow_mode(mode_changes))
         await self.buffer.start()
         await self.router.start()
+        await self.call_host.start()
         try:
             await self.recognizer.start()
         except Exception as exc:
@@ -129,6 +133,7 @@ class App:
                 await self._captions_task
         with contextlib.suppress(Exception):
             await self.captions.stop()
+        await self.call_host.stop()
         await self.router.stop()
         await self.buffer.stop()
 

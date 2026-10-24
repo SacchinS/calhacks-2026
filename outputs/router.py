@@ -2,7 +2,9 @@
 
 - claude_code: publish a ConfirmRequest and wait. YES sends it to Claude Code, NO drops it.
 - siri: send straight to the Siri output (Type to Siri).
-- voice / meet: send straight to the TTS output (the virtual mic).
+- voice / meet: send straight to the TTS output (the virtual mic), or, with
+  `review_before_speaking`, ask for YES / NO first like Claude Code, so a misrecognized
+  sign is never spoken in the signer's name.
 - MODE cycles claude_code -> siri -> voice -> meet.
 
 Claude Code runs in the background: a build takes minutes, and Siri, Voice, and Meet keep
@@ -46,6 +48,7 @@ class Router:
         console: Output | None = None,
         mode: Mode = "claude_code",
         siri: Output | None = None,
+        review_before_speaking: bool = False,
     ) -> None:
         self.bus = bus
         self.claude_code = claude_code
@@ -53,6 +56,7 @@ class Router:
         self.console = console or ConsoleOutput(bus)
         self.siri = siri or self.console
         self.mode: Mode = mode
+        self.review_before_speaking = review_before_speaking
         self.pending: ConfirmRequest | None = None
         self._task: asyncio.Task[None] | None = None
         self._claude_code_job: asyncio.Task[None] | None = None
@@ -99,25 +103,33 @@ class Router:
 
     async def on_translation(self, translation: Translation) -> None:
         if self.mode == "claude_code":
-            if self.pending is not None:
-                self.bus.publish(ConfirmResult(self.pending.request_id, approved=False))
-            self.pending = ConfirmRequest(
-                request_id=uuid.uuid4().hex[:8],
-                english=translation.english,
-                gloss=list(translation.gloss),
-            )
-            self.bus.publish(self.pending)
+            self.ask(translation, "claude_code")
+        elif self.mode in ("voice", "meet") and self.review_before_speaking:
+            self.ask(translation, "tts")
         elif self.mode == "siri":
             await self.deliver(self.siri, translation.english)
         else:
             await self.deliver(self.tts, translation.english)
+
+    def ask(self, translation: Translation, target: str) -> None:
+        if self.pending is not None:
+            self.bus.publish(ConfirmResult(self.pending.request_id, approved=False))
+        self.pending = ConfirmRequest(
+            request_id=uuid.uuid4().hex[:8],
+            english=translation.english,
+            gloss=list(translation.gloss),
+            target=target,
+        )
+        self.bus.publish(self.pending)
 
     async def confirm(self, approved: bool) -> None:
         if self.pending is None:
             return  # YES/NO with nothing to confirm
         request, self.pending = self.pending, None
         self.bus.publish(ConfirmResult(request.request_id, approved))
-        if approved:
+        if approved and request.target == "tts":
+            await self.deliver(self.tts, request.english)
+        elif approved:
             self._claude_code_job = asyncio.create_task(
                 self._after(self._claude_code_job, request.english), name="claude-code"
             )
