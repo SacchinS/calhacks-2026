@@ -79,6 +79,16 @@ class FrameClassifier(ABC):
         """Prediction for the sign in progress at this frame, or None if nothing is signed."""
 
 
+def sign_classifiers(config: Config) -> list[FrameClassifier]:
+    """The real models, in the order tried: custom signs (only when clearly matched), the
+    Kaggle isolated-sign model, then fingerspelling."""
+    from recognition.custom_signs import CustomSignModel
+    from recognition.fingerspelling import FingerspellingModel
+    from recognition.isolated import IsolatedSignModel
+
+    return [CustomSignModel(config), IsolatedSignModel(config), FingerspellingModel(config)]
+
+
 class FrameRecognizer(Recognizer):
     """Base for recognizers that produce LandmarkFrames (replay, camera).
 

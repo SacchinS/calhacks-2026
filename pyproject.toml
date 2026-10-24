@@ -19,6 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 # Person A: live webcam + MediaPipe landmarks (`uv sync --extra camera`).
 camera = [
+    "ai-edge-litert>=1.0",
     "mediapipe>=1.1.1",
     "opencv-python>=5.0.0.93",
 ]

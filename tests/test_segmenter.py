@@ -40,8 +40,18 @@ def test_change_of_sign_starts_a_new_one():
 
 def test_finish_becomes_send_control():
     seg = Segmenter(min_frames=1, confidence_threshold=0.5)
-    (event,) = run(seg, [Prediction("FINISH", 0.9)])
+    (event,) = run(seg, [Prediction("FINISH", 0.9)] * 2)
     assert (event.gloss, event.kind) == ("SEND", "control")
+
+
+def test_control_signs_need_a_longer_hold():
+    """A quick FINISH mid-sentence ("already") must not send; holding it does."""
+    seg = Segmenter(min_frames=3, confidence_threshold=0.5, control_min_frames=8)
+    quick = [Prediction("ME", 0.9)] * 4 + [Prediction("FINISH", 0.9)] * 5 + [None]
+    assert [e.gloss for e in run(seg, quick)] == ["ME"]
+    held = [Prediction("FINISH", 0.9)] * 8
+    assert [e.gloss for e in run(seg, held)] == ["SEND"]
+    assert Segmenter(min_frames=5).control_min_frames == 10
 
 
 def test_gating_rejects_resting_hands():
