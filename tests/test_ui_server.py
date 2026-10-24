@@ -97,6 +97,8 @@ async def test_voice_mode_speaks_without_confirming(engine):
     assert "confirming" not in states and "sending" in states
     sending = next(m for m in messages(engine, "status") if m["state"] == "sending")
     assert sending["intent"] == {"sentence": "Tomorrow rain.", "route": "voice"}
+    (sent,) = messages(engine, "sent")
+    assert (sent["mode"], sent["output"], sent["text"]) == ("voice", "tts", "Tomorrow rain.")
 
 
 async def test_siri_mode_types_to_siri(engine):
@@ -109,6 +111,8 @@ async def test_siri_mode_types_to_siri(engine):
     await until(lambda: typed == ["Tomorrow rain."])
     sending = next(m for m in messages(engine, "status") if m["state"] == "sending")
     assert sending["intent"] == {"sentence": "Tomorrow rain.", "route": "siri"}
+    await until(lambda: messages(engine, "sent"))
+    assert messages(engine, "sent")[0]["mode"] == "siri"
 
 
 async def _record(into, text):
