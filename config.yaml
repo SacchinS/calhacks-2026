@@ -85,7 +85,7 @@ meet:
 cartesia:
   tts_model: sonic-latest        # or pin one, e.g. sonic-3.5
   stt_model: ink-2
-  voice_id: ""                    # a Sonic voice ID (play.cartesia.ai); empty = the first voice listed
+  voice_id: db6b0ed5-d5d3-463d-ae85-518a07d3c2b4   # "Skylar"; any Sonic voice ID (play.cartesia.ai)
   sample_rate: 44100
 
 mock_tts:
