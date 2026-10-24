@@ -134,7 +134,8 @@ make app                          # build dist/SignBridge.app (Swift app + bundl
 
 ## Limitations
 
-- Recognition covers a limited vocabulary, not all of ASL. ASL grammar, regional variation, and facial grammar are only partly handled.
+- Recognition covers a limited vocabulary, not all of ASL. ASL grammar and regional variation are only partly handled.
+- ASL grammar lives partly on the face and body. We read brow raises and furrows and head shakes (once built), but not mouth morphemes (size and intensity, like CHA or OOO) or body shifts (comparison, role shift), so some meaning is lost. A Deaf signer should check the output.
 - Live webcam accuracy can be much lower than benchmark scores. We'll report what we actually measure.
 - Siri can't be reached through a virtual mic. "Hey Siri" doesn't trigger from one, and even with Siri opened by ⌘Space and BlackHole set as the Mac's input, voice Siri ignores it (tested on macOS 26.2: BlackHole carried the audio, Siri heard nothing; it listens to the built-in mic). Siri uses the Type to Siri accessibility feature instead: set Siri's keyboard shortcut to Hold Command Space (Apple Intelligence & Siri settings), turn on Type to Siri (Accessibility > Siri), and give the app Accessibility permission so it can hold ⌘Space and type the question.
 - It's not a replacement for a qualified interpreter. It's a direct option for short calls and voice-only tools.

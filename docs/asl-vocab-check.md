@@ -1,6 +1,15 @@
 # Kaggle ISLR 250-sign vocabulary vs. demo needs
 
-Source: `sign_to_prediction_index_map.json` from the [1st-place model on Hugging Face](https://huggingface.co/sign/kaggle-asl-signs-1st-place) (also has a ready `model.tflite`, 11.2 MB, MIT). Demo words below are a first-pass guess from the design doc's demo plan, not a final script.
+Source: `sign_to_prediction_index_map.json` from the [1st-place model on Hugging Face](https://huggingface.co/sign/kaggle-asl-signs-1st-place) (also has a ready `model.tflite`, 11.2 MB, MIT). The sections after "Draft demo script" were a first-pass guess from the design doc's demo plan.
+
+## Draft demo script
+From `asl-demo-script-research.md`, which links a source for every sign. These are drafts: a Deaf signer must approve them before the demo.
+- Claude Code kick-off: `FOOD STORE /\ WW MAKE`, then `YES`. In vocab: food, store, make, yes. Custom: WW.
+- Siri: `TOMORROW MORNING, you-REMIND-me BUY MILK`. In vocab: tomorrow, morning, milk. Custom: REMIND, BUY.
+- Meet: `HELLO, NICE MEET-you` / `HOW YOU?` / `FINE` / `THANK-YOU`. In vocab: hello, fine, thankyou. Custom: NICE (or map `clean`, the same sign), MEET, HOW, YOU.
+- Re-prompt: `TITLE /\ RED`. In vocab: red. Custom: TITLE.
+- Weather fallback: `TOMORROW RAIN` with raised brows (a question). In vocab: tomorrow, rain.
+- Custom signs to train: WW, REMIND, BUY, MEET, NICE (or map CLEAN), HOW, YOU, TITLE.
 
 ## Claude Code build + live edit
 - In vocab: make, red, blue, black, white, yes, no, finish, now
@@ -15,9 +24,9 @@ Source: `sign_to_prediction_index_map.json` from the [1st-place model on Hugging
 - Missing: play, music, song, stop
 
 ## Siri reminder (chosen for the demo)
-- Demo gloss: `#REMIND TOMORROW MORNING STORE MILK` (REMIND fingerspelled) → "Remind me tomorrow morning to buy milk at the store."
+- Demo gloss (draft): `TOMORROW MORNING, you-REMIND-me BUY MILK` → "Remind me tomorrow morning to buy milk." REMIND is a real sign, not fingerspelled.
 - In vocab: time, later, tomorrow, morning, night, callonphone, store, milk
-- Missing: remind, call
+- Missing: remind, buy, call
 
 ## Meet call
 - In vocab: hello, bye, thankyou, yes, no, minemy, fine, bad, haveto, wait, please, where, who, why
