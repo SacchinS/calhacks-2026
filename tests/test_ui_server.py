@@ -11,7 +11,7 @@ import pytest
 
 from app import App
 from shared.config import ROOT, load_config
-from shared.events import Caption, LandmarkFrame, MockInput, OutputReply, SignEvent
+from shared.events import Caption, LandmarkFrame, MockInput, OutputReply, OutputSent, SignEvent
 from ui.server import EngineServer, render_preview
 
 
@@ -321,3 +321,11 @@ async def test_save_this_position_fits_the_signing_space(engine, tmp_path):
     # The saved position is used again next time.
     again = EngineServer(engine.app, io.StringIO(), ui_config=engine.ui_config_path)
     assert again.space == engine.space
+
+
+async def test_speech_is_filed_under_meet_even_after_switching_away(engine):
+    await engine.handle_command({"cmd": "output_mode", "mode": "meet"})
+    await until(lambda: last_status(engine)["output_mode"] == "meet")
+    await engine.handle_command({"cmd": "output_mode", "mode": "claude_code"})
+    engine.on_event(OutputSent("tts", "Hello."))
+    assert messages(engine, "sent")[-1]["mode"] == "meet"
