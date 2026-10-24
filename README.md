@@ -125,8 +125,10 @@ make app                          # build dist/SignBridge.app (Swift app + bundl
 
 ## Privacy
 
-- Video never leaves your Mac. Hand tracking and sign recognition run on the device.
+- Our app never sends video anywhere. Hand tracking and sign recognition run on your Mac. (If your camera is on in a Meet call, Google Meet sends that video as usual.)
 - Claude receives only the recognized sign words, as text. Cartesia receives only the final English to speak, plus the other side's call audio for captions.
+- Each target gets the English you send it: Claude Code (which also reads the files in its project folder, and sends them to Anthropic), Siri (Apple), or the Meet call.
+- To type to Siri, the app puts the question on the clipboard for a moment, then restores what was there. With Universal Clipboard on, your other Apple devices may briefly see it.
 - Nothing is recorded or saved: no video, no transcripts.
 - The app always shows when the camera is on.
 
