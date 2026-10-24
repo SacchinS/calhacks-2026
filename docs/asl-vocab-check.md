@@ -14,7 +14,8 @@ Source: `sign_to_prediction_index_map.json` from the [1st-place model on Hugging
 - In vocab: radio, listen, loud, quiet
 - Missing: play, music, song, stop
 
-## Siri reminder
+## Siri reminder (chosen for the demo)
+- Demo gloss: `#REMIND TOMORROW MORNING STORE MILK` (REMIND fingerspelled) → "Remind me tomorrow morning to buy milk at the store."
 - In vocab: time, later, tomorrow, morning, night, callonphone, store, milk
 - Missing: remind, call
 
