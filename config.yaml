@@ -32,8 +32,12 @@ language:
   max_tokens: 200
 
 claude_code_cli:
-  project_dir: ../demo-site      # folder Claude Code edits during the demo
+  project_dir: ../demo-site      # folder Claude Code edits (make demo-reset copies demo/site there)
   command: claude
+  # acceptEdits + only these tools, so a build never stops for an approval (no Bash).
+  allowed_tools: Read,Edit,Write,Glob,Grep
+  model: ""                      # empty = Claude Code's default model
+  timeout_seconds: 900
 
 type_to_siri:
   # Siri's keyboard shortcut must be "Hold Command Space", with Type to Siri turned on.
