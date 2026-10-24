@@ -51,6 +51,15 @@ audio:
   # Meet's audio is captured from a DIFFERENT device, or we'd caption ourselves.
   meet_capture_device: BlackHole 16ch
 
+meet:
+  # Said once when Meet mode starts (and by "Introduce me"), because hearing people hang up
+  # on relay calls when they don't know who's calling. The app's Settings can set the name.
+  signer_name: ""
+  app_name: SignBridge
+  intro_on_start: true
+  signing_cue_seconds: 5          # signing this long unsent: "One moment, I'm signing." (0 = off)
+  review_before_speaking: false   # true: Meet and Voice wait for YES / NO, like Claude Code
+
 cartesia:
   tts_model: sonic-3.6
   stt_model: ink-2
