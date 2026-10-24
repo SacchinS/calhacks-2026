@@ -1,6 +1,7 @@
 """Types a question to Siri with Type to Siri, the way SignBridge's engine did.
 
-"Hey Siri" can't be triggered through a virtual mic, so Siri gets text, not speech:
+"Hey Siri" can't be triggered through a virtual mic, and voice Siri ignores BlackHole even when
+it's the Mac's input (tested), so Siri gets text, not speech:
 hold Cmd-Space to open Siri, wait, paste the question, press Return (SignBridge's route, 10/10
 in its tests). Run it with another app in front, not a terminal: a terminal catches the Cmd-V.
 Needs:
