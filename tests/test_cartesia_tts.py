@@ -111,6 +111,18 @@ async def test_picks_a_voice_when_none_is_set():
     assert tts.calls[0]["voice"] == "first-voice"
 
 
-def test_unavailable_without_a_key(monkeypatch):
+async def test_without_a_key_it_speaks_with_say_and_warns_once(monkeypatch):
     monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
-    assert not CartesiaTTSOutput(Bus(), Config()).available()
+    out = CartesiaTTSOutput(Bus(), Config())
+    assert out.available()  # the virtual mic is there
+    notices = out.bus.subscribe(Notice)
+    spoken = []
+
+    async def fake_say(text):
+        spoken.append(text)
+
+    out.fallback.send = fake_say
+    await out.send("Hello.")
+    await out.send("Thank you.")
+    assert spoken == ["Hello.", "Thank you."]
+    assert notices.queue.qsize() == 1
