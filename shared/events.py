@@ -16,6 +16,9 @@ from typing import Any, Literal, get_args
 Point = tuple[float, float, float]  # normalized x, y (0..1, y down) and relative depth z
 Mode = Literal["claude_code", "siri", "voice", "meet"]
 SignKind = Literal["isolated", "fingerspell", "control"]
+# Facial grammar seen during a sign (face and pose landmarks). Raised brows mark a yes/no
+# question or a topic, furrowed brows a wh-question, a head shake negation, a nod affirmation.
+FaceMarker = Literal["brows_raised", "brows_furrowed", "head_shake", "head_nod"]
 NoticeLevel = Literal["info", "warning", "error"]
 
 MODES: tuple[Mode, ...] = get_args(Mode)
@@ -52,7 +55,20 @@ class SignEvent:
     gloss: str
     confidence: float
     kind: SignKind
+    # Facial grammar active during this sign; Utterance.gloss turns runs of them into tags.
+    markers: frozenset[FaceMarker] = frozenset()
     ts: float = field(default_factory=_now)
+
+
+# How each marker is written into the gloss, after the run of signs it covers.
+# brows_raised is "/\" (topic) unless the run ends the utterance: then it's a yes/no question.
+MARKER_TAGS: dict[FaceMarker, str] = {
+    "brows_raised": "/\\",
+    "brows_furrowed": "[wh-question]",
+    "head_shake": "[negation]",
+    "head_nod": "[affirmation]",
+}
+YES_NO_QUESTION = "[yes/no question]"
 
 
 @dataclass(frozen=True)
@@ -64,8 +80,21 @@ class Utterance:
 
     @property
     def gloss(self) -> list[str]:
-        """Gloss tokens for the translator. Fingerspelled words are prefixed `fs-`."""
-        return [f"fs-{s.gloss}" if s.kind == "fingerspell" else s.gloss for s in self.signs]
+        """Gloss tokens for the translator. Fingerspelled words are prefixed `fs-`.
+
+        Each run of signs sharing a face marker is followed by its tag, e.g.
+        `TITLE /\\ RED` or `YOU LIKE COFFEE [yes/no question]` (see MARKER_TAGS).
+        """
+        tokens = []
+        last = len(self.signs) - 1
+        for i, sign in enumerate(self.signs):
+            tokens.append(f"fs-{sign.gloss}" if sign.kind == "fingerspell" else sign.gloss)
+            following = self.signs[i + 1].markers if i < last else frozenset()
+            for marker in MARKER_TAGS:  # fixed order when several runs end on one sign
+                if marker in sign.markers and marker not in following:
+                    ends = i == last and marker == "brows_raised"
+                    tokens.append(YES_NO_QUESTION if ends else MARKER_TAGS[marker])
+        return tokens
 
 
 @dataclass(frozen=True)
