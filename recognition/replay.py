@@ -18,7 +18,7 @@ from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
 
-from recognition.base import FrameClassifier, FrameRecognizer, Prediction
+from recognition.base import FrameClassifier, FrameRecognizer, Prediction, sign_classifiers
 from shared.events import LandmarkFrame, Notice
 
 log = logging.getLogger(__name__)
@@ -85,8 +85,5 @@ class ReplayRecognizer(FrameRecognizer):
 
     def classifiers(self) -> list[FrameClassifier]:
         if self.config.get("recognition.replay_classifier", "labels") == "model":
-            from recognition.fingerspelling import FingerspellingModel
-            from recognition.isolated import IsolatedSignModel
-
-            return [IsolatedSignModel(self.config), FingerspellingModel(self.config)]
+            return sign_classifiers(self.config)
         return [FixtureLabelClassifier()]

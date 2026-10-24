@@ -24,7 +24,21 @@ recognition:
   signing_space: {x_min: 0.1, x_max: 0.9, y_min: 0.05, y_max: 0.8}
   # Segmenter: a sign is emitted after this many consecutive frames above the threshold.
   min_frames: 5
+  # YES / NO / FINISH (= SEND) must be held longer, so a mid-sentence FINISH ("already")
+  # doesn't send. 0 = twice min_frames.
+  control_min_frames: 0
   confidence_threshold: 0.6
+  # Kaggle ISLR model (downloaded here on first use): a rolling window of frames, run every
+  # `isolated_stride` frames; predictions under `isolated_floor` count as nothing.
+  isolated_model_dir: models/islr
+  isolated_window: 48
+  isolated_min_frames: 12
+  isolated_stride: 4
+  isolated_floor: 0.3
+  isolated_gap_seconds: 0.4      # hands out of the signing space this long: a fresh window
+  # Custom signs recorded with tools/record_signs.py (tried before the Kaggle model).
+  custom_signs_dir: models/custom_signs
+  custom_threshold_scale: 1.0    # lower = stricter matching
 
 language:
   claude_model: claude-haiku-5-5
