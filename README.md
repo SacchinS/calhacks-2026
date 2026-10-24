@@ -30,7 +30,7 @@ flowchart LR
 
 1. **Capture**: MediaPipe extracts hand, pose, and face landmarks from the webcam.
 2. **Gating**: only hands raised into the signing area are read, so typing or resting hands don't trigger anything.
-3. **Recognition**: an isolated-sign classifier plus a fingerspelling model turn landmarks into ASL gloss. Control signs (YES, NO, FINISH) confirm and send.
+3. **Recognition**: an isolated-sign classifier, a few custom signs we train ourselves, and a fingerspelling model turn landmarks into ASL gloss (facial grammar, like brows and head shakes, is added as tags once built). Control signs (YES, NO, FINISH) confirm and send.
 4. **Language**: Claude turns the gloss into fluent English.
 5. **Output**: English goes to the active target. Claude Code gets text directly, after an ASL YES/NO confirm. Siri gets the question typed in with Type to Siri: the app holds ⌘Space to open Siri and types it. Dictation and Meet get speech in a Cartesia voice through a virtual microphone (BlackHole on macOS).
 6. **Captions in**: during Meet calls, incoming speech is shown as live captions for the signer (Cartesia speech-to-text).
@@ -66,6 +66,8 @@ shared/        SignEvent and Utterance types, event bus
 The mock recognizer turns keyboard input into sign events, so the language, output, and UI pieces can be built and tested before real recognition is ready.
 
 ## Getting started
+
+Teammates: start with [`HANDOFF.md`](HANDOFF.md).
 
 Requirements:
 - macOS 14+ (Apple Silicon) with a webcam
