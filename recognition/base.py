@@ -15,18 +15,33 @@ from dataclasses import dataclass
 
 from shared.bus import Bus
 from shared.config import Config
-from shared.events import CONTROL_ALIASES, CONTROL_SIGNS, LandmarkFrame, SignEvent, SignKind
+from shared.events import (
+    CONTROL_ALIASES,
+    CONTROL_SIGNS,
+    FaceMarker,
+    LandmarkFrame,
+    SignEvent,
+    SignKind,
+)
 
 log = logging.getLogger(__name__)
 
 
-def make_sign_event(gloss: str, confidence: float, kind: SignKind = "isolated") -> SignEvent:
+def make_sign_event(
+    gloss: str,
+    confidence: float,
+    kind: SignKind = "isolated",
+    markers: frozenset[FaceMarker] = frozenset(),
+) -> SignEvent:
     """Build a SignEvent, uppercasing the gloss and turning control signs into kind=control."""
     gloss = gloss.strip().upper()
     gloss = CONTROL_ALIASES.get(gloss, gloss) if kind != "fingerspell" else gloss
     if gloss in CONTROL_SIGNS and kind != "fingerspell":
         kind = "control"
-    return SignEvent(gloss=gloss, confidence=max(0.0, min(1.0, confidence)), kind=kind)
+    confidence = max(0.0, min(1.0, confidence))
+    if kind == "control":
+        markers = frozenset()  # control signs are never translated
+    return SignEvent(gloss=gloss, confidence=confidence, kind=kind, markers=markers)
 
 
 class Recognizer(ABC):
