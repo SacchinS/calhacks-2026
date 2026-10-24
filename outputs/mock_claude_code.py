@@ -19,7 +19,7 @@ class MockClaudeCodeOutput(Output):
         return True
 
     async def send(self, text: str) -> None:
-        log.info("mock Claude Code got: %s", text)
+        log.debug("mock Claude Code got: %s", text)
         reply = [
             f"(mock Claude Code) Request: {text}",
             "Reading the project files...",

@@ -113,7 +113,7 @@ class SiriOutput(Output):
             raise RuntimeError("needs Accessibility permission to type to Siri")
         if not type_to_siri_enabled():
             raise RuntimeError("turn on Type to Siri (System Settings > Accessibility > Siri)")
-        log.info("typing to Siri: %s", text)
+        log.info("typing to Siri (%d chars)", len(text))
         await asyncio.to_thread(self._type, text)
 
     def _type(self, text: str) -> None:

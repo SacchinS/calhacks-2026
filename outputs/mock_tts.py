@@ -19,7 +19,7 @@ class MockTTSOutput(Output):
         return True
 
     async def send(self, text: str) -> None:
-        log.info("mock TTS spoke: %s", text)
+        log.debug("mock TTS spoke: %s", text)
         print(f"[mock tts] spoke: {text}", flush=True)
         if self.config.get("mock_tts.say_aloud", False) and shutil.which("say"):
             proc = await asyncio.create_subprocess_exec("say", text)

@@ -127,7 +127,7 @@ class FrameRecognizer(Recognizer):
                         break
             event = self.segmenter.push(prediction)
             if event is not None:
-                log.info(
+                log.debug(
                     "%s recognized %s (%s, %.2f)",
                     self.name,
                     event.gloss,

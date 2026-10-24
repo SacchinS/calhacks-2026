@@ -63,7 +63,7 @@ class SayTTSOutput(Output):
         if device is None:
             raise RuntimeError(f"audio device {self.device_name!r} not found")
         samples = await self.render(text)
-        log.info("say -> %s: %s", self.device_name, text)
+        log.info("say -> %s (%d chars)", self.device_name, len(text))
         await asyncio.to_thread(play_on_device, samples, SAMPLE_RATE, device)
 
     @staticmethod

@@ -40,6 +40,6 @@ class MockCaptionSource(CaptionSource):
 
     async def _run(self, lines: list[str]) -> None:
         for line in itertools.cycle(lines):
-            log.info("mock caption: %s", line)
+            log.debug("mock caption: %s", line)
             self.bus.publish(Caption(line))
             await asyncio.sleep(self.interval)

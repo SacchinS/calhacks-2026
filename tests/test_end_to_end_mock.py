@@ -148,3 +148,20 @@ def drain(sub):
     while not sub.queue.empty():
         out.append(sub.get_nowait())
     return out
+
+
+async def test_users_words_never_reach_info_logs(app, caplog):
+    """Privacy: the packaged app saves INFO logs to disk, so no transcripts at INFO."""
+    caplog.set_level("INFO")
+    events = app.bus.subscribe()
+    await app.start()
+    app.bus.publish(MockInput("zebra purple /send"))
+    await next_of(events, ConfirmRequest)
+    app.bus.publish(MockInput("/yes"))
+    await next_of(events, OutputSent)
+    for mode in ("siri", "voice"):
+        app.router.set_mode(mode)
+        app.bus.publish(MockInput("zebra purple /send"))
+        await next_of(events, OutputSent)
+    logged = " ".join(r.getMessage() for r in caplog.records).lower()
+    assert "zebra" not in logged and "purple" not in logged
