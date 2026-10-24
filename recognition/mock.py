@@ -113,7 +113,7 @@ class MockRecognizer(Recognizer):
             self.bus.publish(Notice("warning", f"Mock recognizer: {exc}"))
             return
         for event in events:
-            log.info("mock sign %s (%s)", event.gloss, event.kind)
+            log.debug("mock sign %s (%s)", event.gloss, event.kind)
             self.bus.publish(event)
 
     async def start(self) -> None:

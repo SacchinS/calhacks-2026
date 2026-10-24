@@ -16,5 +16,5 @@ class MockSiriOutput(Output):
         return True
 
     async def send(self, text: str) -> None:
-        log.info("mock Siri typed: %s", text)
+        log.debug("mock Siri typed: %s", text)
         print(f"[mock siri] typed: {text}", flush=True)

@@ -72,7 +72,7 @@ class Router:
                 try:
                     await self.handle(event)
                 except Exception:  # never let one bad event kill the router
-                    log.exception("router failed on %r", event)
+                    log.exception("router failed on %s", type(event).__name__)
                     self.bus.publish(Notice("error", f"Router error on {type(event).__name__}"))
         finally:
             sub.close()
