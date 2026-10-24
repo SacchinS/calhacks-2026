@@ -106,6 +106,21 @@ enum RouteInfo {
 }
 
 /// How each output mode is shown (calhacks-2026 addition).
+/// The demo script's draft glosses (docs/asl-demo-script-research.md), in demo order, in the
+/// mock-sign syntax (`/\` = raised brows over the topic). Demo Mode's backup keys 1-6 and Preview's
+/// test phrases. A Deaf signer must approve them before the demo.
+enum DemoScript {
+    static let phrases: [[String]] = [
+        ["FOOD", "STORE", "/\\", "WW", "MAKE"],                       // 1 Claude Code kick-off
+        ["TOMORROW", "MORNING,", "YOU-REMIND-ME", "BUY", "MILK"],     // 2 Siri reminder
+        ["HELLO,", "NICE", "MEET-YOU"],                               // 3 Meet greeting
+        ["HOW", "YOU", "[wh]"],                                       // 4 Meet
+        ["THANK-YOU"],                                                // 5 Meet
+        ["TITLE", "/\\", "RED"],                                      // 6 Claude Code re-prompt
+    ]
+    static func label(_ phrase: [String]) -> String { phrase.joined(separator: " ") }
+}
+
 enum OutputMode {
     static let all = ["claude_code", "siri", "voice", "meet"]
     static func label(_ mode: String) -> String {
