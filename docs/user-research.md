@@ -18,7 +18,7 @@ Survey response, Oct 23, 2026. He agreed to be quoted.
 
 ## What we changed
 
-1. **Video calls come first.** The Meet call is demo moment 1 and gets the most polish. Claude Code and Siri show the same pipeline reaching other voice-first tools.
+1. **Video calls are the centerpiece.** The Meet call gets the most time and polish in the demo. We open with a signed Claude Code request so it can build in the background, and Siri shows the same pipeline reaching other voice-first tools.
 2. **Every call starts by saying who's calling.** Hearing people hang up on relay calls because they don't know who it is. In Meet mode the app introduces the signer in their Cartesia voice, and says "one moment, I'm signing" during long pauses so the other side doesn't assume the line is dead.
 3. **Video never leaves the laptop.** Tracking and sign recognition run on the device. Only the recognized sign words go to Claude, as text, and only the final English goes to Cartesia. Nothing is recorded or saved, and the app always shows whether the camera is on.
 4. **The signer sees the English before anyone hears it.** Claude Code already waits for a signed YES. Meet mode can do the same ("review before speaking"), so a misrecognized sign isn't spoken in the signer's name.
