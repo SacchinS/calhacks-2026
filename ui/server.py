@@ -13,7 +13,8 @@ it onto our bus. Commands (stdin, one JSON object per line):
   {"cmd": "calibrate"}
   {"cmd": "config", "values": {...}}                    saves the app's settings
   {"cmd": "output_mode", "mode": "claude_code|siri|voice|meet"}   (ours) where English goes
-  {"cmd": "mock_input", "text": "me want #title /send"}      (ours) the mock-sign box
+  {"cmd": "mock_input", "text": "title /\\ red /send"}      (ours) the mock-sign box
+  {"cmd": "introduce"}                                  (ours) say the Meet call intro again
   {"cmd": "quit"}
 
 Events (stdout):
@@ -21,7 +22,8 @@ Events (stdout):
   {"type": "status", "state": "idle|listening|thinking|confirming|sending", "mode": ...,
    "glosses": [...], "intent": {"sentence": ..., "route": "text|siri|voice"} | null,
    "target": ..., "log": [...], "holding": null, "fps": ..., "error": null,
-   "output_mode": ..., "components": {...}, "mock": bool}       on change, and every second
+   "output_mode": ..., "components": {...}, "mock": bool,
+   "claude_code_working": bool, "camera_on": bool}                                 on change, and every second
   {"type": "frame", "seq": n, "jpeg": "<base64>"}   while the preview is on (mirrored, drawn)
   {"type": "check" | "route_tested" | "calibrated" | "config" | "error", ...}
   {"type": "caption", "text": ...}, {"type": "reply", "text": ..., "done": bool}   (ours)
@@ -132,6 +134,7 @@ class EngineServer:
         self.out = out
         self.ui_config_path = ui_config
         self.ui_config = self._load_ui_config()
+        self._apply_settings()
         self.space = SigningSpace.from_config(self.config)
         self.mirror = bool(self.config.get("ui.mirror_camera", True))
 
@@ -143,6 +146,7 @@ class EngineServer:
         self.utterance: list[str] = []  # the phrase being translated / confirmed / sent
         self.english: str | None = None
         self.pending_id: str | None = None
+        self.pending_target = "claude_code"
         self.thinking = False
         self.sending = False
         self.claude_code_jobs: list[str] = []  # approved requests Claude Code is still working on
@@ -196,6 +200,8 @@ class EngineServer:
             "error": None,
             "output_mode": self.output_mode,
             "claude_code_working": bool(self.claude_code_jobs),
+            # The webcam is open (only the camera recognizer opens it; the app always shows this).
+            "camera_on": self.app.chosen.get("recognizer") == "camera" and self.mode != "off",
             "components": self.app.chosen,
             "mock": self.app.chosen.get("recognizer") == "mock",
         }
@@ -308,11 +314,15 @@ class EngineServer:
                 self.sending = True  # voice / meet: straight to the voice
         elif isinstance(event, ConfirmRequest):
             self.pending_id = event.request_id
+            self.pending_target = event.target
             self.english = event.english
+            self.sending = False
         elif isinstance(event, ConfirmResult):
             if event.request_id == self.pending_id:
                 self.pending_id = None
-                if event.approved and self.english:
+                if event.approved and self.pending_target != "claude_code":
+                    self.sending = True  # reviewed in Meet / Voice: now it's spoken
+                elif event.approved and self.english:
                     # Claude Code builds in the background: don't hold the app on "Sending".
                     self.claude_code_jobs.append(self.english)
                     self.log.append("Claude Code is working")
@@ -373,9 +383,12 @@ class EngineServer:
         elif cmd == "config":
             self.ui_config.update(msg.get("values") or {})
             self._save_ui_config()
+            self._apply_settings()
             self.emit({"type": "config", "config": self.ui_config})
         elif cmd == "output_mode":
             self.set_output_mode(str(msg.get("mode")))
+        elif cmd == "introduce":
+            self.app.call_host.introduce()
         elif cmd == "mock_input":
             if str(msg.get("text", "")).strip():
                 self.bus.publish(MockInput(str(msg["text"])))
@@ -508,10 +521,17 @@ class EngineServer:
             "phrase_rest": 1.5,
             "min_conf": float(self.config.get("recognition.confidence_threshold", 0.6)),
             "voice_device": self.config.get("audio.virtual_mic_device", "BlackHole 2ch"),
+            "signer_name": self.config.get("meet.signer_name", "") or "",
+            "review_before_speaking": bool(self.config.get("meet.review_before_speaking", False)),
         }
         with contextlib.suppress(OSError, ValueError):
             cfg.update(json.loads(self.ui_config_path.read_text()))
         return cfg
+
+    def _apply_settings(self) -> None:
+        """Settings the app's Settings window changes that the engine uses."""
+        self.app.call_host.name = str(self.ui_config.get("signer_name") or "").strip()
+        self.app.router.review_before_speaking = bool(self.ui_config.get("review_before_speaking"))
 
     def _save_ui_config(self) -> None:
         self.ui_config_path.parent.mkdir(parents=True, exist_ok=True)

@@ -37,6 +37,9 @@ final class EngineClient: ObservableObject {
     @Published var outputMode = "claude_code"
     @Published var components: [String: String] = [:]
     @Published var claudeCodeWorking = false
+    @Published var cameraOn = false
+    /// The Meet call so far: what the signer said ("you") and the other side's captions ("them").
+    @Published var meetLog: [(who: String, text: String)] = []
     @Published var mockRecognizer = false
     @Published var captions: [String] = []
     @Published var replies: [String] = []
@@ -187,6 +190,7 @@ final class EngineClient: ObservableObject {
     }
     func calibrate() { send(["cmd": "calibrate"]) }
     func saveConfig(_ values: [String: Any]) { send(["cmd": "config", "values": values]) }
+    func introduce() { send(["cmd": "introduce"]) }
     func setOutputMode(_ mode: String) { send(["cmd": "output_mode", "mode": mode]) }
     func mockInput(_ text: String) {
         if !text.trimmingCharacters(in: .whitespaces).isEmpty { send(["cmd": "mock_input", "text": text]) }
@@ -249,6 +253,7 @@ final class EngineClient: ObservableObject {
             outputMode = e["output_mode"] as? String ?? outputMode
             components = e["components"] as? [String: String] ?? components
             claudeCodeWorking = e["claude_code_working"] as? Bool ?? false
+            cameraOn = e["camera_on"] as? Bool ?? false
             mockRecognizer = e["mock"] as? Bool ?? mockRecognizer
         case "frame":
             if let b64 = e["jpeg"] as? String, let data = Data(base64Encoded: b64) {
@@ -264,10 +269,14 @@ final class EngineClient: ObservableObject {
             lastRouteTest = (e["route"] as? String ?? "", e["ok"] as? Bool ?? false, e["detail"] as? String ?? "")
         case "caption":
             captions = Array((captions + [e["text"] as? String ?? ""]).suffix(30))
+            meetLog = Array((meetLog + [("them", e["text"] as? String ?? "")]).suffix(60))
         case "reply":
             replies = Array((replies + [e["text"] as? String ?? ""]).suffix(60))
         case "sent":
             sent = Array((sent + [(e["mode"] as? String ?? "", e["text"] as? String ?? "")]).suffix(60))
+            if e["mode"] as? String == "meet" {
+                meetLog = Array((meetLog + [("you", e["text"] as? String ?? "")]).suffix(60))
+            }
         case "error":
             engineError = e["message"] as? String
         default:

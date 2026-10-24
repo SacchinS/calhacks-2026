@@ -16,6 +16,7 @@ struct DemoView: View {
                     StatePill(state: engine.state).scaleEffect(1.25).padding(.leading, 10)
                     Spacer()
                     if engine.claudeCodeWorking { ClaudeCodeWorking().font(.title3) }
+                    CameraIndicator(on: engine.cameraOn).font(.title3)
                     if let target = engine.target, engine.state != "idle" {
                         Label(target, systemImage: "macwindow").font(.title3).foregroundStyle(.secondary)
                     }
