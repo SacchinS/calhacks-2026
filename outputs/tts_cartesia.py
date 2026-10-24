@@ -40,6 +40,7 @@ class CartesiaTTSOutput(Output):
         self.device_name = config.get("audio.virtual_mic_device", "BlackHole 2ch")
         self._client = client
         self.fallback = SayTTSOutput(bus, config)
+        self._warned = False
 
     @property
     def client(self) -> Any:
@@ -50,14 +51,19 @@ class CartesiaTTSOutput(Output):
         return self._client
 
     def available(self) -> bool:
-        return bool(Config.secret("CARTESIA_API_KEY")) and (
-            find_output_device(self.device_name) is not None
-        )
+        # Without a key it still speaks (with `say`), so a call never goes silent.
+        return find_output_device(self.device_name) is not None
 
     async def send(self, text: str) -> None:
         device = find_output_device(self.device_name)
         if device is None:
             raise RuntimeError(f"audio device {self.device_name!r} not found")
+        if self._client is None and not Config.secret("CARTESIA_API_KEY"):
+            if not self._warned:
+                self._warned = True
+                self.bus.publish(Notice("warning", "No CARTESIA_API_KEY in .env: using `say`"))
+            await self.fallback.send(text)
+            return
         try:
             await self.stream(text, device)
         except Exception as exc:
