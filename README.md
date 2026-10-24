@@ -10,7 +10,7 @@ Built at Cal Hacks 13.0 (Oct 23–25, 2026).
 
 Voice assistants, dictation, and AI tools are increasingly built around speech. For people whose first language is ASL, that means working in a second language or being left out. Our design rule is **parity**: give signers what voice users already have.
 
-We're a hearing team, and we're building this with input from Deaf ASL faculty at the University of Washington. We plan to keep developing it after Cal Hacks based on their feedback.
+We're a hearing team, and we're building this with input from Deaf ASL faculty at the University of Washington. Professor Lance Forshay told us video calls are where he'd use it, that hearing people often hang up on relay calls because they don't know who's calling, and that accuracy, privacy, and "government recording" would stop him trusting a tool like this. So calls come first, every call starts by saying who's calling, and video never leaves the laptop. His answers are in [`docs/user-research.md`](docs/user-research.md). We plan to keep developing it after Cal Hacks with Deaf testers.
 
 ## How it works
 
@@ -43,6 +43,9 @@ flowchart LR
 | Signed prompts and live edits in Claude Code | Planned (MVP) |
 | Siri by sign | Planned (MVP) |
 | Google Meet: speech out, captions in, "signing..." cue | Planned (MVP) |
+| Call intro: says who's calling at the start of a call | Planned (MVP) |
+| Video stays on the laptop, camera-on indicator | Planned (MVP) |
+| Review the English before it's spoken in Meet | Planned (MVP) |
 | Signing-area gating | Planned (MVP) |
 | App-switching signs | Planned (MVP) |
 | ASL YES/NO confirm for Claude Code | Planned (MVP) |
@@ -120,13 +123,21 @@ make app                          # build dist/SignBridge.app (Swift app + bundl
 - Kaggle ASL Fingerspelling 2023 winning model: names and rare words
 - [MediaPipe Model Maker](https://ai.google.dev/edge/mediapipe/solutions/model_maker): custom command signs
 
+## Privacy
+
+- Video never leaves your Mac. Hand tracking and sign recognition run on the device.
+- Claude receives only the recognized sign words, as text. Cartesia receives only the final English to speak, plus the other side's call audio for captions.
+- Nothing is recorded or saved: no video, no transcripts.
+- The app always shows when the camera is on.
+
 ## Limitations
 
 - Recognition covers a limited vocabulary, not all of ASL. ASL grammar, regional variation, and facial grammar are only partly handled.
 - Live webcam accuracy can be much lower than benchmark scores. We'll report what we actually measure.
 - Siri can't be reached through a virtual mic. "Hey Siri" doesn't trigger from one, and even with Siri opened by ⌘Space and BlackHole set as the Mac's input, voice Siri ignores it (tested on macOS 26.2: BlackHole carried the audio, Siri heard nothing; it listens to the built-in mic). Siri uses the Type to Siri accessibility feature instead: set Siri's keyboard shortcut to Hold Command Space (Apple Intelligence & Siri settings), turn on Type to Siri (Accessibility > Siri), and give the app Accessibility permission so it can hold ⌘Space and type the question.
+- It's not a replacement for a qualified interpreter. It's a direct option for short calls and voice-only tools.
 - macOS only for now.
 
 ## Acknowledgments
 
-Thanks to the Deaf ASL faculty at UW for their time and feedback.
+Thanks to the Deaf ASL faculty at UW for their time and feedback, especially Professor Lance Forshay.
