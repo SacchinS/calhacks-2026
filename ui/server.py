@@ -143,6 +143,7 @@ class EngineServer:
         self.mode = "off"  # the app's mode: off | run | framing | gestures
         self.preview = False
         self.output_mode = self.config.mode
+        self.voice_mode = self.output_mode if self.output_mode in ("voice", "meet") else "voice"
         self.woke = False
         self.gloss: list[str] = []  # live, until SEND
         self.utterance: list[str] = []  # the phrase being translated / confirmed / sent
@@ -332,6 +333,8 @@ class EngineServer:
                     self.log.append("cancelled")
         elif isinstance(event, ModeChanged):
             self.output_mode = event.mode
+            if event.mode in ("voice", "meet"):
+                self.voice_mode = event.mode
         elif isinstance(event, OutputSent):
             mode = self.output_mode
             if event.output in ("claude_code", "console") and event.text in self.claude_code_jobs:
@@ -339,6 +342,10 @@ class EngineServer:
                 mode = "claude_code"
             else:
                 self.sending = False
+                if event.output == "tts":
+                    mode = self.voice_mode  # spoken in Meet or Voice, even if the mode moved on
+                elif event.output == "siri":
+                    mode = "siri"
             self.log.append("sent" if event.output != "console" else "printed to the console")
             sent = {"mode": mode, "output": event.output, "text": event.text}
             self.emit({"type": "sent", **sent})

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 from outputs.base import Output
 
@@ -17,4 +18,5 @@ class MockSiriOutput(Output):
 
     async def send(self, text: str) -> None:
         log.debug("mock Siri typed: %s", text)
-        print(f"[mock siri] typed: {text}", flush=True)
+        if sys.stderr.isatty():  # never into the packaged app's log file
+            print(f"[mock siri] typed: {text}", file=sys.stderr, flush=True)
