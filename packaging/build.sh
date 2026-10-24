@@ -11,8 +11,9 @@
 # Signs with your first "Apple Development" identity so macOS keeps Camera permission across rebuilds (an
 # ad-hoc signature changes every build). Override: SIGN_IDENTITY="..." or SIGN_IDENTITY=-
 #
-# TODO(Person C): API keys. The bundled engine reads Resources/engine/.env, which this script doesn't create;
-# decide where a packaged app gets ANTHROPIC_API_KEY and CARTESIA_API_KEY from (never commit them).
+# API keys: the app reads ~/Library/Application Support/calhacks-2026/.env (ANTHROPIC_API_KEY,
+# CARTESIA_API_KEY); this script never copies keys into the bundle. To run real components, put a config.yaml
+# in that folder too (the bundled one keeps every line on mock), with an absolute claude_code_cli.project_dir.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT=$(pwd)
@@ -57,6 +58,7 @@ if [[ ! -f "$MODEL" ]]; then
   curl -fsSL -o "$MODEL" "$(sed -n 's/^ *holistic_model_url: *//p' config.yaml)"
 fi
 cp "$MODEL" "$ENGINE/models/"
+if [[ -d models/islr ]]; then cp -R models/islr "$ENGINE/models/"; fi  # else it downloads on first use
 find "$APP" -name "__pycache__" -type d -prune -exec rm -rf {} +
 
 echo "== Smoke test: the engine imports with the bundled Python"

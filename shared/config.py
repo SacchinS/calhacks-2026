@@ -1,4 +1,10 @@
-"""Loads config.yaml plus secrets from .env (ANTHROPIC_API_KEY, CARTESIA_API_KEY)."""
+"""Loads config.yaml plus secrets from .env (ANTHROPIC_API_KEY, CARTESIA_API_KEY).
+
+Secrets come from the repo's .env, then ~/Library/Application Support/calhacks-2026/.env
+(where the packaged app gets them; keys never go in the bundle or the repo). The packaged
+app also prefers a config.yaml in that folder, so it can run real components even though
+the bundled config.yaml keeps every line on mock.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +19,8 @@ from dotenv import load_dotenv
 from shared.events import MODES
 
 ROOT = Path(__file__).resolve().parent.parent  # the repo, or Resources/engine in the .app
+SUPPORT = Path("~/Library/Application Support/calhacks-2026").expanduser()
+IN_APP_BUNDLE = ".app/Contents/Resources" in str(ROOT)
 
 # Allowed values for each component line. The first one is the mock.
 CHOICES: dict[str, tuple[str, ...]] = {
@@ -62,6 +70,9 @@ class Config:
 
 def load_config(path: str | Path | None = None, **overrides: str) -> Config:
     load_dotenv(ROOT / ".env")
+    load_dotenv(SUPPORT / ".env")  # doesn't override keys already set
+    if path is None and IN_APP_BUNDLE and (SUPPORT / "config.yaml").exists():
+        path = SUPPORT / "config.yaml"
     path = Path(path) if path else ROOT / "config.yaml"
     raw: dict[str, Any] = (yaml.safe_load(path.read_text()) or {}) if path.exists() else {}
     raw.update(overrides)

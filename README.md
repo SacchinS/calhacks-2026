@@ -137,6 +137,8 @@ make lint                         # ruff check + format check
 make app                          # build dist/SignBridge.app (Swift app + bundled Python engine)
 ```
 
+The packaged app reads its keys from `~/Library/Application Support/calhacks-2026/.env`, and a `config.yaml` there if you put one (the bundled one is all mocks; use absolute paths for `claude_code_cli.project_dir` and `recognition.custom_signs_dir`). Keys are never copied into the bundle.
+
 ## Models and data
 
 - [Kaggle ISLR 2023 1st-place model](https://huggingface.co/sign/kaggle-asl-signs-1st-place) (MIT license): isolated sign recognition, 250 signs. Downloaded to `models/islr/` the first time the camera runs; run with LiteRT.
