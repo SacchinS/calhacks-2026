@@ -196,3 +196,23 @@ async def test_claude_code_requests_run_one_at_a_time_in_order():
     claude_code.release.set()
     await router.wait_for_claude_code()
     assert claude_code.sent == ["Build the site.", "Make the title red."]
+
+
+@pytest.mark.parametrize("mode", ["voice", "meet"])
+async def test_review_before_speaking_waits_for_yes(mode):
+    bus = Bus()
+    events = bus.subscribe()
+    tts = RecordingOutput("tts")
+    router = Router(
+        bus, claude_code=RecordingOutput("claude_code"), tts=tts, review_before_speaking=True
+    )
+    router.set_mode(mode)
+    await router.handle(translation("Hello, nice to meet you."))
+    (request,) = [e for e in drain(events) if isinstance(e, ConfirmRequest)]
+    assert request.target == "tts" and tts.sent == []
+    await router.handle(control("NO"))
+    assert tts.sent == []
+    await router.handle(translation("Hello, nice to meet you."))
+    await router.handle(control("YES"))
+    assert tts.sent == ["Hello, nice to meet you."]
+    assert not router.claude_code_busy
