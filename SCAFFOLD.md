@@ -167,7 +167,7 @@ Each stub must import cleanly, have the right signature, log that it's a stub, a
 - `fingerspelling.py`: Kaggle ASL Fingerspelling competition model.
 - `claude.py`: Claude via the Anthropic SDK, using `language/prompts/gloss_to_english.md`. Write a first draft of that prompt: ASL gloss in, natural English out, keep the signer's meaning, don't add content, and when the input is a coding request, phrase it as a clear instruction.
 - `claude_code.py`: run `claude -p "<text>"` in a configured project directory and stream the output back to the UI.
-- `siri.py`: implement this one for real (it's small): Type to Siri, ported from SignBridge's `signbridge/routes.py`. Hold Cmd-Space to open Siri (its shortcut set to "Hold Command Space", Type to Siri on), paste the question, press Return. Needs Accessibility permission and pyobjc (Quartz, Cocoa, ApplicationServices).
+- `siri.py`: implemented for real (done, tested on macOS 26.2): Type to Siri, ported from SignBridge's `signbridge/routes.py`. Hold Cmd-Space to open Siri (its shortcut set to "Hold Command Space", Type to Siri on), paste the question, press Return. Needs Accessibility permission and pyobjc (Quartz, Cocoa, ApplicationServices).
 - `tts_cartesia.py`: stream Cartesia Sonic audio and play it into the "BlackHole 2ch" output device with `sounddevice`. If Cartesia fails at runtime, fall back to `tts_say.py` and warn in the UI.
 - `tts_say.py`: implement this one for real (it's small): macOS `say` rendered to audio and played into "BlackHole 2ch".
 - `captions/cartesia_stt.py`: capture Meet's audio from a separate capture device (not the device our TTS writes to, or we'll caption ourselves) and stream it to Cartesia Ink. The device name lives in `config.yaml`.
