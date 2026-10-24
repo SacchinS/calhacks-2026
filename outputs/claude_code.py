@@ -21,6 +21,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
 import shutil
 import time
 from pathlib import Path
@@ -46,6 +47,9 @@ class ClaudeCodeOutput(Output):
         self.allowed_tools = config.get("claude_code_cli.allowed_tools", DEFAULT_TOOLS)
         self.model = config.get("claude_code_cli.model", "") or None
         self.timeout = float(config.get("claude_code_cli.timeout_seconds", 900))
+        # .env's ANTHROPIC_API_KEY is for the translator. Claude Code would use it instead of
+        # the account `claude` is logged in with, so it's left out unless asked for.
+        self.use_api_key = bool(config.get("claude_code_cli.use_api_key", False))
         # The session to continue; remembered on disk so a restart mid-demo keeps it.
         self.session_file = self.project_dir / ".claude-session"
         self.session_id: str | None = self._load_session()
@@ -75,6 +79,7 @@ class ClaudeCodeOutput(Output):
         proc = await asyncio.create_subprocess_exec(
             *self.args(text),
             cwd=self.project_dir,
+            env=self.env(),
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -107,6 +112,12 @@ class ClaudeCodeOutput(Output):
             self.bus.publish(OutputReply(self.name, "Claude Code failed.", done=True))
             raise RuntimeError(f"Claude Code exited {code}: {detail[-300:]}")
         self.bus.publish(OutputReply(self.name, f"Done in {seconds:.0f} s.", done=True))
+
+    def env(self) -> dict[str, str]:
+        env = dict(os.environ)
+        if not self.use_api_key:
+            env.pop("ANTHROPIC_API_KEY", None)
+        return env
 
     def _remember_session(self, session_id: Any) -> None:
         if isinstance(session_id, str) and session_id and session_id != self.session_id:

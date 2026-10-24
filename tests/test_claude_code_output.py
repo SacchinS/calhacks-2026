@@ -100,3 +100,11 @@ def test_unavailable_without_the_project_folder(tmp_path):
 def test_tool_descriptions():
     assert describe_tool("Edit", {"file_path": "/a/b/style.css"}) == "Editing style.css…"
     assert describe_tool("Glob", {"pattern": "*.html"}) == "Glob *.html…"
+
+
+def test_the_translators_api_key_is_kept_from_claude_code(site, monkeypatch):
+    config, _ = site
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    assert "ANTHROPIC_API_KEY" not in ClaudeCodeOutput(Bus(), config).env()
+    config.sections["claude_code_cli"]["use_api_key"] = True
+    assert ClaudeCodeOutput(Bus(), config).env()["ANTHROPIC_API_KEY"] == "sk-test"
