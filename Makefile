@@ -1,4 +1,4 @@
-.PHONY: install swift run mock test lint format app demo-reset demo-serve
+.PHONY: install swift run mock demo test lint format app demo-reset demo-serve
 
 MAC_APP = ui/macos/.build/debug/SignBridge
 
@@ -19,6 +19,11 @@ run: swift
 mock: swift
 	uv sync -q --inexact
 	ENGINE_ROOT=$(CURDIR) $(MAC_APP) --mock
+
+# The live demo: every real component (config.demo.yaml on top of config.yaml).
+demo: swift
+	uv sync -q --inexact --extra camera
+	ENGINE_ROOT=$(CURDIR) $(MAC_APP) --overlay config.demo.yaml
 
 test:
 	uv run pytest -q
