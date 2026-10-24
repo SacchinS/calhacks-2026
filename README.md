@@ -105,7 +105,7 @@ cp .env.example .env                        # fill in ANTHROPIC_API_KEY and CART
 uv sync --extra camera                      # MediaPipe + OpenCV for the webcam (Person A)
 ```
 
-Choose each component in `config.yaml` (every default is the mock), then `make run`:
+For the live demo, `make demo` runs every real component (`config.demo.yaml` on top of `config.yaml`). To pick components one at a time, set them in `config.yaml` (every default is the mock, and `main` keeps it that way), then `make run`:
 
 ```yaml
 recognizer: mock        # mock | replay | camera

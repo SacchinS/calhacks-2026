@@ -177,11 +177,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Sign to Claude Code, Siri, and Meet (engine).")
     parser.add_argument("--mock", action="store_true", help="force every component to its mock")
     parser.add_argument("--config", help="path to config.yaml")
+    parser.add_argument("--overlay", help="settings on top of config.yaml, e.g. config.demo.yaml")
     args = parser.parse_args()
 
     # Logs go to stderr: stdout carries the protocol.
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    config = load_config(args.config)
+    config = load_config(args.config, overlay=args.overlay)
     if args.mock:
         config = config.all_mocks()
     with contextlib.suppress(KeyboardInterrupt):
