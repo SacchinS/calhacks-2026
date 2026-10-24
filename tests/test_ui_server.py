@@ -127,6 +127,14 @@ async def test_output_mode_picks_any_mode_and_meet_shows_captions(engine):
     await until(lambda: last_status(engine)["output_mode"] == "claude_code")
 
 
+async def test_quick_mode_picks_land_on_the_last_one(engine):
+    engine.set_output_mode("siri")
+    engine.set_output_mode("voice")
+    await until(lambda: last_status(engine)["output_mode"] == "voice")
+    await asyncio.sleep(0.1)
+    assert engine.app.router.mode == "voice" and last_status(engine)["output_mode"] == "voice"
+
+
 async def test_mode_off_pauses_the_recognizer(engine):
     await engine.handle_command({"cmd": "mode", "mode": "off"})
     engine.bus.publish(MockInput("hello"))

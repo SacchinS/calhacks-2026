@@ -420,12 +420,9 @@ class EngineServer:
         self.control("SEND")
 
     def set_output_mode(self, mode: str) -> None:
-        """MODE cycles claude_code -> siri -> voice -> meet; press it until we're on `mode`."""
-        if mode not in MODES:
-            return
-        steps = (MODES.index(mode) - MODES.index(self.output_mode)) % len(MODES)
-        for _ in range(steps):
-            self.control("MODE")
+        """Pick a mode directly. (Pressing MODE N times raced: N came from a stale mode.)"""
+        if mode in MODES:
+            self.app.router.set_mode(mode)
 
     async def run_check(self, name: str) -> None:
         if name == "claude":
