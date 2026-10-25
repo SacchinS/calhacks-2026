@@ -156,7 +156,8 @@ autocomplete:
   substitution_penalty: 0.35
   max_substitutions: 1
   context_seconds: 30            # recent conversation (in memory only) to search and tag with
-  search_timeout_ms: 40          # slower than this: rank without context for that letter
+  search_timeout_ms: 300         # slower than this: rank without context for that letter
+                                 # (a 30 s window takes 40-120 ms on Moss; 40 dropped a third)
   top_k: 50
   learn_from_captions: true      # remember names / acronyms / jargon the other side says
   transcript_weight: 0.5         # a word heard counts half as much as one you spelled

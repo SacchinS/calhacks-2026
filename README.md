@@ -207,7 +207,7 @@ Frequency and last use come from the local file, held in memory, not from Moss. 
 weights are in `config.yaml` (`autocomplete:`).
 
 If Moss isn't available (no keys, or no network at startup) or a query takes longer than
-40 ms, suggestions are ranked by letters, frequency and recency alone. Each suggestion's
+300 ms, suggestions are ranked by letters, frequency and recency alone. Each suggestion's
 latency is logged.
 
 **Try it.**

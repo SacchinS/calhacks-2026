@@ -4,13 +4,16 @@
     uv run python tools/seed_vocab.py --mock          # ... into vocab-mock.sqlite (make mock)
     uv run python tools/seed_vocab.py --synthetic 500 --time   # 500 made-up words, then time
                                                       # building the search like the engine does
-    uv run python tools/seed_vocab.py --bench 50      # time P-R -> Pranav and F-I -> Figma
+    uv run python tools/seed_vocab.py --bench 50      # time P -> Pranav and F -> Figma
     uv run python tools/seed_vocab.py --list
     uv run python tools/seed_vocab.py --reset         # delete every remembered word
 
 The demo words: Julian (tennis, three weeks ago), Jupyter (data work, recent), June, and a
 few more, so J-U ranks differently with a tennis or a data conversation. Pranav and
-Kubernetes aren't seeded: the mock captions teach them in the demo.
+Kubernetes aren't seeded: the mock captions teach them in the demo. Decoys start with the
+demo letters and are used more, and more recently, than Pranav and Figma (Priya, Postgres,
+Python; Firebase, Fiona, Flutter), so P and F alone suggest a decoy: only the conversation
+gets them right, which shows the search doing the work.
 """
 
 from __future__ import annotations
@@ -41,6 +44,16 @@ DEMO = [
     ("API", "acronym", 1, ("backend", "integration", "software")),
     ("Figma", "term", 3, ("design", "mockups", "dashboard")),
     ("Marisol", "name", 5, ("design review", "dashboard", "team")),
+    # Decoys for P and F (one row per use).
+    *[("Priya", "name", d, ("hiring", "recruiting", "interviews")) for d in range(8)],
+    *[("Postgres", "term", d, ("database", "backend", "migrations")) for d in range(1, 7)],
+    *[("Python", "term", d, ("scripts", "data analysis", "notebooks")) for d in range(1, 6)],
+    *[("Firebase", "term", d, ("backend", "login", "mobile app")) for d in range(7)],
+    *[("Fiona", "name", d, ("sales", "quarterly targets", "customers")) for d in range(1, 7)],
+    *[("Flutter", "term", d, ("mobile app", "ios", "android")) for d in range(2, 6)],
+    # Other letters.
+    *[("Sarah", "name", d, ("marketing", "launch", "campaign")) for d in range(2, 6)],
+    *[("Zendesk", "term", d, ("support tickets", "customers")) for d in range(3, 6)],
 ]
 
 
@@ -106,7 +119,7 @@ def demo_captions() -> list[str]:
 
 
 async def bench(config, rounds: int, path: Path) -> None:
-    """Spell P-R and F-I `rounds` times each against the demo call, and report the latency the
+    """Spell P and F `rounds` times each against the demo call, and report the latency the
     pitch quotes. The words come from the demo list plus the captions, exactly as in a call:
     Pranav and Figma are learned from what the other side says."""
     import contextlib
@@ -141,13 +154,17 @@ async def bench(config, rounds: int, path: Path) -> None:
         if ac.store.for_term("PRANAV") and ac.store.for_term("FIGMA"):
             break
         await asyncio.sleep(0.01)
+    for _ in range(500):  # ...and added to the search (in a call, B says them seconds earlier)
+        if not ac._tasks:
+            break
+        await asyncio.sleep(0.01)
     ac.stats = build_stats(ac.store.all(), ac.transcript_weight)
 
     results: dict[str, dict[str, list]] = {
         word: {"latency": [], "search": [], "top": []} for word in ("Pranav", "Figma")
     }
     for _ in range(rounds):
-        for word, letters in (("Pranav", "PR"), ("Figma", "FI")):
+        for word, letters in (("Pranav", "P"), ("Figma", "F")):
             # The last ~30 seconds of the call, as the engine holds it while the signer spells.
             ac.conversation.clear()
             for line in captions:
@@ -168,7 +185,7 @@ async def bench(config, rounds: int, path: Path) -> None:
 
     print(f"\n{search.name} search, {rounds} rounds each, {len(ac.stats)} words remembered")
     print(f"startup build: {build_ms:.0f} ms")
-    for word, letters in (("Pranav", "P-R"), ("Figma", "F-I")):
+    for word, letters in (("Pranav", "P"), ("Figma", "F")):
         row = results[word]
         hits = sum(top == word for top in row["top"])
         print(f"\n{letters} -> {word}: top suggestion {hits}/{len(row['top'])} rounds")
@@ -196,7 +213,7 @@ def main() -> None:
         const=50,
         default=0,
         metavar="N",
-        help="spell P-R and F-I N times each (default 50) and report the latency",
+        help="spell P and F N times each (default 50) and report the latency",
     )
     parser.add_argument("--list", action="store_true")
     parser.add_argument("--reset", action="store_true")
