@@ -24,6 +24,7 @@ from language.utterance import UtteranceBuffer
 from outputs.call_host import CallHost
 from outputs.console import ConsoleOutput
 from outputs.router import Router
+from outputs.turn_taking import TurnTakingOutput
 from recognition.base import Recognizer
 from recognition.mock import MockRecognizer
 from shared.bus import Bus
@@ -84,7 +85,7 @@ class App:
             self.bus,
             claude_code=self._build("claude_code", self.bus, config),
             siri=self._build("siri", self.bus, config),
-            tts=self._build("tts", self.bus, config),
+            tts=self._voice(config),
             console=self.console,
             mode=config.mode,  # type: ignore[arg-type]
             review_before_speaking=bool(config.get("meet.review_before_speaking", False)),
@@ -92,6 +93,13 @@ class App:
         self.call_host = CallHost(self.bus, config, self.router)
         self.captions: CaptionSource = self._build("captions", self.bus, config)
         self._captions_task: asyncio.Task[None] | None = None
+
+    def _voice(self, config: Config) -> Any:
+        """The TTS output, turn-aware in calls (waits for the other side to finish)."""
+        tts = self._build("tts", self.bus, config)
+        if config.get("meet.turn_taking", True):
+            tts = TurnTakingOutput(self.bus, config, tts)
+        return tts
 
     def _build(self, component: str, *args: Any) -> Any:
         choice = self.chosen[component]
@@ -113,6 +121,8 @@ class App:
         await self.buffer.start()
         await self.router.start()
         await self.call_host.start()
+        if isinstance(self.router.tts, TurnTakingOutput):
+            await self.router.tts.start()
         try:
             await self.recognizer.start()
         except Exception as exc:
@@ -134,6 +144,8 @@ class App:
         with contextlib.suppress(Exception):
             await self.captions.stop()
         await self.call_host.stop()
+        if isinstance(self.router.tts, TurnTakingOutput):
+            await self.router.tts.stop()
         await self.router.stop()
         await self.buffer.stop()
 

@@ -22,6 +22,7 @@ from shared.events import (
 async def app():
     app = App(load_config().all_mocks())
     app.router.claude_code.chunk_delay = 0
+    app.config.sections["mock_tts"]["seconds_per_word"] = 0  # instant mock speech
     yield app
     await app.stop()
 

@@ -104,3 +104,20 @@ async def test_an_error_event_stops_with_a_notice():
     notice = await asyncio.wait_for(notices.get(), 2)
     assert "bad key" in notice.message
     await src.stop()
+
+
+async def test_ink_turn_events_become_turn_events():
+    from shared.events import TurnEvent
+
+    events = [
+        SimpleNamespace(type="turn.start", transcript=""),
+        SimpleNamespace(type="turn.eager_end", transcript="Can you"),
+        SimpleNamespace(type="turn.resume", transcript="Can you"),
+        SimpleNamespace(type="turn.end", transcript="Can you take it?"),
+    ]
+    src, _, _ = source(events)
+    turns = src.bus.subscribe(TurnEvent)
+    await src.start()
+    kinds = [(await asyncio.wait_for(turns.get(), 2)).kind for _ in range(4)]
+    await src.stop()
+    assert kinds == ["start", "eager_end", "resume", "end"]

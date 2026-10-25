@@ -81,16 +81,27 @@ meet:
   intro_on_start: true
   signing_cue_seconds: 5          # signing this long unsent: "One moment, I'm signing." (0 = off)
   review_before_speaking: false   # true: Meet and Voice wait for YES / NO, like Claude Code
+  # Turn-aware speaking (Cartesia Ink turn detection on the other side's audio): wait for
+  # them to finish, or after chime_in_seconds of talking say the interjection and then speak.
+  turn_taking: true
+  chime_in_seconds: 8
+  interjection: "Sorry, can I jump in?"
+  yield_seconds: 2.5              # after the interjection, wait this long for them to pause
+  barge_in_seconds: 1.0           # talked over this long: stop, and say it again at the pause
 
 cartesia:
   tts_model: sonic-latest        # or pin one, e.g. sonic-3.5
   stt_model: ink-2
   voice_id: db6b0ed5-d5d3-463d-ae85-518a07d3c2b4   # "Skylar"; any Sonic voice ID (play.cartesia.ai)
   sample_rate: 44100
+  # Optional Ink turn-detection tuning, passed to the STT websocket when set:
+  # turn_start_threshold, turn_end_threshold, turn_eager_end_threshold, turn_end_timeout_ms
 
 mock_tts:
+  seconds_per_word: 0.1           # mock speech takes this long per word (0 = instant)
   say_aloud: false                # true: also speak mock TTS on your speakers with `say`
 
 captions_mock:
   file: fixtures/captions_sample.txt
   interval_seconds: 3.0
+  talk_seconds: 1.5               # each mock line is a 1.5 s "turn", so speech waits for it
