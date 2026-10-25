@@ -84,11 +84,11 @@ def record(phrases: list[str], takes: int, rest: float) -> None:
     import cv2
 
     from recognition.camera import Camera
-    from recognition.gating import SigningSpace
     from tools.record_signs import show
+    from tools.tune_recognition import signing_space
 
     config = load_config()
-    gate = SigningSpace.from_config(config)
+    gate = signing_space(config)  # the one saved in setup, like the app
     camera = Camera(config)
     try:
         for i, phrase in enumerate(phrases, 1):
@@ -103,14 +103,14 @@ def record(phrases: list[str], takes: int, rest: float) -> None:
                     frame = gate.apply(frame)
                     if frame.hands_in_signing_space:
                         ready_since = None
-                        if not show(cv2, frame, f"{title}: rest your hands"):
+                        if not show(cv2, frame, f"{title}: rest your hands", space=gate):
                             return
                         continue
                     ready_since = ready_since or time.monotonic()
                     left = 1.5 - (time.monotonic() - ready_since)
                     if left <= 0:
                         break
-                    if not show(cv2, frame, f"{title}: ready... {left:.1f}"):
+                    if not show(cv2, frame, f"{title}: ready... {left:.1f}", space=gate):
                         return
                 # Record everything from the first sign until the hands rest.
                 clip, started, last_in = [], None, None
@@ -128,7 +128,7 @@ def record(phrases: list[str], takes: int, rest: float) -> None:
                         if now - last_in > rest or now - started > MAX_SECONDS:
                             break
                     label = "recording" if started else "GO: sign it"
-                    if not show(cv2, frame, f"{title}: {label}", (80, 220, 80)):
+                    if not show(cv2, frame, f"{title}: {label}", (80, 220, 80), space=gate):
                         return
                 if len(clip) < 10:
                     print(f"{phrase} take {take}: too short, skipped")

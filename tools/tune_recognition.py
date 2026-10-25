@@ -170,10 +170,20 @@ def model_values(config: Config, window: int, stride: int, floor: float) -> dict
 Factory = Callable[[Config], tuple[FrameClassifier | None, FrameClassifier]]
 
 
+class NoModel(FrameClassifier):
+    """Stands in for a main sign model when config.yaml uses custom signs only."""
+
+    def predict(self, frame: LandmarkFrame) -> Prediction | None:
+        return None
+
+
 def real_classifiers(config: Config) -> tuple[FrameClassifier | None, FrameClassifier]:
     from recognition.custom_signs import CustomSignModel
 
     custom = CustomSignModel(config)
+    models = config.get("recognition.sign_models", ["custom", "kaggle"]) or []
+    if "kaggle" not in models and main_model(config) != "asl_citizen":
+        return custom, NoModel()  # custom signs only, like the app
     if main_model(config) == "asl_citizen":
         from recognition.asl_citizen import ASLCitizenModel
 
