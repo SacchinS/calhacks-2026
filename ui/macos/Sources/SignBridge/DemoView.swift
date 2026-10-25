@@ -57,7 +57,12 @@ struct DemoView: View {
                     .transition(.opacity).id(caption)
                 }
             }
-            history.frame(width: 340)
+            VStack(alignment: .leading, spacing: 18) {
+                TicketCard(engine: engine, large: true).padding(.top, engine.ticket == nil ? 0 : 44)
+                history
+            }
+            .frame(width: engine.ticket == nil ? 340 : 460)
+            .animation(.easeInOut(duration: 0.25), value: engine.ticket == nil)
         }
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -71,7 +76,8 @@ struct DemoView: View {
         }
     }
 
-    /// Backup keys for a live demo: W start, C send, X cancel, N say it now, 1-3 the demo script's phrases.
+    /// Backup keys for a live demo: W start, C send (or create a ready ticket), X cancel (or dismiss
+    /// the ticket), N say it now, 1-3 the demo script's phrases, 4 redraft the ticket now.
     private var shortcuts: some View {
         let phrases = DemoScript.phrases
         return ZStack {
@@ -82,6 +88,7 @@ struct DemoView: View {
             ForEach(Array(phrases.enumerated()), id: \.offset) { i, p in
                 Button("") { engine.fake(p) }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: [])
             }
+            Button("") { engine.redraftTicket() }.keyboardShortcut(KeyEquivalent(Character("\(phrases.count + 1)")), modifiers: [])
         }
         .opacity(0).allowsHitTesting(false)
     }
@@ -148,7 +155,8 @@ struct DemoView: View {
     /// Recent phrases: signs, sentence, where it went, and whether it was sent.
     private var history: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Recent").font(.title3.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 60)
+            Text("Recent").font(.title3.weight(.semibold)).foregroundStyle(.secondary)
+                .padding(.top, engine.ticket == nil ? 60 : 0)
             if engine.history.isEmpty {
                 Text("Phrases you send or cancel show up here.").foregroundStyle(.tertiary)
             }

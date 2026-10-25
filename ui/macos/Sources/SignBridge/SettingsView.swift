@@ -68,6 +68,15 @@ struct SettingsView: View {
                 }
                 .padding(.top, 8)
             }
+            Section {
+                HStack {
+                    Text("With live Jira tickets on, SignBridge keeps this call's captions and your spoken sentences in memory, and send them to Claude to draft the ticket. They're never written to disk.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Clear Call Notes") { engine.clearTicketNotes() }
+                        .help("Forget this call's notes and dismissed drafts, and hide the ticket card")
+                }
+            }
             RememberedWords(engine: engine)
             Section("Privacy") {
                 Label("Video never leaves this Mac. Hand tracking and sign recognition run here.", systemImage: "video.slash")

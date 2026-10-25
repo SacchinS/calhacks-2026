@@ -18,6 +18,7 @@ struct PreviewView: View {
                         camera
                         VStack(spacing: 14) {
                             transcript
+                            TicketCard(engine: engine)
                             call(maxHeight: .infinity)
                             Spacer(minLength: 0)
                             if engine.mockRecognizer { MockSignBox(engine: engine) } else { SpellBox(engine: engine) }
@@ -31,6 +32,7 @@ struct PreviewView: View {
                     topBar
                     camera
                     transcript
+                    TicketCard(engine: engine)
                     call(maxHeight: 320)
                     if engine.mockRecognizer { MockSignBox(engine: engine) } else { SpellBox(engine: engine) }
                     controls

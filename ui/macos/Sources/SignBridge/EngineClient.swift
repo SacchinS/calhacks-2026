@@ -73,6 +73,8 @@ final class EngineClient: ObservableObject {
     }
     @Published var vocab: [VocabWord] = []
     @Published var mockRecognizer = false
+    /// The live Jira ticket Claude is drafting from the call, while the card shows (TicketCard).
+    @Published var ticket: TicketUpdate?
     @Published var captions: [String] = []
     private var pending: (glosses: [String], sentence: String, route: String)?
     /// Arguments for the engine, e.g. --mock (everything after the app's own binary path).
@@ -237,6 +239,21 @@ final class EngineClient: ObservableObject {
     func listVocab() { send(["cmd": "vocab_list"]) }
     func deleteWord(_ term: String) { send(["cmd": "vocab_delete", "term": term]) }
     func deleteUse(_ id: String) { send(["cmd": "vocab_delete", "id": id]) }
+    /// Creates the ticket on the card in Jira, only if `version` is still the one shown and it's ready.
+    func approveTicket(version: Int) {
+        guard let ticket, ticket.approvable, ticket.version == version else { return }
+        send(["cmd": "ticket", "action": "approve", "version": version, "via": "button"])
+    }
+    /// Tries a failed create again, with the same version (so the same Jira request).
+    func retryTicket(version: Int) {
+        guard let ticket, ticket.state == "failed", ticket.version == version else { return }
+        send(["cmd": "ticket", "action": "approve", "version": version, "via": "retry"])
+    }
+    func dismissTicket() { send(["cmd": "ticket", "action": "dismiss"]) }
+    /// Redraft now (Demo Mode's key 4).
+    func redraftTicket() { send(["cmd": "ticket", "action": "draft"]) }
+    /// Forget this call's notes and dismissed drafts (Settings > Calls).
+    func clearTicketNotes() { send(["cmd": "ticket", "action": "clear_notes"]) }
     func mockInput(_ text: String) {
         if !text.trimmingCharacters(in: .whitespaces).isEmpty { send(["cmd": "mock_input", "text": text]) }
     }
@@ -306,6 +323,7 @@ final class EngineClient: ObservableObject {
             themTalking = e["them_talking"] as? Bool ?? false
             mockRecognizer = e["mock"] as? Bool ?? mockRecognizer
             autocomplete = Self.parseAutocomplete(e["autocomplete"] as? [String: Any])
+            if e.keys.contains("ticket") { showTicket(TicketUpdate.parse(e["ticket"])) }
             if let s = e["autocomplete_stats"] as? [String: Any] {
                 autocompleteStats = AutocompleteStats(
                     accepted: s["accepted"] as? Int ?? 0, lettersSaved: s["letters_saved"] as? Int ?? 0,
@@ -352,6 +370,8 @@ final class EngineClient: ObservableObject {
                                             tags: o["tags"] as? [String] ?? [])
                           })
             }
+        case "ticket":
+            showTicket(TicketUpdate.parse(e))
         case "error":
             engineError = e["message"] as? String
         default:
@@ -361,6 +381,12 @@ final class EngineClient: ObservableObject {
 }
 
 extension EngineClient {
+    /// Status repeats the ticket every second: only a real change reaches the card, so its
+    /// highlight and frozen fields aren't reset.
+    func showTicket(_ new: TicketUpdate?) {
+        if new != ticket { ticket = new }
+    }
+
     static func parseAutocomplete(_ a: [String: Any]?) -> Autocomplete? {
         guard let a, let letters = a["letters"] as? String, !letters.isEmpty else { return nil }
         func word(_ w: Any?) -> Autocomplete.Word? {
