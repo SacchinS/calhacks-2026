@@ -7,7 +7,9 @@
 
 For each take: a window shows the camera; rest your hands, wait for "GO", sign once, then
 drop your hands. A take starts when your hands enter the signing space and ends when they
-leave it. Examples go to models/custom_signs/<GLOSS>/ (gitignored). Record only teammates
+leave it. Examples go to models/custom_signs/<GLOSS>/ (gitignored): NN.npz is what the
+matcher uses; NN.jsonl is the take's raw landmarks with half a second of rest on each side
+(the replay format, so takes can be replayed through the other sign models). Record only teammates
 who agree, and learn each sign from a Deaf signer or the linked source videos first.
 Press q to quit early.
 """
@@ -15,8 +17,10 @@ Press q to quit early.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
+from collections import deque
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -48,6 +52,7 @@ def record(gloss: str, takes: int) -> None:
 
     from recognition.camera import Camera
     from recognition.gating import SigningSpace
+    from recognition.replay import frame_to_json
 
     config = load_config()
     gate = SigningSpace.from_config(config)
@@ -57,11 +62,13 @@ def record(gloss: str, takes: int) -> None:
         for take in range(1, takes + 1):
             # Wait for resting hands, then count down.
             ready_since = None
+            before: deque = deque(maxlen=15)  # rest before the sign, for the raw take
             while True:
                 frame = camera.read()
                 if frame is None:
                     continue
                 frame = gate.apply(frame)
+                before.append(frame)
                 if frame.hands_in_signing_space:
                     ready_since = None
                     if not show(cv2, frame, f"{gloss} {take}/{takes}: rest your hands"):
@@ -74,13 +81,14 @@ def record(gloss: str, takes: int) -> None:
                 if not show(cv2, frame, f"{gloss} {take}/{takes}: ready... {left:.1f}"):
                     return
             # Record from hands-in to hands-out.
-            clip, started, last_in = [], None, None
+            clip, started, last_in, raw = [], None, None, []
             while True:
                 frame = camera.read()
                 if frame is None:
                     continue
                 frame = gate.apply(frame)
                 now = time.monotonic()
+                (raw if started or frame.hands_in_signing_space else before).append(frame)
                 if frame.hands_in_signing_space:
                     started = started or now
                     last_in = now
@@ -94,6 +102,10 @@ def record(gloss: str, takes: int) -> None:
                     return
             try:
                 path = lib.add(gloss, clip)
+                frames = list(before) + raw
+                with path.with_suffix(".jsonl").open("w") as f:
+                    for fr in frames:
+                        f.write(json.dumps(frame_to_json(fr, t=fr.ts - frames[0].ts)) + "\n")
                 print(f"take {take}: {len(clip)} frames -> {path}")
             except ValueError as exc:
                 print(f"take {take} skipped: {exc}")

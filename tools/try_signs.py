@@ -1,5 +1,6 @@
-"""Try signs live with the ASL Citizen model: what it sees, and why a demo sign does or
-doesn't count, so the cutoffs in config.yaml can be set from real signing.
+"""Try signs live: what the app would recognize (your recorded custom signs first, then
+the ASL Citizen model), and why an ASL Citizen demo sign does or doesn't count, so the
+cutoffs in config.yaml can be set from real signing.
 
     uv sync --extra camera
     uv run python tools/try_signs.py                  # q quits
@@ -37,6 +38,7 @@ def main() -> None:
 
     from recognition.asl_citizen import ASLCitizenModel, display
     from recognition.camera import Camera
+    from recognition.custom_signs import CustomSignModel
     from recognition.gating import SigningSpace
     from recognition.segmenter import Segmenter
     from tools.try_letters import draw
@@ -49,6 +51,8 @@ def main() -> None:
     except (OSError, KeyError, TypeError, ValueError):
         pass
     model = ASLCitizenModel(config)
+    custom = CustomSignModel(config)
+    print(f"Custom signs: {', '.join(sorted(custom.library.examples)) or '(none recorded)'}")
     segmenter = Segmenter.from_config(config)
     demo = sorted({display(model.glosses[i]) for i in model.allowed})
     print(f"Demo signs: {', '.join(demo)}")
@@ -85,15 +89,16 @@ def main() -> None:
                     model._since_run + 1 >= model.stride
                     and len(model.frames) + 1 >= model.min_window
                 )
-                prediction = model.predict(frame)
+                mine = custom.predict(frame)
+                theirs = model.predict(frame)
+                prediction = mine or theirs  # the app's order: custom signs first
+                if mine is not None:
+                    line = f"custom: {mine.gloss} {mine.confidence:.2f}"
                 if ran:
                     frames = list(model.frames)
-                    taken = (
-                        f"{prediction.gloss} {prediction.confidence:.2f}"
-                        if prediction
-                        else "nothing"
-                    )
-                    line = f"takes: {taken}"
+                    taken = f"{theirs.gloss} {theirs.confidence:.2f}" if theirs else "nothing"
+                    if mine is None:
+                        line = f"asl citizen: {taken}"
                     print(f"{taken:<14} as seen: {explain(frames, False)}", flush=True)
                     print(f"{'':<14} mirrored: {explain(frames, True)}", flush=True)
             event = segmenter.push(prediction)
