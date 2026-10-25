@@ -102,7 +102,7 @@ enum RouteInfo {
 /// P-R and autocomplete finishes them. A Deaf signer must approve them before the demo.
 enum DemoScript {
     static let phrases: [[String]] = [
-        ["WAIT,", "#FIGMA", "COLOR", "PROBLEM"],      // 1 "Wait, there's a color problem in Figma."
+        ["#FIGMA", "COLOR", "PROBLEM"],              // 1 "There's a color problem in Figma."
         ["ME", "MEET", "#PRANAV", "TOMORROW"],        // 2 "I'll meet with Pranav tomorrow."
         ["HELLO,", "NICE", "MEET", "YOU"],            // 3 a greeting, to open the call
     ]
