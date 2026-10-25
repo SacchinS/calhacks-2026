@@ -3,7 +3,7 @@ import AVFoundation
 import SwiftUI
 
 enum SetupStep: Int, CaseIterable, Identifiable {
-    case welcome, camera, voice, framing, gestures, signs, done
+    case welcome, camera, voice, framing, signs, done
     var id: Int { rawValue }
     var title: String {
         switch self {
@@ -11,7 +11,6 @@ enum SetupStep: Int, CaseIterable, Identifiable {
         case .camera: "Camera"
         case .voice: "Voice"
         case .framing: "Position"
-        case .gestures: "Gestures"
         case .signs: "Signs"
         case .done: "Done"
         }
@@ -22,7 +21,6 @@ enum SetupStep: Int, CaseIterable, Identifiable {
         case .camera: "camera"
         case .voice: "speaker.wave.2"
         case .framing: "person.crop.rectangle"
-        case .gestures: "hand.thumbsup"
         case .signs: "book"
         case .done: "checkmark.seal"
         }
@@ -111,9 +109,8 @@ struct SetupView: View {
     private func go(_ s: SetupStep) {
         step = s
         // Camera steps need the engine's camera and preview; others don't.
-        let live = s == .framing || s == .gestures
-        engine.setMode(s == .framing ? "framing" : s == .gestures ? "gestures" : "off")
-        engine.setPreview(live)
+        engine.setMode(s == .framing ? "framing" : "off")
+        engine.setPreview(s == .framing)
     }
 
     private func done(_ s: SetupStep, _ ok: Bool) {
@@ -126,7 +123,6 @@ struct SetupView: View {
         case .camera: CameraPage(done: { done(.camera, $0) })
         case .voice: VoicePage(engine: engine, done: { done(.voice, $0) })
         case .framing: FramingPage(engine: engine, done: { done(.framing, $0) })
-        case .gestures: GesturesPage(engine: engine, done: { done(.gestures, $0) })
         case .signs: SignsPage(done: { done(.signs, true) })
         case .done: DonePage(skipped: SetupStep.allCases.filter { ![.welcome, .done].contains($0) && !completed.contains($0) })
         }
@@ -311,44 +307,6 @@ struct FramingPage: View {
     }
 }
 
-struct GesturesPage: View {
-    @ObservedObject var engine: EngineClient
-    let done: (Bool) -> Void
-    private let info: [(String, String, String)] = [
-        ("wake", "Start", "Both open palms facing the camera, apart, held still"),
-        ("confirm", "Send", "Thumbs up, held still, other hand down"),
-        ("cancel", "Cancel", "Thumbs down, held still"),
-    ]
-    var body: some View {
-        PageHeader(title: "Control gestures", subtitle: "Try each one. Hold it still for about a second.")
-        HStack(alignment: .top, spacing: 20) {
-            LivePreview(engine: engine)
-            VStack(alignment: .leading, spacing: 14) {
-                ForEach(info, id: \.0) { name, title, how in
-                    let isDone = engine.practiceDone.contains(name)
-                    let isNext = engine.practiceTodo.first == name
-                    HStack(alignment: .top) {
-                        Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(isDone ? .green : .secondary).font(.title2)
-                        VStack(alignment: .leading) {
-                            Text(title).font(.headline)
-                            Text(how).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                            if isNext, let h = engine.holding, h.0 == name {
-                                ProgressView(value: h.1).frame(width: 140)
-                            }
-                        }
-                    }
-                    .opacity(isDone || isNext ? 1 : 0.5)
-                }
-            }
-            .frame(width: 230)
-        }
-        Color.clear.frame(height: 1).onChange(of: engine.practiceTodo.isEmpty && !engine.practiceDone.isEmpty) { _, all in
-            if all { done(true) }
-        }
-    }
-}
-
 struct SignsPage: View {
     let done: () -> Void
     var body: some View {
@@ -364,9 +322,9 @@ struct DonePage: View {
     var body: some View {
         PageHeader(title: "You're set", subtitle: "SignBridge lives in the menu bar (the hand icon).")
         VStack(alignment: .leading, spacing: 10) {
-            Label("Click into the app you want to use (Messages, Notes, a call), then show both palms.", systemImage: "1.circle")
-            Label("Sign, then rest your hands.", systemImage: "2.circle")
-            Label("Check the sentence, then thumbs up to send or thumbs down to cancel.", systemImage: "3.circle")
+            Label("Join your Meet call with BlackHole 2ch as the microphone.", systemImage: "1.circle")
+            Label("Sign with your hands in the green box. Spell names letter by letter; YES takes the suggestion.", systemImage: "2.circle")
+            Label("Sign FINISH: your words are spoken in the call.", systemImage: "3.circle")
         }
         .font(.title3)
         if !skipped.isEmpty {
