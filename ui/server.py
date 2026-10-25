@@ -176,6 +176,11 @@ class EngineServer:
         self.frame: LandmarkFrame | None = None
         self.frame_times: deque[float] = deque(maxlen=60)
         self.frame_seq = 0
+        # The preview is drawn off the event loop, at most preview_fps, skipping frames while
+        # one is still being drawn: tracking gets the time first (a busy loop lost hands).
+        self.preview_fps = float(self.config.get("ui.preview_fps", 15))
+        self._drawing: asyncio.Task[None] | None = None
+        self._last_drawn = 0.0
         self._holding: list[Any] | None = None
         self._last_status: dict[str, Any] | None = None
         self._tasks: list[asyncio.Task[None]] = []
@@ -341,17 +346,7 @@ class EngineServer:
                 self._holding = holding
                 self.emit_status()
             if self.preview:
-                state = getattr(self.app.recognizer, "sign_state", None)
-                jpeg = render_preview(event, self.space, self.mirror, state)
-                if jpeg:
-                    self.frame_seq += 1
-                    self.emit(
-                        {
-                            "type": "frame",
-                            "seq": self.frame_seq,
-                            "jpeg": base64.b64encode(jpeg).decode(),
-                        }
-                    )
+                self._draw(event)
             return
         if isinstance(event, SignEvent):
             if event.kind != "control":
@@ -397,6 +392,23 @@ class EngineServer:
         elif isinstance(event, AutocompleteUpdate):
             self.spelling = event if event.letters else None
         self.emit_status()
+
+    def _draw(self, frame: LandmarkFrame) -> None:
+        now = time.monotonic()
+        busy = self._drawing is not None and not self._drawing.done()
+        if busy or now - self._last_drawn < 1 / self.preview_fps:
+            return
+        self._last_drawn = now
+        state = getattr(self.app.recognizer, "sign_state", None)
+        self._drawing = asyncio.get_running_loop().create_task(self._draw_frame(frame, state))
+
+    async def _draw_frame(self, frame: LandmarkFrame, state: str | None) -> None:
+        jpeg = await asyncio.to_thread(render_preview, frame, self.space, self.mirror, state)
+        if jpeg and self.preview:
+            self.frame_seq += 1
+            self.emit(
+                {"type": "frame", "seq": self.frame_seq, "jpeg": base64.b64encode(jpeg).decode()}
+            )
 
     # ---- app -> bus ----
 

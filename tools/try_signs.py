@@ -140,7 +140,7 @@ def main() -> None:
             if event is not None:
                 recognized.append(event.gloss)
                 print(f"==> recognized {event.gloss}", flush=True)
-            state = custom.state(frame.hands_in_signing_space)
+            state = custom.state(frame.hands_in_signing_space, frame.ts)
             box = BOX_BGR[state]
             if not draw(cv2, frame, space, [line, "", " ".join(recognized[-6:]) or "-"], box):
                 break
