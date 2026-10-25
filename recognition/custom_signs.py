@@ -236,11 +236,15 @@ class CustomSignModel(FrameClassifier):
         """Answers are whole signs, to emit at once (not per-frame guesses for the segmenter)."""
         return self.mode == "segment"
 
-    def state(self, hands_up: bool) -> str:
-        """idle (hands down) | signing (a sign is being made) | detected (one came out)."""
+    def state(self, hands_up: bool, now: float | None = None) -> str:
+        """idle (hands down) | signing (a sign is being made) | detected (one came out). A
+        hand lost for less than end_gap (a tracking blip) still counts as signing."""
         if self.locked:
             return "detected"
-        return "signing" if hands_up else "idle"
+        if hands_up:
+            return "signing"
+        recent = now is not None and now - self._last_in < self.end_gap
+        return "signing" if self.segment and recent else "idle"
 
     def early_match(self, frames: list[LandmarkFrame]) -> Prediction | None:
         """The clip so far, if it already clearly is a sign (and long enough to be all of it)."""

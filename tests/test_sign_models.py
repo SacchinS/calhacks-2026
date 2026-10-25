@@ -188,3 +188,13 @@ def test_a_raise_spent_fingerspelling_gives_no_sign(library):
     assert model.end_segment(signed[-1].ts + 0.5) is None  # and no last try at the drop
     again = [model.predict(f) for f in sweep(0.31, 0.69, 12)]
     assert [p.gloss for p in again if p] == ["WW"]  # the next raise is a sign again
+
+
+def test_a_tracking_blip_keeps_the_box_yellow(library):
+    model = CustomSignModel(Config(), library=library)
+    first = sweep(0.31, 0.69, 10)[:5]  # partway into a sign
+    for f in first:
+        model.predict(f)
+    last = first[-1].ts
+    assert model.state(False, last + 0.1) == "signing"  # lost for 0.1 s: still signing
+    assert model.state(False, last + 0.5) == "idle"  # gone: hands down

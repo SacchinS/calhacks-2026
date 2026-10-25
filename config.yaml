@@ -8,6 +8,7 @@ vocab_search: mock      # mock | moss    fingerspelling autocomplete's context s
 
 ui:
   mirror_camera: true           # show the camera window like a mirror (selfie view)
+  preview_fps: 15               # preview frames per second (drawn off the tracking loop)
 
 recognition:
   replay_file: fixtures/landmarks_sample.jsonl

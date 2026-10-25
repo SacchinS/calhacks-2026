@@ -201,7 +201,9 @@ class FrameRecognizer(Recognizer):
                     end = getattr(classifier, "end_segment", None)
                     whole = whole or (end(frame.ts) if end is not None else None)
             states = [
-                c.state(frame.hands_in_signing_space) for c in classifiers if hasattr(c, "state")
+                c.state(frame.hands_in_signing_space, frame.ts)
+                for c in classifiers
+                if hasattr(c, "state")
             ]
             self.sign_state = next(
                 (s for s in ("detected", "signing") if s in states),
