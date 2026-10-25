@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var engine: EngineClient
     let runSetup: () -> Void
+    var resetApp: () -> Void = {}
     @State private var still = 0.5
     @State private var phraseRest = 1.5
     @State private var minConf = 0.6
@@ -74,6 +75,11 @@ struct SettingsView: View {
                 Label("Nothing is recorded: no video, no transcripts. Autocomplete keeps only words, a few topic tags, and when they were used, in a file on this Mac.", systemImage: "externaldrive.badge.xmark")
             }
             .font(.callout)
+            Section {
+                Button("Reset SignBridge…", role: .destructive, action: resetApp)
+                Text("Puts every setting back to its default and runs setup again. Recorded signs and API keys stay.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .tint(Brand.accent)

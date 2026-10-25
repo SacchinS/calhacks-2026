@@ -229,6 +229,8 @@ final class EngineClient: ObservableObject {
     }
     var voiceID: String { config["voice_id"] as? String ?? "" }
     func chooseVoice(_ id: String) { saveConfig(["voice_id": id]) }
+    /// Settings back to their defaults so setup runs again (optionally forgetting remembered words).
+    func reset(forgetWords: Bool) { send(["cmd": "reset", "forget_words": forgetWords]) }
     func letters(_ text: String) { send(["cmd": "letters", "text": text]) }
     func acceptSuggestion(_ index: Int = 0) { send(["cmd": "autocomplete", "action": "accept", "index": index]) }
     func dismissSuggestions() { send(["cmd": "autocomplete", "action": "dismiss"]) }
