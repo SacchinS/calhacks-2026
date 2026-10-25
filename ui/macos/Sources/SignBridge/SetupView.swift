@@ -211,6 +211,8 @@ struct VoicePage: View {
             StatusLine(ok: r.ok, text: r.detail)
             if r.ok {
                 Text("In Meet's settings, choose **BlackHole 2ch** as the microphone.").padding(.top, 6)
+                Text("For captions, choose a **Multi-Output Device** with your speakers and **BlackHole 16ch** as Meet's speaker (make one in Audio MIDI Setup).")
+                    .foregroundStyle(.secondary)
                 Button("Play a test phrase into it") { engine.testRoute("voice", text: "SignBridge voice test.") }
                 RouteResult(engine: engine, route: "voice",
                             okText: "Played. You won't hear it here; someone in your call would.")
@@ -301,7 +303,7 @@ struct FramingPage: View {
             Button("Save This Position") { engine.calibrate() }.controlSize(.large).disabled(!engine.framingOK)
             if let msg = engine.lastCalibration { Text(msg).foregroundStyle(.secondary) }
         }
-        Text("Rest your hands below the orange line (or out of view) to finish a phrase.")
+        Text("Sign inside the box: it turns yellow while you sign and green when a sign is recognized. Drop your hands between signs.")
             .foregroundStyle(.secondary).padding(.top, 4)
         Color.clear.frame(height: 1).onChange(of: engine.lastCalibration) { _, msg in done(msg?.hasPrefix("Saved") ?? false) }
     }
@@ -355,8 +357,9 @@ struct DonePage: View {
         PageHeader(title: "You're set", subtitle: "SignBridge lives in the menu bar (the hand icon).")
         VStack(alignment: .leading, spacing: 10) {
             Label("Join your Meet call with BlackHole 2ch as the microphone.", systemImage: "1.circle")
-            Label("Sign with your hands in the green box. Spell names letter by letter; YES takes the suggestion.", systemImage: "2.circle")
+            Label("Sign inside the box, dropping your hands between signs. Spell names letter by letter; YES takes the suggestion.", systemImage: "2.circle")
             Label("Sign FINISH: your words are spoken in the call.", systemImage: "3.circle")
+            Label("Turn on Call Overlay in the menu bar to follow along on top of Meet.", systemImage: "4.circle")
         }
         .font(.title3)
         if !skipped.isEmpty {

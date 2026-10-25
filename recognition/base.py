@@ -134,6 +134,7 @@ class FrameRecognizer(Recognizer):
         self.faces = FaceMarkerDetector(config)
         self.markers = MarkerTally()
         self.letters = None  # the letter reader, once running (the app shows its hold)
+        self.letter_hold: float | None = None  # Settings' letter hold, over the config's
         self.sign_state = "idle"  # idle | signing | detected: the preview's box color
         # A demo letter held this long makes the raise fingerspelling: no signs in it. Signs
         # are done well within it; a letter needs letter_hold_seconds to count anyway.
@@ -176,6 +177,8 @@ class FrameRecognizer(Recognizer):
 
         classifiers = self.classifiers()
         letters = self.letters = self._letters()
+        if letters is not None and self.letter_hold is not None:
+            letters.hold = self.letter_hold
         async for raw in self.frames():
             frame = self.gate.apply(raw)
             self.bus.publish(frame)
