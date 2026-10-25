@@ -4,12 +4,12 @@
     uv run python tools/seed_vocab.py --mock          # ... into vocab-mock.sqlite (make mock)
     uv run python tools/seed_vocab.py --synthetic 500 --time   # 500 made-up words, then time
                                                       # building the search like the engine does
-    uv run python tools/seed_vocab.py --bench 50      # time P-R -> Priyanka and F-I -> Figma
+    uv run python tools/seed_vocab.py --bench 50      # time P-R -> Pranav and F-I -> Figma
     uv run python tools/seed_vocab.py --list
     uv run python tools/seed_vocab.py --reset         # delete every remembered word
 
 The demo words: Julian (tennis, three weeks ago), Jupyter (data work, recent), June, and a
-few more, so J-U ranks differently with a tennis or a data conversation. Priyanka and
+few more, so J-U ranks differently with a tennis or a data conversation. Pranav and
 Kubernetes aren't seeded: the mock captions teach them in the demo.
 """
 
@@ -108,7 +108,7 @@ def demo_captions() -> list[str]:
 async def bench(config, rounds: int, path: Path) -> None:
     """Spell P-R and F-I `rounds` times each against the demo call, and report the latency the
     pitch quotes. The words come from the demo list plus the captions, exactly as in a call:
-    Priyanka and Figma are learned from what the other side says."""
+    Pranav and Figma are learned from what the other side says."""
     import contextlib
 
     from app import load_class
@@ -138,16 +138,16 @@ async def bench(config, rounds: int, path: Path) -> None:
     for line in captions:
         ac.bus.publish(Caption(line, is_final=True))
     for _ in range(500):  # the words the other side said are learned in the background
-        if ac.store.for_term("PRIYANKA") and ac.store.for_term("FIGMA"):
+        if ac.store.for_term("PRANAV") and ac.store.for_term("FIGMA"):
             break
         await asyncio.sleep(0.01)
     ac.stats = build_stats(ac.store.all(), ac.transcript_weight)
 
     results: dict[str, dict[str, list]] = {
-        word: {"latency": [], "search": [], "top": []} for word in ("Priyanka", "Figma")
+        word: {"latency": [], "search": [], "top": []} for word in ("Pranav", "Figma")
     }
     for _ in range(rounds):
-        for word, letters in (("Priyanka", "PR"), ("Figma", "FI")):
+        for word, letters in (("Pranav", "PR"), ("Figma", "FI")):
             # The last ~30 seconds of the call, as the engine holds it while the signer spells.
             ac.conversation.clear()
             for line in captions:
@@ -168,7 +168,7 @@ async def bench(config, rounds: int, path: Path) -> None:
 
     print(f"\n{search.name} search, {rounds} rounds each, {len(ac.stats)} words remembered")
     print(f"startup build: {build_ms:.0f} ms")
-    for word, letters in (("Priyanka", "P-R"), ("Figma", "F-I")):
+    for word, letters in (("Pranav", "P-R"), ("Figma", "F-I")):
         row = results[word]
         hits = sum(top == word for top in row["top"])
         print(f"\n{letters} -> {word}: top suggestion {hits}/{len(row['top'])} rounds")

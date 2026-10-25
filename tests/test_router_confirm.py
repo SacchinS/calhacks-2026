@@ -123,7 +123,7 @@ async def spelling_setup(review=True):
     config = load_config().all_mocks()
     bus = Bus()
     store = VocabStore(":memory:")
-    store.add([Occurrence("Priyanka", "name", "fingerspelled", tags=("design", "mockups"))])
+    store.add([Occurrence("Pranav", "name", "fingerspelled", tags=("design", "mockups"))])
     autocomplete = Autocompleter(bus, config, store, KeywordSearch(config), MockTagger())
     await autocomplete.start()
     buffer = UtteranceBuffer(bus, MockTranslator(config))
@@ -149,7 +149,7 @@ async def test_yes_while_spelling_takes_the_word_and_leaves_the_sentence_pending
     handlers = [buffer.handle, router.handle]
     for handle in handlers if buffer_first else reversed(handlers):
         await handle(yes)
-    assert [s.gloss for s in buffer.signs] == ["PRIYANKA"]
+    assert [s.gloss for s in buffer.signs] == ["PRANAV"]
     assert router.pending is not None and router.pending.english == "Hello, nice to meet you."
     assert tts.sent == []
     await autocomplete.stop()

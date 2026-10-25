@@ -8,7 +8,7 @@ Read `README.md` first for the product context. `MVP.md` describes what each tea
 
 ## Product in one paragraph
 
-A laptop app for Deaf ASL signers in Google Meet calls. A webcam feed is turned into hand and pose landmarks (MediaPipe). Isolated signs and fingerspelled letters are recognized from the landmarks; an autocomplete suggests the word being spelled; and Claude turns the resulting gloss (e.g. `HELLO fs-PRIYANKA NICE MEET-YOU`) into natural English. **Text-to-speech (Cartesia) through a virtual microphone** (BlackHole on macOS) speaks it in the call as normal mic input, optionally after the signer confirms with a signed YES/NO. Incoming speech is shown as live captions (Cartesia speech-to-text).
+A laptop app for Deaf ASL signers in Google Meet calls. A webcam feed is turned into hand and pose landmarks (MediaPipe). Isolated signs and fingerspelled letters are recognized from the landmarks; an autocomplete suggests the word being spelled; and Claude turns the resulting gloss (e.g. `HELLO fs-PRANAV NICE MEET-YOU`) into natural English. **Text-to-speech (Cartesia) through a virtual microphone** (BlackHole on macOS) speaks it in the call as normal mic input, optionally after the signer confirms with a signed YES/NO. Incoming speech is shown as live captions (Cartesia speech-to-text).
 
 ## How it's shown
 
@@ -131,7 +131,7 @@ Interfaces:
 The team needs to build and demo everything downstream before the models work. `recognition/mock.py` takes input from the mock-sign box in the Preview window (and from the terminal under `make mock`) and publishes `SignEvent`s:
 
 - Typing a word + Enter publishes an isolated sign with that gloss (uppercased).
-- `#hello` publishes a fingerspelled word; `~pri` publishes the letters P, R, I one at a time.
+- `#hello` publishes a fingerspelled word; `~pr` publishes the letters P, R one at a time.
 - Face markers go after the signs they cover (back to the line start, a comma, or the previous marker): `title /\ red` (topic), `tomorrow rain [q]` (yes/no question), `[wh]`, `[neg]`, `[nod]`. Commas and question marks on signs are dropped.
 - `/yes`, `/no`, `/send`, `/clear` publish control signs.
 - `make mock` runs the whole app with every component on its mock, so it works with no webcam, no API keys, and no BlackHole.
@@ -193,7 +193,7 @@ Shared files (`shared/`, `app.py`, `config.yaml`, `Makefile`, `tests/contracts/`
 ## Definition of done
 
 - `make test` passes, including end-to-end mock tests: typed signs + `SEND` are spoken by the mock voice; with review before speaking, they produce a `ConfirmRequest`, and then `YES` speaks them while `NO` says nothing.
-- `make mock` builds and opens the Mac app (setup wizard on first run, then Preview), and it updates live as you type mock signs: the call panel shows what was "spoken" and the scripted captions, and `~pri` shows autocomplete suggestions.
+- `make mock` builds and opens the Mac app (setup wizard on first run, then Preview), and it updates live as you type mock signs: the call panel shows what was "spoken" and the scripted captions, and `~pr` shows autocomplete suggestions.
 - Setting `recognizer: replay` runs the app from the landmark fixture with no webcam.
 - All contract tests pass for every mock.
 - Every file `MVP.md` assigns to a person exists, and `make mock` runs with each person's config line still on `mock`.

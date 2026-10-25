@@ -12,6 +12,10 @@ never shipped an Intel Mac build, so this is the only machine that could run Mos
 before the demo. Expect the Mac to be faster on the Moss numbers (its embedding model runs on
 Apple Silicon) and about the same on the Claude ones, which are network-bound.
 
+**Measured with the old demo name.** These runs used Priyanka. The demo name is now Pranav,
+spelled with the same two letters (P-R), so nothing here should change much, but the demo
+laptop's `--bench` run (spec Prompt 3) measures Pranav and replaces these in the README.
+
 | | |
 |---|---|
 | Date | 2026-10-25 |

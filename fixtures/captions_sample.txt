@@ -1,9 +1,9 @@
 # Scripted incoming speech for Meet mode (mock captions). One caption per line.
-# The demo call: Priyanka, a designer. Set your name to Sam (Settings > Calls) to see the
-# mention alert. Autocomplete learns Priyanka and Figma from the second caption: then type
-# ~pr (or spell P-R), YES, and later ~fi (F-I) when she asks where the feedback goes.
+# The demo call: Pranav, a designer. Set your name to Sam (Settings > Calls) to see the
+# mention alert. Autocomplete learns Pranav and Figma from the second caption: then type
+# ~pr (or spell P-R), YES, and later ~fi (F-I) when Pranav asks where the feedback goes.
 Hi! Can you hear me okay?
-Hi, I'm Priyanka, I'm designing the new app. The mockups are all in Figma.
+Hi, I'm Pranav, I'm designing the new app. The mockups are all in Figma.
 So the onboarding screens are done, and the settings page is next.
 Sam, where should we put the feedback?
 Perfect, I'll share the link in the chat.

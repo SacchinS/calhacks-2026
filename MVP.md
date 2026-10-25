@@ -32,16 +32,16 @@
 | 1:40–2:35 | **How it works** (2 slides): the stack (webcam → MediaPipe on the Mac → sign models + letter model → Moss autocomplete, local → Claude Haiku → Cartesia Sonic into Meet; back: Cartesia Ink captions and turn-taking), then features and privacy with the measured numbers (letters saved, latency) |
 | 2:35–3:00 | **Close:** testing with Deaf users after Cal Hacks |
 
-**The demo** is one Google Meet call between two laptops, live, with a real webcam; Demo Mode is on the projector. A teammate on the other laptop plays Priyanka, a designer:
+**The demo** is one Google Meet call between two laptops, live, with a real webcam; Demo Mode is on the projector. A teammate on the other laptop plays Pranav, a designer:
 
-1. **She talks; captions show it.** *"Hi, I'm Priyanka, I'm designing the new app. The mockups are all in Figma."* The captions appear, and the autocomplete remembers Priyanka and Figma.
-2. **Signing, fingerspelling, voice.** The signer signs `HELLO`, spells **P-R**, and the app suggests **Priyanka**; `YES` takes it. Then `NICE MEET-you` and `FINISH`: her laptop hears *"Hello Priyanka, nice to meet you."* in the Cartesia voice, at the next pause.
-3. **She asks the signer something.** *"Sacchin, where should we put the feedback?"* The name banner flashes over every window. The signer spells **F-I**, `YES` takes **Figma**, `FINISH`, and the voice says *"Figma."*
-4. **If there's time:** she talks fast, and the signer taps "Please slow down a little." (said right away).
+1. **Pranav talks; captions show it.** *"Hi, I'm Pranav, I'm designing the new app. The mockups are all in Figma."* The captions appear, and the autocomplete remembers Pranav and Figma.
+2. **Signing, fingerspelling, voice.** The signer signs `HELLO`, spells **P-R**, and the app suggests **Pranav**; `YES` takes it. Then `NICE MEET-you` and `FINISH`: Pranav's laptop hears *"Hello Pranav, nice to meet you."* in the Cartesia voice, at the next pause.
+3. **Pranav asks the signer something.** *"Sacchin, where should we put the feedback?"* The name banner flashes over every window. The signer spells **F-I**, `YES` takes **Figma**, `FINISH`, and the voice says *"Figma."*
+4. **If there's time:** Pranav talks fast, and the signer taps "Please slow down a little." (said right away).
 
 The fingerspelled words were picked for letters the letter model reads well on our signer (P, R, F, I; `recognition.letter_set: PRFI`). Two letters each are enough for the autocomplete, and P-R and F-I don't share a start. Backups: Demo Mode's keys 1–3 send the demo phrases, typed letters still drive the autocomplete, and a backup video is recorded the night before.
 
-**Open:** how long each letter is held in the demo (5 s now, for testing with people new to ASL; 2–3 s once the signer has practiced), and who signs, plays Priyanka, and presents. The signer's name in the script has to match Settings > Calls for the banner.
+**Open:** how long each letter is held in the demo (5 s now, for testing with people new to ASL; 2–3 s once the signer has practiced), and who signs, plays Pranav, and presents. The signer's name in the script has to match Settings > Calls for the banner.
 
 **The demo glosses are drafts.** The greeting (`HELLO, NICE MEET-you`) is attested on Lifeprint (`docs/asl-demo-script-research.md`, Moment 3). The fingerspelled names are standard ASL practice. A Deaf signer must approve or rewrite the exact sentences before the demo. Nobody on the team knows ASL, so learn every demo sign from the source videos linked in the research doc (or from a Deaf signer), never by guessing, and keep the demo script short and fixed.
 
@@ -76,7 +76,7 @@ The fingerspelled words were picked for letters the letter model reads well on o
 
 **MVP (in this order):**
 1. **Camera, landmarks, gating, segmenter, control signs.** *(Built.)* MediaPipe Holistic landmarks, the signing-space box, one `SignEvent` per sign, and held YES / NO / FINISH.
-2. **Fingerspelled letters from the camera.** *(Next.)* A static-handshape letter model on the 21 hand landmarks (an ONNX MLP from Hugging Face, A–Z; check its license) that publishes one `Letter` per letter when a handshape is held still, only once two letters come in a row (so a sign's starting handshape isn't read as a letter). J and Z move, so keep them out of the demo words. The autocomplete already allows for look-alike handshapes (M/N, U/V/R, A/S/T/E). Done when spelling P-R and F-I live brings up Priyanka and Figma.
+2. **Fingerspelled letters from the camera.** *(Next.)* A static-handshape letter model on the 21 hand landmarks (an ONNX MLP from Hugging Face, A–Z; check its license) that publishes one `Letter` per letter when a handshape is held still, only once two letters come in a row (so a sign's starting handshape isn't read as a letter). J and Z move, so keep them out of the demo words. The autocomplete already allows for look-alike handshapes (M/N, U/V/R, A/S/T/E). Done when spelling P-R and F-I live brings up Pranav and Figma.
 3. **A bigger sign vocabulary.** *(Next.)* Add the ASL Citizen ST-GCN model (Microsoft, MIT code, 2,731 signs, MediaPipe Holistic points, ~20 ms per sign on an M1) next to the Kaggle model, limited to the demo's signs so it only chooses among them, with a "nothing" cutoff so other movement isn't forced into a demo sign. Weights go in `models/asl_citizen/` (gitignored). Done when the greeting comes out right most of the time.
 4. **Record and tune.** Record the demo phrases with `tools/record_script.py` and tune the thresholds with `tools/tune_recognition.py` (on the `person-a` branch until its PR merges). Record a real fixture to replace `fixtures/landmarks_sample.jsonl`.
 5. **Custom signs.** *(Built: `recognition/custom_signs.py`, `tools/record_signs.py`.)* Only for demo signs neither model knows (likely the MEET-you form). Learn each from the videos in `docs/asl-demo-script-research.md`.
@@ -103,7 +103,7 @@ The fingerspelled words were picked for letters the letter model reads well on o
 
 **Stretch:** a "what's on me" recap after the call, from captions held in memory only.
 
-**Test alone with:** `recognizer: mock` (type `~pri`), `translator: claude`, `vocab_search: moss`.
+**Test alone with:** `recognizer: mock` (type `~pr`), `translator: claude`, `vocab_search: moss`.
 
 **Needs:** `ANTHROPIC_API_KEY` and the Moss keys in `.env`.
 

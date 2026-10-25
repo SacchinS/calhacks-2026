@@ -37,12 +37,12 @@ TAKES_DIR = ROOT / "models" / "takes"
 MAX_SECONDS = 15.0  # longest take
 
 # The Meet demo (MVP.md, docs/asl-demo-script-research.md Moment 3) and the control signs, in
-# the mock-sign syntax. `~pri` is fingerspelled letter by letter, then YES takes the
+# the mock-sign syntax. `~pr` is fingerspelled letter by letter, then YES takes the
 # autocomplete's suggestion; the tuner scores only the signs. Drafts until a Deaf signer
 # approves them.
 SCRIPT = [
     "HELLO, NICE MEET-YOU",
-    "~pri YES",
+    "~pr YES",
     "HOW YOU [wh]",
     "FINE, THANK-YOU",
     "~fi YES",

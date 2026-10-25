@@ -9,7 +9,7 @@ import pytest
 from language.tagger import ClaudeTagger
 from shared.config import Config, load_config
 
-DEMO_CAPTION = "Hi, I'm Priyanka, I'm designing the new app. The mockups are all in Figma."
+DEMO_CAPTION = "Hi, I'm Pranav, I'm designing the new app. The mockups are all in Figma."
 TENNIS = "Julian and I played doubles again on Saturday; we need a fourth next weekend."
 BACKEND = "The API is returning a 500 on the signup endpoint since yesterday's deploy."
 
@@ -23,7 +23,7 @@ needs_claude = pytest.mark.skipif(not _anthropic_key(), reason="ANTHROPIC_API_KE
 
 # Words that must never appear in a tag: other people in the conversation, and the word the
 # tags belong to (a tag repeating the word tells search nothing).
-OTHER_NAMES = {"priyanka", "julian", "sam", "marisol"}
+OTHER_NAMES = {"pranav", "julian", "sam", "marisol"}
 
 
 def check(tagged, word: str, context: str, kind: str | None = None) -> None:
@@ -51,10 +51,10 @@ def check(tagged, word: str, context: str, kind: str | None = None) -> None:
 @needs_claude
 async def test_live_tagger_on_the_demo_words():
     tagger = ClaudeTagger(load_config())
-    tagged = await tagger.tag(["Priyanka", "Figma"], DEMO_CAPTION)
-    check(tagged.get("Priyanka"), "Priyanka", DEMO_CAPTION, kind="name")
+    tagged = await tagger.tag(["Pranav", "Figma"], DEMO_CAPTION)
+    check(tagged.get("Pranav"), "Pranav", DEMO_CAPTION, kind="name")
     check(tagged.get("Figma"), "Figma", DEMO_CAPTION)
-    print(f"\nPriyanka: {tagged['Priyanka'].tags}")
+    print(f"\nPranav: {tagged['Pranav'].tags}")
     print(f"Figma: {tagged['Figma'].tags}")
 
 
