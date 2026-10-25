@@ -17,7 +17,8 @@ async def call():
     bus = Bus()
     tts = RecordingOutput("tts")
     router = Router(bus, claude_code=RecordingOutput("claude_code"), tts=tts)
-    config = Config(sections={"meet": {"signer_name": "Sam", "signing_cue_seconds": 0.05}})
+    meet = {"signer_name": "Sam", "signing_cue_seconds": 0.05, "intro_on_start": True}
+    config = Config(sections={"meet": meet})
     host = CallHost(bus, config, router)
     await router.start()
     await host.start()
@@ -75,3 +76,10 @@ async def test_signing_cue_once_per_utterance_and_only_in_meet(call):
     bus.publish(UtteranceProgress(()))  # sent quickly: no cue
     await settle(0.1)
     assert tts.sent == [CUE]
+
+
+def test_meeting_defaults_have_no_automatic_intro_or_cue():
+    from shared.config import load_config
+
+    host = CallHost(Bus(), load_config(), Router(Bus(), RecordingOutput("c"), RecordingOutput("t")))
+    assert not host.intro_on_start and host.cue_seconds == 0

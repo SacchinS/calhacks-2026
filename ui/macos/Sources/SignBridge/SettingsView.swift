@@ -51,7 +51,7 @@ struct SettingsView: View {
             Section {
                 TextField("Your name", text: $signerName, prompt: Text("e.g. Sam"))
                 Toggle("Review before speaking", isOn: $review)
-                Text("When a Meet call starts, SignBridge says: \"Hi, this is \(signerName.isEmpty ? "<name>" : signerName). I'm Deaf and signing through SignBridge, so there may be a short pause before I answer.\" With review on, Meet and Voice wait for you to sign YES before speaking, like Claude Code.")
+                Text("\"Introduce me\" in a call says: \"Hi, this is \(signerName.isEmpty ? "<name>" : signerName). I'm Deaf and signing through SignBridge, so there may be a short pause before I answer.\" Useful on calls with people who don't know you. With review on, Meet and Voice wait for you to sign YES before speaking, like Claude Code.")
                     .font(.caption).foregroundStyle(.secondary)
             } header: {
                 Text("Calls")

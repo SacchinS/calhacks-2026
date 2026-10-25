@@ -74,12 +74,16 @@ audio:
   meet_capture_device: BlackHole 16ch
 
 meet:
-  # Said once when Meet mode starts (and by "Introduce me"), because hearing people hang up
-  # on relay calls when they don't know who's calling. The app's Settings can set the name.
+  # The call intro ("Hi, this is <name>. I'm Deaf and signing through SignBridge...") is for
+  # calls with strangers, where hearing people hang up on relay calls when they don't know
+  # who's calling. In team meetings everyone knows you, so it's off unless you press
+  # "Introduce me". The app's Settings can set the name.
   signer_name: ""
   app_name: SignBridge
-  intro_on_start: true
-  signing_cue_seconds: 5          # signing this long unsent: "One moment, I'm signing." (0 = off)
+  intro_on_start: false
+  # Signing this long unsent: "One moment, I'm signing." Off for meetings, where people can
+  # see you signing (0 = off). Useful on audio-only calls.
+  signing_cue_seconds: 0
   review_before_speaking: false   # true: Meet and Voice wait for YES / NO, like Claude Code
   # Turn-aware speaking (Cartesia Ink turn detection on the other side's audio): wait for
   # them to finish, or after chime_in_seconds of talking say the interjection and then speak.

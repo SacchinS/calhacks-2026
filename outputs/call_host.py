@@ -1,10 +1,12 @@
 """Meet call manners, spoken in the signer's voice through the TTS output.
 
-- Call intro: when Meet mode starts, say once who's calling and that they sign, because
-  hearing people hang up on relay calls when they don't know who's calling
-  (docs/user-research.md). `introduce()` replays it (the app's "Introduce me" button).
+- Call intro: say who's calling and that they sign, because hearing people hang up on relay
+  calls when they don't know who's calling (docs/user-research.md). That's a problem on
+  calls with strangers, not team meetings, so it's said on Meet start only with
+  `meet.intro_on_start`; `introduce()` says it any time (the app's "Introduce me" button).
 - Signing cue: if the signer has been signing for a few seconds without sending, say
-  "One moment, I'm signing." at most once per utterance, so the other side waits.
+  "One moment, I'm signing." at most once per utterance. Off by default
+  (`meet.signing_cue_seconds`): in a video meeting people can see you signing.
 
 Both go through the router's delivery, so they show up in the app like anything else sent.
 """
@@ -38,8 +40,8 @@ class CallHost:
         self.router = router
         self.name = str(config.get("meet.signer_name", "") or "").strip()
         self.app_name = str(config.get("meet.app_name", "SignBridge"))
-        self.intro_on_start = bool(config.get("meet.intro_on_start", True))
-        self.cue_seconds = float(config.get("meet.signing_cue_seconds", 5))
+        self.intro_on_start = bool(config.get("meet.intro_on_start", False))
+        self.cue_seconds = float(config.get("meet.signing_cue_seconds", 0))
         self.mode = router.mode
         self._cue_timer: asyncio.Task[None] | None = None
         self._cued = False  # the cue was said for the current utterance
