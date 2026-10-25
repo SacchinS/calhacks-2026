@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Live view for the user and for demos: camera with tracking, what was signed, Claude's sentence and route.
+/// Live view for the user and for demos: camera with tracking, what was signed, Claude's sentence, and the call.
 struct PreviewView: View {
     @ObservedObject var engine: EngineClient
     var showGuide: () -> Void = {}
@@ -18,9 +18,8 @@ struct PreviewView: View {
                     HStack(alignment: .top, spacing: 18) {
                         camera
                         VStack(spacing: 14) {
-                            OutputModePicker(engine: engine)
                             transcript
-                            OutputPanel(engine: engine, maxHeight: .infinity)
+                            call(maxHeight: .infinity)
                             Spacer(minLength: 0)
                             if engine.mockRecognizer { MockSignBox(engine: engine) } else { SpellBox(engine: engine) }
                             controls
@@ -31,10 +30,9 @@ struct PreviewView: View {
             } else {
                 VStack(spacing: 14) {
                     topBar
-                    OutputModePicker(engine: engine)
                     camera
                     transcript
-                    OutputPanel(engine: engine)
+                    call(maxHeight: 320)
                     if engine.mockRecognizer { MockSignBox(engine: engine) } else { SpellBox(engine: engine) }
                     controls
                 }
@@ -49,6 +47,12 @@ struct PreviewView: View {
     }
 
     // MARK: pieces
+
+    /// The call: your words and their captions, quick replies, and the intro button.
+    private func call(maxHeight: CGFloat) -> some View {
+        MeetPanel(engine: engine, maxHeight: maxHeight,
+                  title: "Call" + (engine.components["captions"] == "mock" ? " (mock captions)" : ""))
+    }
 
     private var camera: some View {
         ZStack(alignment: .bottom) {
@@ -76,7 +80,6 @@ struct PreviewView: View {
             Text("SignBridge").font(.headline)
             StatePill(state: engine.state)
             Spacer()
-            if engine.claudeCodeWorking { ClaudeCodeWorking() }
             if let target = engine.target, engine.state != "idle" {
                 Label(target, systemImage: "macwindow").foregroundStyle(.secondary)
             }
@@ -112,7 +115,7 @@ struct PreviewView: View {
                 Text(engine.sentence ?? "").font(.system(size: 30, weight: .semibold))
                     .fixedSize(horizontal: false, vertical: true)
                 HStack {
-                    Label(RouteInfo.label(engine.route, target: engine.target), systemImage: RouteInfo.icon(engine.route)).foregroundStyle(Brand.accent).font(.headline)
+                    Label(RouteInfo.label(target: engine.target), systemImage: RouteInfo.icon).foregroundStyle(Brand.accent).font(.headline)
                     Spacer()
                     if engine.state == "confirming" {
                         Text("Sign YES to send, NO to cancel").foregroundStyle(.secondary)
@@ -280,19 +283,6 @@ struct CameraIndicator: View {
     }
 }
 
-/// Shown in every mode while Claude Code builds in the background.
-struct ClaudeCodeWorking: View {
-    var body: some View {
-        HStack(spacing: 7) {
-            ProgressView().controlSize(.small)
-            Text("Claude Code is working").font(.subheadline.weight(.semibold))
-        }
-        .padding(.horizontal, 11).padding(.vertical, 5)
-        .background(Color.purple.opacity(0.16), in: Capsule())
-        .foregroundStyle(.purple)
-    }
-}
-
 struct StatePill: View {
     let state: String
     var body: some View {
@@ -314,85 +304,7 @@ struct StatePill: View {
     }
 }
 
-// MARK: calhacks-2026 additions, in the same style
-
-/// Where English goes: Claude Code (after a signed YES), a voice for Siri and dictation, or a Meet call.
-struct OutputModePicker: View {
-    @ObservedObject var engine: EngineClient
-    var body: some View {
-        Picker("Send to", selection: Binding(get: { engine.outputMode }, set: { engine.setOutputMode($0) })) {
-            ForEach(OutputMode.all, id: \.self) { mode in
-                Label(OutputMode.label(mode), systemImage: OutputMode.icon(mode)).tag(mode)
-            }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .controlSize(.large)
-    }
-}
-
-/// Claude Code's reply in Claude Code mode, or the other side's captions in Meet mode.
-struct OutputPanel: View {
-    @ObservedObject var engine: EngineClient
-    var maxHeight: CGFloat = 130
-    var body: some View {
-        switch engine.outputMode {
-        case "claude_code":
-            panel("Claude Code" + mock("claude_code"), icon: "chevron.left.forwardslash.chevron.right",
-                  lines: engine.replies.filter { !$0.isEmpty }, empty: "Claude Code's reply shows up here.",
-                  font: .system(.callout, design: .monospaced),
-                  note: engine.claudeCodeWorking ? "Still working. Siri, Voice, and Meet keep working meanwhile." : nil)
-        case "siri":
-            panel("Typed to Siri" + mock("siri"), icon: "mic.circle.fill", lines: sent("siri"),
-                  empty: "Questions typed to Siri show up here.", font: .title3.weight(.semibold),
-                  note: "Siri answers in its own window, top right of the screen.")
-        case "voice":
-            panel("Spoken" + mock("tts"), icon: "speaker.wave.2.fill", lines: sent("voice"),
-                  empty: "What SignBridge says into the virtual mic shows up here.",
-                  font: .title3.weight(.semibold),
-                  note: "Pick BlackHole 2ch as the mic in the app you're using, then start its dictation.")
-        case "meet":
-            // Taller than the other panels: the conversation plus the quick-reply buttons.
-            MeetPanel(engine: engine, maxHeight: max(maxHeight, 320), title: "Call" + mock("captions"))
-        default:
-            EmptyView()
-        }
-    }
-
-    private func sent(_ mode: String) -> [String] {
-        engine.sent.filter { $0.mode == mode }.map(\.text)
-    }
-
-    private func mock(_ component: String) -> String {
-        engine.components[component] == "mock" ? " (mock)" : ""
-    }
-
-    private func panel(_ title: String, icon: String, lines: [String], empty: String, font: Font,
-                       note: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(title, systemImage: icon).font(.headline).foregroundStyle(Brand.accent)
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 4) {
-                        if lines.isEmpty { Text(empty).foregroundStyle(.tertiary) }
-                        ForEach(Array(lines.suffix(30).enumerated()), id: \.offset) { i, line in
-                            Text(line).font(font).textSelection(.enabled).id(i)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                }
-                .onChange(of: lines.count) { _, _ in proxy.scrollTo(min(lines.count, 30) - 1, anchor: .bottom) }
-            }
-            if let note { Text(note).font(.caption).foregroundStyle(.secondary) }
-        }
-        .frame(maxWidth: .infinity, minHeight: 70, maxHeight: maxHeight, alignment: .topLeading)
-        .padding(16)
-        .background(Brand.surface, in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.08)))
-    }
-}
-
-/// Typed signs for the mock recognizer: `food store /\ ww make`, `#sarah` (fingerspelled), `~pri` (letters
+/// Typed signs for the mock recognizer: `hello nice meet-you`, `#sarah` (fingerspelled), `~pri` (letters
 /// one at a time, for autocomplete), face markers
 /// after the signs they cover (`/\`, `[q]`, `[wh]`, `[neg]`, `[nod]`), and `/send /yes /no /clear`.
 struct MockSignBox: View {
@@ -402,7 +314,7 @@ struct MockSignBox: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "keyboard").foregroundStyle(Brand.accent)
-            TextField("Type signs: food store /\\ ww make · #sarah · ~pri (letters) · [q] [wh] [neg] · /send /yes /no /clear", text: $text)
+            TextField("Type signs: hello nice meet-you · #sarah · ~pri (letters) · [q] [wh] [neg] · /send /yes /no /clear", text: $text)
                 .textFieldStyle(.roundedBorder).focused($focused).onSubmit(submit)
             Button("Sign", action: submit).buttonStyle(.borderedProminent)
         }

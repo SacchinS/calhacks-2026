@@ -1,18 +1,15 @@
 import AppKit
-import ApplicationServices
 import AVFoundation
 import SwiftUI
 
 enum SetupStep: Int, CaseIterable, Identifiable {
-    case welcome, camera, accessibility, claude, siri, voice, framing, gestures, signs, done
+    case welcome, camera, claude, voice, framing, gestures, signs, done
     var id: Int { rawValue }
     var title: String {
         switch self {
         case .welcome: "Welcome"
         case .camera: "Camera"
-        case .accessibility: "Accessibility"
         case .claude: "Claude"
-        case .siri: "Siri"
         case .voice: "Voice"
         case .framing: "Position"
         case .gestures: "Gestures"
@@ -24,9 +21,7 @@ enum SetupStep: Int, CaseIterable, Identifiable {
         switch self {
         case .welcome: "hand.wave"
         case .camera: "camera"
-        case .accessibility: "accessibility"
         case .claude: "sparkles"
-        case .siri: "mic.circle"
         case .voice: "speaker.wave.2"
         case .framing: "person.crop.rectangle"
         case .gestures: "hand.thumbsup"
@@ -131,9 +126,7 @@ struct SetupView: View {
         switch step {
         case .welcome: WelcomePage()
         case .camera: CameraPage(done: { done(.camera, $0) })
-        case .accessibility: AccessibilityPage(done: { done(.accessibility, $0) })
         case .claude: ClaudePage(engine: engine, done: { done(.claude, $0) })
-        case .siri: SiriPage(engine: engine, done: { done(.siri, $0) })
         case .voice: VoicePage(engine: engine, done: { done(.voice, $0) })
         case .framing: FramingPage(engine: engine, done: { done(.framing, $0) })
         case .gestures: GesturesPage(engine: engine, done: { done(.gestures, $0) })
@@ -174,7 +167,7 @@ struct WelcomePage: View {
             Logo(size: 88)
             VStack(alignment: .leading, spacing: 4) {
                 TitleText("SignBridge", font: .system(size: 40, weight: .bold))
-                Text("Sign to your Mac. Ask Siri, type messages, speak in calls.")
+                Text("Sign in your Google Meet calls. SignBridge speaks for you and captions the call.")
                     .font(.title3).foregroundStyle(.secondary)
             }
         }
@@ -215,40 +208,13 @@ struct CameraPage: View {
     }
 }
 
-struct AccessibilityPage: View {
-    let done: (Bool) -> Void
-    @State private var trusted = AXIsProcessTrusted()
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    var body: some View {
-        PageHeader(title: "Accessibility",
-                   subtitle: "Lets SignBridge type your message into Siri and text fields, like a keyboard would.")
-        if trusted {
-            StatusLine(ok: true, text: "Accessibility access is on.")
-        } else {
-            StatusLine(ok: false, text: "Turn on SignBridge in Privacy & Security > Accessibility. This page updates by itself.")
-            Button("Open Accessibility Settings") {
-                let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-                _ = AXIsProcessTrustedWithOptions(options)
-                openSettingsPane("Privacy_Accessibility")
-            }
-            .controlSize(.large)
-        }
-        Color.clear.frame(height: 1)
-            .onAppear { done(trusted) }
-            .onReceive(timer) { _ in
-                trusted = AXIsProcessTrusted()
-                done(trusted)
-            }
-    }
-}
-
 struct ClaudePage: View {
     @ObservedObject var engine: EngineClient
     let done: (Bool) -> Void
     var body: some View {
         PageHeader(title: "Claude",
-                   subtitle: "Claude turns the signs you make into a natural sentence and picks where it goes.")
-        Text("SignBridge uses your Claude Code sign-in. If the check fails, open Terminal, run `claude`, and sign in with /login.")
+                   subtitle: "Claude turns the signs you make into a natural sentence for the call.")
+        Text("SignBridge uses the Anthropic API key in its .env file (ANTHROPIC_API_KEY). If the check fails, add the key and restart the app.")
             .fixedSize(horizontal: false, vertical: true)
         Button("Check Connection") { engine.check("claude") }.controlSize(.large).padding(.vertical, 8)
         if let r = engine.checks["claude"] {
@@ -260,53 +226,16 @@ struct ClaudePage: View {
     }
 }
 
-struct SiriPage: View {
-    @ObservedObject var engine: EngineClient
-    let done: (Bool) -> Void
-    @State private var sent = false
-    @State private var trusted = AXIsProcessTrusted()
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    var body: some View {
-        PageHeader(title: "Siri", subtitle: "SignBridge asks Siri your questions by typing them for you.")
-        VStack(alignment: .leading, spacing: 8) {
-            Text("1. In Apple Intelligence & Siri settings, set Keyboard Shortcut to **Hold Command Space**.")
-            Text("2. In Accessibility > Siri, turn on **Type to Siri**.")
-            Button("Open Siri Settings") {
-                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Siri-Settings.extension")!)
-            }
-        }
-        Divider().padding(.vertical, 12)
-        if !trusted {
-            StatusLine(ok: false, text: "Turn on Accessibility for SignBridge first (the Accessibility step).")
-        }
-        Button("Ask Siri \"What time is it?\"") {
-            sent = true
-            engine.testRoute("siri", text: "What time is it?")
-        }
-        .controlSize(.large)
-        .disabled(!trusted)
-        .onReceive(timer) { _ in trusted = AXIsProcessTrusted() }
-        RouteResult(engine: engine, route: "siri", okText: "Sent to Siri.")
-        if sent, engine.lastRouteTest?.ok == true {
-            Text("Did Siri answer?").padding(.top, 8)
-            HStack {
-                Button("Yes, it answered") { done(true) }
-                Button("No") { done(false) }
-            }
-        }
-    }
-}
-
 struct VoicePage: View {
     @ObservedObject var engine: EngineClient
     let done: (Bool) -> Void
     var body: some View {
-        PageHeader(title: "Voice in calls (optional)",
-                   subtitle: "SignBridge can speak for you in FaceTime, Zoom or Discord through a virtual microphone.")
+        PageHeader(title: "Voice in calls",
+                   subtitle: "SignBridge speaks for you in Google Meet through a virtual microphone.")
         if let r = engine.checks["voice"] {
             StatusLine(ok: r.ok, text: r.detail)
             if r.ok {
-                Text("In your call app, choose **BlackHole 2ch** as the microphone.").padding(.top, 6)
+                Text("In Meet's settings, choose **BlackHole 2ch** as the microphone.").padding(.top, 6)
                 Button("Play a test phrase into it") { engine.testRoute("voice", text: "SignBridge voice test.") }
                 RouteResult(engine: engine, route: "voice",
                             okText: "Played. You won't hear it here; someone in your call would.")
