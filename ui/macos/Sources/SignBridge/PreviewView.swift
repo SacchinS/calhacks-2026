@@ -3,7 +3,6 @@ import SwiftUI
 /// Live view for the user and for demos: camera with tracking, what was signed, Claude's sentence, and the call.
 struct PreviewView: View {
     @ObservedObject var engine: EngineClient
-    var showGuide: () -> Void = {}
     var showDemo: () -> Void = {}
     private let fakePhrases = DemoScript.phrases
 
@@ -161,7 +160,6 @@ struct PreviewView: View {
                     .help("Speak right away, without waiting for a pause (the NOW sign)")
             }
             Spacer()
-            Button(action: showGuide) { Label("Signs", systemImage: "book") }.buttonStyle(.borderless)
             Button(action: showDemo) { Label("Demo", systemImage: "arrow.up.left.and.arrow.down.right") }
                 .buttonStyle(.borderless)
             Menu {

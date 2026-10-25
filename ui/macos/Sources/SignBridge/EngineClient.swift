@@ -41,6 +41,11 @@ final class EngineClient: ObservableObject {
     @Published var themTalking = false
     /// One-tap replies for calls (meet.quick_replies); urgent ones are said without waiting.
     @Published var quickReplies: [(text: String, urgent: Bool)] = []
+    /// The Cartesia voices setup offers (cartesia.voices), and the last preview's result.
+    struct Voice: Identifiable, Equatable { let id: String; let name: String; let about: String }
+    @Published var voices: [Voice] = []
+    @Published var previewing: String?
+    @Published var lastPreview: (voiceID: String, ok: Bool, detail: String)?
     /// Someone on the call said your name (MentionBanner shows it over every window).
     struct MentionAlert: Equatable { let text: String; let question: Bool; let final: Bool; let turn: Int }
     @Published var mention: MentionAlert?
@@ -217,6 +222,13 @@ final class EngineClient: ObservableObject {
     func saveConfig(_ values: [String: Any]) { send(["cmd": "config", "values": values]) }
     func introduce() { send(["cmd": "introduce"]) }
     func quickReply(_ text: String) { send(["cmd": "quick_reply", "text": text]) }
+    func previewVoice(_ id: String) {
+        previewing = id
+        lastPreview = nil
+        send(["cmd": "voice_preview", "voice_id": id])
+    }
+    var voiceID: String { config["voice_id"] as? String ?? "" }
+    func chooseVoice(_ id: String) { saveConfig(["voice_id": id]) }
     func letters(_ text: String) { send(["cmd": "letters", "text": text]) }
     func acceptSuggestion(_ index: Int = 0) { send(["cmd": "autocomplete", "action": "accept", "index": index]) }
     func dismissSuggestions() { send(["cmd": "autocomplete", "action": "dismiss"]) }
@@ -245,6 +257,9 @@ final class EngineClient: ObservableObject {
         switch e["type"] as? String {
         case "ready":
             config = e["config"] as? [String: Any] ?? [:]
+            voices = (e["voices"] as? [[String: Any]] ?? []).compactMap { v in
+                (v["id"] as? String).map { Voice(id: $0, name: v["name"] as? String ?? $0, about: v["about"] as? String ?? "") }
+            }
             quickReplies = (e["quick_replies"] as? [[String: Any]] ?? []).compactMap { r in
                 (r["text"] as? String).map { (text: $0, urgent: r["urgent"] as? Bool ?? false) }
             }
@@ -305,6 +320,9 @@ final class EngineClient: ObservableObject {
             }
         case "calibrated":
             lastCalibration = e["message"] as? String
+        case "voice_previewed":
+            previewing = nil
+            lastPreview = (e["voice_id"] as? String ?? "", e["ok"] as? Bool ?? false, e["detail"] as? String ?? "")
         case "route_tested":
             lastRouteTest = (e["route"] as? String ?? "", e["ok"] as? Bool ?? false, e["detail"] as? String ?? "")
         case "caption":
