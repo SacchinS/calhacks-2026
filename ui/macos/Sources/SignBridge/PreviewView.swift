@@ -22,7 +22,7 @@ struct PreviewView: View {
                             transcript
                             OutputPanel(engine: engine, maxHeight: .infinity)
                             Spacer(minLength: 0)
-                            if engine.mockRecognizer { MockSignBox(engine: engine) }
+                            if engine.mockRecognizer { MockSignBox(engine: engine) } else { SpellBox(engine: engine) }
                             controls
                         }
                         .frame(width: min(560, geo.size.width * 0.38))
@@ -35,7 +35,7 @@ struct PreviewView: View {
                     camera
                     transcript
                     OutputPanel(engine: engine)
-                    if engine.mockRecognizer { MockSignBox(engine: engine) }
+                    if engine.mockRecognizer { MockSignBox(engine: engine) } else { SpellBox(engine: engine) }
                     controls
                 }
             }
@@ -91,7 +91,7 @@ struct PreviewView: View {
         VStack(alignment: .leading, spacing: 12) {
             switch engine.state {
             case "listening", "thinking":
-                if engine.glosses.isEmpty {
+                if engine.glosses.isEmpty && engine.autocomplete == nil {
                     Text("Sign, then rest your hands.").font(.title2).foregroundStyle(.secondary)
                 } else {
                     HStack(spacing: 8) {
@@ -126,6 +126,7 @@ struct PreviewView: View {
                     Text(engine.mockRecognizer ? "Type signs below to start." : "Start signing.").font(.title2).foregroundStyle(.secondary)
                 }
             }
+            AutocompleteBar(engine: engine)
             if engine.state == "idle", let last = engine.log.last {  // e.g. what was just sent, or an error
                 Text(last).font(.caption).foregroundStyle(.tertiary)
             }
@@ -135,6 +136,7 @@ struct PreviewView: View {
         .background(Brand.surface, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.08)))
         .animation(.easeInOut(duration: 0.2), value: engine.state)
+        .animation(.easeInOut(duration: 0.15), value: engine.autocomplete)
     }
 
     private var controls: some View {
@@ -390,7 +392,8 @@ struct OutputPanel: View {
     }
 }
 
-/// Typed signs for the mock recognizer: `food store /\ ww make`, `#sarah` (fingerspelled), face markers
+/// Typed signs for the mock recognizer: `food store /\ ww make`, `#sarah` (fingerspelled), `~pri` (letters
+/// one at a time, for autocomplete), face markers
 /// after the signs they cover (`/\`, `[q]`, `[wh]`, `[neg]`, `[nod]`), and `/send /yes /no /clear`.
 struct MockSignBox: View {
     @ObservedObject var engine: EngineClient
@@ -399,7 +402,7 @@ struct MockSignBox: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "keyboard").foregroundStyle(Brand.accent)
-            TextField("Type signs: food store /\\ ww make · #sarah · [q] [wh] [neg] · /send /yes /no /clear", text: $text)
+            TextField("Type signs: food store /\\ ww make · #sarah · ~pri (letters) · [q] [wh] [neg] · /send /yes /no /clear", text: $text)
                 .textFieldStyle(.roundedBorder).focused($focused).onSubmit(submit)
             Button("Sign", action: submit).buttonStyle(.borderedProminent)
         }

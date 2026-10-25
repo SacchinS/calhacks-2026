@@ -112,4 +112,6 @@ class UtteranceBuffer:
 
     def _progress(self) -> None:
         gloss = Utterance(signs=tuple(self.signs)).gloss
+        if self.spelling is not None:
+            self.spelling.gloss = tuple(gloss)  # the signs so far are context for suggestions
         self.bus.publish(UtteranceProgress(gloss=tuple(gloss)))

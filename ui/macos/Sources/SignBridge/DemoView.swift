@@ -43,6 +43,7 @@ struct DemoView: View {
                     }
                 }
                 stage.frame(minHeight: 190)
+                AutocompleteBar(engine: engine, large: true)
                 if engine.outputMode == "meet" {
                     FloorStatus(engine: engine, font: .title2.weight(.semibold))
                     QuickReplies(engine: engine, size: .large)

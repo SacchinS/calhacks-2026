@@ -60,7 +60,6 @@ from shared.events import (
     OutputSent,
     SignEvent,
     Suggestion,
-    UtteranceProgress,
 )
 
 log = logging.getLogger(__name__)
@@ -110,7 +109,7 @@ class Autocompleter:
         self.search_ready = False
         self._context: dict[str, float] = {}  # last context scores, reused while refining
         self.conversation: deque[tuple[float, str]] = deque(maxlen=200)
-        self.gloss: tuple[str, ...] = ()  # the utterance so far, as context too
+        self.gloss: tuple[str, ...] = ()  # the utterance so far (set by the buffer): context too
         self.meeting_id = uuid.uuid4().hex[:12] if config.mode == "meet" else ""
         self._heard: dict[str, tuple[str, float]] = {}  # term -> (meeting, when), from captions
         # Metrics for the pitch: accepted suggestions, letters saved, latency.
@@ -132,7 +131,7 @@ class Autocompleter:
         rows = await asyncio.to_thread(self.store.all)
         self.stats = build_stats(rows, self.transcript_weight)
         self.accepted, self.letters_saved = await asyncio.to_thread(self.store.letters_saved)
-        sub = self.bus.subscribe(Caption, OutputSent, ModeChanged, UtteranceProgress)
+        sub = self.bus.subscribe(Caption, OutputSent, ModeChanged)
         self._task = asyncio.create_task(self._follow(sub), name="autocomplete")
         self._spawn(self._open_search(rows))
 
@@ -185,8 +184,6 @@ class Autocompleter:
                         self._heard_say(event.text)
                 elif isinstance(event, OutputSent):
                     self._remember_text(event.text)  # what the signer said is context too
-                elif isinstance(event, UtteranceProgress):
-                    self.gloss = event.gloss
                 elif isinstance(event, ModeChanged):
                     if event.mode == "meet" and not self.meeting_id:
                         self.meeting_id = uuid.uuid4().hex[:12]
@@ -206,13 +203,22 @@ class Autocompleter:
         if not letter or not self.enabled:
             return
         started = time.perf_counter()
+        shown = self.suggestions
         self.letters += letter
-        # Right away from what's known (letters, frequency, the last context scores), then
-        # refined with a fresh context search.
+        # Ranked right away from what's known (letters, frequency, the last context scores),
+        # so YES works even before the context search is back; then refined with it.
         self.suggestions = tuple(self.rank(self.letters, self._context))
-        self._publish("cached", (time.perf_counter() - started) * 1000)
         if self._suggesting is not None:
             self._suggesting.cancel()
+        if len(self.letters) >= self.min_letters and self.search_ready and self.context_text():
+            # The search answers in milliseconds: until then keep showing the earlier
+            # guesses that still fit, rather than flashing a ranking without context.
+            still = {normalize(s.term) for s in self.suggestions}
+            self._publish(
+                self.last_search, shown=tuple(s for s in shown if normalize(s.term) in still)
+            )
+        else:
+            self._publish("letters", (time.perf_counter() - started) * 1000)
         if len(self.letters) >= self.min_letters:
             self._suggesting = asyncio.create_task(self._refine(self.letters, started))
 
@@ -276,8 +282,13 @@ class Autocompleter:
             self._suggesting = None
         self.letters, self.suggestions, self.dismissed = "", (), False
 
-    def _publish(self, search: str, latency_ms: float | None = None) -> None:
-        shown = () if self.dismissed or len(self.letters) < self.min_letters else self.suggestions
+    def _publish(
+        self, search: str, latency_ms: float | None = None, shown: tuple | None = None
+    ) -> None:
+        if shown is None:
+            shown = self.suggestions
+        if self.dismissed or len(self.letters) < self.min_letters:
+            shown = ()
         self.bus.publish(
             AutocompleteUpdate(self.letters, shown, self.dismissed, search, latency_ms)
         )

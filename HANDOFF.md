@@ -65,7 +65,8 @@ The glosses for all four moments are drafts (`docs/asl-demo-script-research.md`)
 | Custom signs (`recognition/custom_signs.py`, `tools/record_signs.py`) | A | **Built.** Few-shot matching from recorded examples. Nothing recorded yet: WW, YOU-REMIND-ME, MEET-YOU, BUY, HOW, YOU, TITLE. |
 | Segmenter and control signs (`recognition/segmenter.py`) | A | Works. YES / NO / FINISH need a hold (2x `min_frames`), so a mid-sentence FINISH doesn't send. |
 | Face markers (`recognition/face_markers.py`) | A | **Built, off by default** (`recognition.face_markers`). Heuristic; untested on a real face. |
-| Fingerspelling (`recognition/fingerspelling.py`) | A | Stub. No released Kaggle winner on Hugging Face; the demo script doesn't need it. |
+| Fingerspelling (`recognition/fingerspelling.py`) | A | Stub: the camera produces no letters yet. No released Kaggle winner on Hugging Face. Autocomplete needs it to publish one `Letter` event per letter. |
+| Fingerspelling autocomplete (`language/autocomplete.py`, `vocab.py`, `vocab_search.py`, `vocab_terms.py`, `tagger.py`) | B | **Built and tested on typed letters** (`~pri` in the mock box, or the app's "Fingerspell by typing" box). It ranks words by letters, the conversation (Moss session or keyword mock), frequency and recency; learns words from your spelling and from captions; keeps its memory in a local SQLite file; and lets you list and delete words in Settings. Moss itself isn't run yet (no keys): `uv run pytest --live tests/test_moss_search.py` once they're in `.env`. |
 | Replay (`recognizer: replay`) | A | Works, but `fixtures/landmarks_sample.jsonl` is fake data. |
 | Claude translator (`language/claude.py`, prompt) | B | **Built** (Haiku 5.5, no thinking). Prompt has the glossary, face-marker tags, and demo examples. Not run against the API yet (no key on the build machine): run `uv run pytest --live tests/test_claude_translator.py`. |
 | Confirm flow and router (`outputs/router.py`) | B | Works. Claude Code runs in the background (Siri and Meet keep working during a build). Optional review before speaking in Meet and Voice. |
@@ -79,6 +80,13 @@ The glosses for all four moments are drafts (`docs/asl-demo-script-research.md`)
 | Call intro and signing cue (`outputs/call_host.py`) | C | Works on mocks: the intro when Meet starts, "Introduce me", and "One moment, I'm signing." after 5 s of unsent signing. |
 
 ## Recent changes
+
+- **Fingerspelling autocomplete with Moss** (Oct 24). `shared/events.py` gained `Letter`, `Suggestion`, and `AutocompleteUpdate`. A new component line, `vocab_search: mock | moss`, is on `moss` in `config.demo.yaml` and needs `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY`.
+  - **Flow:** the utterance buffer hands letters to the autocompleter in order with the signs. While a word is being spelled, YES accepts it and NO dismisses it, and the confirm and cancel gestures do the same. A sign or SEND keeps the letters as spelled.
+  - **Storage:** the memory is `~/Library/Application Support/calhacks-2026/vocab.sqlite` (`vocab-mock.sqlite` for the mock search). The Moss session is built from it at startup, never pushed.
+  - **New protocol:** status fields `autocomplete` and `autocomplete_stats`; commands `letters`, `autocomplete`, `vocab_list` and `vocab_delete`; event `vocab`.
+  - **Mock and tools:** `~abc` in the mock box spells letters, the mock captions mention Priyanka and Kubernetes, and `make seed-vocab` loads demo words.
+  - **Known edge:** YES while spelling and while a Claude Code confirmation is pending acts on both.
 
 - **Mention alerts** (Oct 24). `captions/mentions.py` watches the captions for the signer's name (Settings > Calls, plus `meet.mention_names`) and publishes a new `Mention` event in `shared/events.py`: once per turn as soon as the name is heard, then again with the full sentence and whether it's a question. The app shows a flashing yellow banner above every window, fullscreen Meet included, without taking focus (`MentionBanner.swift`). `meet.alert_on_questions` alerts on every question, for 1:1 calls. New protocol event `mention`. The mock captions are now a short sprint check-in that says "Sam, can you take the filters ticket by Friday?".
 - **Meetings first: quick replies, quieter defaults** (Oct 24). The Meet panel has one-tap replies (`meet.quick_replies`): pressing one is the approval, normal ones wait for a pause, urgent ones ("Can you repeat that?", "Please slow down a little.", "One at a time, please.") are said right away. New command `quick_reply`; `ready` now lists the replies. The call intro and "One moment, I'm signing." are off by default (`meet.intro_on_start`, `meet.signing_cue_seconds`): they help on calls with strangers, not team meetings where people know you and can see you sign. "Introduce me" still works.
@@ -101,7 +109,7 @@ The glosses for all four moments are drafts (`docs/asl-demo-script-research.md`)
 
 These need hardware, keys, or ASL, so they couldn't be done on the build machine. In rough demo order:
 
-1. **Keys** (lead): put `ANTHROPIC_API_KEY` and `CARTESIA_API_KEY` in `.env` on the demo laptop. Then `uv run pytest --live` runs the real translator cases and the Cartesia outputs.
+1. **Keys** (lead): put `ANTHROPIC_API_KEY` and `CARTESIA_API_KEY` in `.env` on the demo laptop (done on the build machine). `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY` are still needed, from a Moss project (code CALHACKS on the Portal's billing page). Then `uv run pytest --live` runs the real translator, Cartesia and Moss tests, including the 500-word startup timing.
 2. **Translator check** (B): run `uv run pytest --live tests/test_claude_translator.py` and fix the prompt where a case fails; check it's under ~2 s.
 3. **Custom signs** (A): learn WW, YOU-REMIND-ME, MEET-YOU, BUY, HOW, YOU, and TITLE from the source videos (or a Deaf signer), record 5+ takes each with `tools/record_signs.py`, and run `--check`. The signer who demos should record them.
 4. **Live recognition** (A): `recognizer: camera`, sign the demo script, and tune `confidence_threshold`, `isolated_floor`, `min_frames`, and `control_min_frames` until each phrase comes out right. Then record a real fixture to replace `fixtures/landmarks_sample.jsonl`.
