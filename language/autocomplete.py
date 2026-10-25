@@ -33,6 +33,7 @@ import asyncio
 import contextlib
 import logging
 import math
+import re
 import time
 import uuid
 from collections import deque
@@ -490,29 +491,17 @@ class Autocompleter:
         return out
 
     async def related_words(self, text: str, k: int = 8) -> list[dict[str, Any]]:
-        """Return remembered words relevant to a ticket draft without retaining the text.
-
-        Literal mentions win, followed by the current in-memory search scores when available.
-        The caller may discard the input immediately after this method returns.
-        """
-        tokens = {token.casefold() for token in text.split() if token.strip()}
-        literal: list[dict[str, Any]] = []
-        for stats in self.stats.values():
-            if stats.term.casefold() in tokens:
-                literal.append({"term": stats.term, "kind": stats.kind, "tags": list(stats.tags)})
+        """Remembered words that appear in `text` (a ticket draft's notes), so Claude spells
+        names and tools the signer's way. Only words actually said in the call: the rest of
+        the memory stays on the Mac. The text isn't kept."""
+        tokens = {token.casefold() for token in re.findall(r"[\w'-]+", text)}
+        literal = [
+            {"term": stats.term, "kind": stats.kind, "tags": list(stats.tags)}
+            for stats in self.stats.values()
+            if stats.term.casefold() in tokens
+        ]
         literal.sort(key=lambda item: item["term"].casefold())
-        out = literal[:k]
-        if len(out) >= k:
-            return out
-        seen = {item["term"].casefold() for item in out}
-        for stats in sorted(self.stats.values(), key=lambda item: (-item.count, -item.last_used)):
-            if stats.term.casefold() in seen:
-                continue
-            out.append({"term": stats.term, "kind": stats.kind, "tags": list(stats.tags)})
-            seen.add(stats.term.casefold())
-            if len(out) >= k:
-                break
-        return out
+        return literal[:k]
 
     async def delete_word(self, term: str) -> int:
         term_norm = normalize(term)

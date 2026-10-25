@@ -15,6 +15,7 @@ struct PreviewView: View {
                         camera
                         VStack(spacing: 14) {
                             transcript
+                            TicketCard(engine: engine)
                             SentList(engine: engine, maxHeight: .infinity)
                             input
                             controls
@@ -27,6 +28,7 @@ struct PreviewView: View {
                     topBar
                     camera
                     transcript
+                    TicketCard(engine: engine)
                     SentList(engine: engine, maxHeight: 200)
                     input
                     controls
@@ -138,6 +140,7 @@ struct PreviewView: View {
         }
         .fixedSize(horizontal: false, vertical: true)
         .animation(.easeInOut(duration: 0.2), value: engine.state)
+        .animation(.spring(duration: 0.35), value: engine.ticket)
         .animation(.easeInOut(duration: 0.15), value: engine.autocomplete)
     }
 
@@ -395,7 +398,7 @@ struct CameraIndicator: View {
         .padding(.horizontal, 10).padding(.vertical, 4)
         .background((on ? Color.red : Color.gray).opacity(0.16), in: Capsule())
         .foregroundStyle(on ? Color(red: 1, green: 0.45, blue: 0.42) : .secondary)
-        .help("Video stays on this Mac: only the recognized sign words leave it, as text.")
+        .help("Video stays on this Mac: only text leaves it.")
     }
 }
 

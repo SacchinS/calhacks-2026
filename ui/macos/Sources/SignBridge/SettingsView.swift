@@ -66,8 +66,9 @@ struct SettingsView: View {
             RememberedWords(engine: engine)
             Section("Privacy") {
                 Label("Video never leaves this Mac. Hand tracking and sign recognition run here.", systemImage: "video.slash")
-                Label("Claude gets only the recognized sign words, as text. Cartesia gets only the English to speak, plus the other side's call audio for captions.", systemImage: "text.bubble")
-                Label("Nothing is recorded: no video, no transcripts. Autocomplete keeps only words, a few topic tags, and when they were used, in a file on this Mac.", systemImage: "externaldrive.badge.xmark")
+                Label("Claude gets text only: the signs it turns into English and, while Jira tickets are on, the call's captions and your sentences to draft a ticket. Cartesia gets only the English to speak, plus the other side's call audio for captions.", systemImage: "text.bubble")
+                Label("Nothing reaches Jira until you sign YES (or press Add) on a ticket, and then only the ticket itself, never the captions.", systemImage: "ticket")
+                Label("Nothing is saved: no video, no transcripts (ticket notes stay in memory for the call). Autocomplete keeps only words, a few topic tags, and when they were used, in a file on this Mac.", systemImage: "externaldrive.badge.xmark")
             }
             .font(.callout)
             Section {

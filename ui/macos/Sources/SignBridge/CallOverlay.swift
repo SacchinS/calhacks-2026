@@ -14,12 +14,25 @@ final class CallOverlay {
     private let openPreview: () -> Void
     private var panel: NSPanel?
     private var moved: NSObjectProtocol?
+    private var ticketWatch: AnyCancellable?
 
     var isShown: Bool { panel?.isVisible ?? false }
+
+    /// One row, plus a second for the Jira ticket while there is one.
+    private var size: NSSize { Self.size(ticket: engine.ticket != nil) }
+    private static func size(ticket: Bool) -> NSSize { NSSize(width: 880, height: ticket ? 182 : 112) }
 
     init(engine: EngineClient, openPreview: @escaping () -> Void) {
         self.engine = engine
         self.openPreview = openPreview
+        // Grow upward for the ticket row (the origin is the bottom corner, so it stays put).
+        ticketWatch = engine.$ticket.map { $0 != nil }.removeDuplicates().dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] hasTicket in  // the new value: $ticket fires before it's stored
+                guard let panel = self?.panel else { return }
+                panel.setFrame(NSRect(origin: panel.frame.origin, size: Self.size(ticket: hasTicket)),
+                               display: true, animate: true)
+            }
     }
 
     func toggle() { isShown ? hide() : show() }
@@ -27,7 +40,7 @@ final class CallOverlay {
     func show() {
         let panel = self.panel ?? makePanel()
         self.panel = panel
-        let size = NSSize(width: 880, height: 112)
+        let size = self.size
         if let saved = UserDefaults.standard.string(forKey: Self.originKey) {
             panel.setFrame(NSRect(origin: NSPointFromString(saved), size: size), display: true)
         } else if let screen = NSScreen.main {
@@ -70,6 +83,7 @@ struct CallOverlayView: View {
     let close: () -> Void
 
     var body: some View {
+        VStack(spacing: 10) {
         HStack(spacing: 16) {
             SignStateBadge(state: engine.signState, size: 52)
             VStack(alignment: .leading, spacing: 6) {
@@ -100,6 +114,8 @@ struct CallOverlayView: View {
             .help("Quick replies, said in your voice")
             OverlayButton(icon: "macwindow", help: "Open SignBridge", action: openPreview)
             OverlayButton(icon: "chevron.down", help: "Hide (menu bar > Call Overlay)", action: close)
+        }
+        TicketStrip(engine: engine)
         }
         .controlSize(.large)
         .padding(.leading, 20).padding(.trailing, 16).padding(.vertical, 14)

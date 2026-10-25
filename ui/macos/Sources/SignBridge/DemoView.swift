@@ -178,6 +178,7 @@ struct DemoView: View {
                 Text("CONVERSATION").font(.system(size: 13, weight: .bold)).tracking(1.2).foregroundStyle(.secondary)
             }
             .padding(.top, 64)
+            TicketCard(engine: engine, large: true).animation(.spring(duration: 0.4), value: engine.ticket)
             if engine.history.isEmpty {
                 Text("Phrases you send or cancel show up here.").foregroundStyle(.tertiary)
             }

@@ -47,6 +47,23 @@ enum Snapshots {
         }
 
         save("logo", CGSize(width: 512, height: 512), Logo(size: 512, glow: false))
+        func ticket(_ state: String, ready: Bool, version: Int, changed: [String] = [], key: String = "") -> EngineClient.Ticket {
+            .init(state: state, version: version, ready: ready, changed: changed,
+                  summary: "Fix the dashboard chart colors in Figma",
+                  description: "The redesigned charts use colors that don't match the release palette. Meet with Pranav to align them before the release.",
+                  asked: "Sam", assignee: ready ? "signer" : "", due: ready ? "2026-10-26" : "", labels: ["design"],
+                  people: ["Pranav"], reasons: [], blocks: ready ? .init(key: "SB-3", summary: "Dashboard release") : nil,
+                  duplicate: nil, key: key, url: "", auditSaved: state == "created", error: "", mock: false)
+        }
+        let drafting = sample { e in e.ticket = ticket("tentative", ready: false, version: 1) }
+        let readyTicket = sample { e in
+            e.signState = "idle"; e.ticket = ticket("tentative", ready: true, version: 3, changed: ["assign_to_signer", "due", "blocks"])
+        }
+        let created = sample { e in e.ticket = ticket("created", ready: true, version: 3, key: "SB-12") }
+        save("ticket-drafting", CGSize(width: 720, height: 820), PreviewView(engine: drafting))
+        save("ticket-ready", CGSize(width: 720, height: 820), PreviewView(engine: readyTicket))
+        save("ticket-overlay", CGSize(width: 880, height: 182), CallOverlayView(engine: readyTicket, openPreview: {}, close: {}))
+        save("ticket-demo", CGSize(width: 1440, height: 900), DemoView(engine: created, exit: {}))
         save("preview-idle", CGSize(width: 720, height: 820), PreviewView(engine: idle))
         save("preview-signing", CGSize(width: 720, height: 820), PreviewView(engine: signing))
         save("preview-spelling", CGSize(width: 720, height: 820), PreviewView(engine: spelling))

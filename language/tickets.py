@@ -243,7 +243,9 @@ class TicketDrafter:
         }
         kwargs: dict[str, Any] = {
             "model": self.model,
-            "max_tokens": 4000,
+            # Opus 5.5 always thinks, and thinking counts toward this: room for both, so a
+            # long draft isn't cut off mid-JSON (which would silently drop the ticket).
+            "max_tokens": 16000,
             "output_config": {
                 "effort": self.effort,
                 "format": {"type": "json_schema", "schema": SCHEMA},

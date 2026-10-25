@@ -167,7 +167,8 @@ struct WelcomePage: View {
         }
         .padding(.bottom, 18)
         Storyboard()
-        Label("Video never leaves this Mac. Only the recognized words go to Claude.", systemImage: "lock.fill")
+        Label("Video never leaves this Mac. Only text goes to Claude: what you sign, and the call's captions so it can draft Jira tickets. Nothing reaches Jira until you approve it.", systemImage: "lock.fill")
+            .fixedSize(horizontal: false, vertical: true)
             .foregroundStyle(.secondary).padding(.top, 10)
         Text("Setup takes about 3 minutes.").foregroundStyle(.secondary).padding(.top, 14)
     }

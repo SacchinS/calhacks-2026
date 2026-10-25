@@ -61,6 +61,17 @@ final class EngineClient: ObservableObject {
         var words: [Word] { (top.map { [$0] } ?? []) + alternates }
     }
     @Published var autocomplete: Autocomplete?
+    /// The Jira ticket Claude is drafting from the call (language/tickets.py), nil when none.
+    struct Ticket: Equatable {
+        struct Link: Equatable { let key: String; let summary: String }
+        /// tentative | creating | created | failed
+        let state: String, version: Int, ready: Bool, changed: [String]
+        let summary: String, description: String, asked: String, assignee: String, due: String
+        let labels: [String], people: [String], reasons: [String]
+        let blocks: Link?, duplicate: Link?
+        let key: String, url: String, auditSaved: Bool, error: String, mock: Bool
+    }
+    @Published var ticket: Ticket?
     /// For the pitch: suggestions accepted, letters saved, and how fast suggestions come.
     struct AutocompleteStats: Equatable {
         var accepted = 0, lettersSaved = 0, words = 0
@@ -236,6 +247,12 @@ final class EngineClient: ObservableObject {
     func letters(_ text: String) { send(["cmd": "letters", "text": text]) }
     func acceptSuggestion(_ index: Int = 0) { send(["cmd": "autocomplete", "action": "accept", "index": index]) }
     func dismissSuggestions() { send(["cmd": "autocomplete", "action": "dismiss"]) }
+    /// Add the ticket to Jira (the button; signing YES does the same in the engine).
+    func approveTicket() {
+        if let t = ticket { send(["cmd": "ticket", "action": "approve", "version": t.version, "via": "button"]) }
+    }
+    /// Drop the draft, or clear a created one so drafting starts again.
+    func dismissTicket() { send(["cmd": "ticket", "action": "dismiss"]) }
     func listVocab() { send(["cmd": "vocab_list"]) }
     func deleteWord(_ term: String) { send(["cmd": "vocab_delete", "term": term]) }
     func deleteUse(_ id: String) { send(["cmd": "vocab_delete", "id": id]) }
@@ -309,6 +326,7 @@ final class EngineClient: ObservableObject {
             themTalking = e["them_talking"] as? Bool ?? false
             mockRecognizer = e["mock"] as? Bool ?? mockRecognizer
             autocomplete = Self.parseAutocomplete(e["autocomplete"] as? [String: Any])
+            ticket = Self.parseTicket(e["ticket"] as? [String: Any])
             if let s = e["autocomplete_stats"] as? [String: Any] {
                 autocompleteStats = AutocompleteStats(
                     accepted: s["accepted"] as? Int ?? 0, lettersSaved: s["letters_saved"] as? Int ?? 0,
@@ -364,6 +382,25 @@ final class EngineClient: ObservableObject {
 }
 
 extension EngineClient {
+    static func parseTicket(_ t: [String: Any]?) -> Ticket? {
+        guard let t, let state = t["state"] as? String, state != "none", state != "dismissed" else { return nil }
+        let d = t["draft"] as? [String: Any] ?? [:]
+        func link(_ x: Any?) -> Ticket.Link? {
+            guard let x = x as? [String: Any], let key = x["key"] as? String else { return nil }
+            return .init(key: key, summary: x["summary"] as? String ?? "")
+        }
+        return Ticket(state: state, version: t["version"] as? Int ?? 0, ready: t["ready"] as? Bool ?? false,
+                      changed: t["changed"] as? [String] ?? [],
+                      summary: d["summary"] as? String ?? "", description: d["description"] as? String ?? "",
+                      asked: d["asked"] as? String ?? "", assignee: d["assignee"] as? String ?? "",
+                      due: d["due"] as? String ?? "", labels: d["labels"] as? [String] ?? [],
+                      people: d["people"] as? [String] ?? [], reasons: d["reasons"] as? [String] ?? [],
+                      blocks: link(d["blocks"]), duplicate: link(d["possible_duplicate"]),
+                      key: t["key"] as? String ?? "", url: t["url"] as? String ?? "",
+                      auditSaved: t["audit_saved"] as? Bool ?? false, error: t["error"] as? String ?? "",
+                      mock: t["mock"] as? Bool ?? false)
+    }
+
     static func parseAutocomplete(_ a: [String: Any]?) -> Autocomplete? {
         guard let a, let letters = a["letters"] as? String, !letters.isEmpty else { return nil }
         func word(_ w: Any?) -> Autocomplete.Word? {
