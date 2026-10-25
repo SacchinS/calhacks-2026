@@ -5,11 +5,19 @@ app would count, so you can check the model and settle `recognition.letter_orien
     uv run python tools/try_letters.py                # q quits
     uv run python tools/try_letters.py --orientation mirrored
 
-Hold each letter still for a moment, then move to the next; slide a little for a double
-letter. The top line is the model's guess for this frame, as the camera sees the hand and
-mirrored. Counted letters show below, the way autocomplete gets them (the first letter of a
-word appears once the second is held). On quitting it prints which orientation read your
-hand more surely: put that in config.yaml. Nothing is saved.
+Keep one hand inside the green box (the signing space you saved in setup). Hold each
+letter still for a moment, then move to the next; slide a little for a double letter.
+
+- Line 1: the model's guess this frame, as the camera sees the hand and mirrored.
+- Line 2: why it is or isn't counted: unsure (under `letter_threshold`), holding (not yet
+  `letter_hold_seconds`), counted, or waiting for a second letter (a word's first letter
+  shows only once the second is held, so a sign's handshape isn't read as a letter).
+- Line 3: the counted letters, the way autocomplete gets them. Fingerspelling has no space
+  sign: a word ends when you pause (`letter_end_seconds`) or sign something else, shown
+  here as a space.
+
+On quitting it prints which orientation read your hand more surely: put that in
+config.yaml. Nothing is saved.
 """
 
 from __future__ import annotations
@@ -31,17 +39,23 @@ def main() -> None:
     parser.add_argument("--orientation", choices=["auto", "as_is", "mirrored"])
     args = parser.parse_args()
 
+    import json
+
     import cv2
 
     from recognition.camera import Camera
     from recognition.fingerspelling import ORIENTATIONS, LetterModel, LetterReader
     from recognition.gating import SigningSpace
-    from tools.record_signs import show
+    from ui.server import UI_CONFIG
 
     config = load_config()
     if args.orientation:
         config.sections.setdefault("recognition", {})["letter_orientation"] = args.orientation
     space = SigningSpace.from_config(config)
+    try:  # the position saved in the app's setup ("Save This Position")
+        space = SigningSpace(**json.loads(UI_CONFIG.read_text())["signing_space"])
+    except (OSError, KeyError, TypeError, ValueError):
+        pass
     model = LetterModel(config)
     each = {o: LetterModel(config, model.run, model.classes) for o in ORIENTATIONS}
     for orientation, m in each.items():
@@ -63,8 +77,11 @@ def main() -> None:
                 surest = max(guesses, key=lambda o: guesses[o][1] if guesses[o] else 0)
                 if guesses[surest] and guesses[surest][1] >= reader.threshold:
                     wins[surest] += 1
+            was_spelling = reader.spelling
             spelled += "".join(letter.letter for letter in reader.push(frame, space))
-            if not show(cv2, frame, f"{line}  |  {spelled[-14:] or '-'}", (80, 220, 80)):
+            if was_spelling and not reader.spelling and not spelled.endswith(" "):
+                spelled += " "  # the word ended
+            if not draw(cv2, frame, space, [line, reader.status, spelled[-24:] or "-"]):
                 break
     finally:
         camera.close()
@@ -73,6 +90,21 @@ def main() -> None:
         best, _ = wins.most_common(1)[0]
         print(f"Surer reads: {dict(wins)}. Set recognition.letter_orientation: {best}")
     print(f"Counted: {spelled or '(nothing)'}")
+
+
+def draw(cv2, frame, space, lines: list[str]) -> bool:
+    """The mirrored camera, the signing space, and three lines. False if q was pressed."""
+    image = cv2.cvtColor(frame.image, cv2.COLOR_RGB2BGR)
+    h, w = image.shape[:2]
+    corner = (int(space.x_min * w), int(space.y_min * h))
+    cv2.rectangle(image, corner, (int(space.x_max * w), int(space.y_max * h)), (80, 220, 80), 2)
+    image = cv2.flip(image, 1)
+    for i, text in enumerate(lines):
+        y, size = 50 + 50 * i, 1.4 if i == 2 else 0.9
+        cv2.putText(image, text, (30, y), cv2.FONT_HERSHEY_SIMPLEX, size, (0, 0, 0), 6)
+        cv2.putText(image, text, (30, y), cv2.FONT_HERSHEY_SIMPLEX, size, (255, 255, 255), 2)
+    cv2.imshow("Try letters", image)
+    return cv2.waitKey(1) & 0xFF != ord("q")
 
 
 if __name__ == "__main__":
