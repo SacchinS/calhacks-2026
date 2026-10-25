@@ -45,7 +45,7 @@ From `MVP.md` ("Checkpoints" has the full list):
 
 A release check-in on Google Meet between two laptops (details in `MVP.md`, "What the MVP must do"):
 1. **Speech and captions.** "The dashboard's ready. Pranav redesigned the charts in Figma last night, so I think we ship tomorrow." The autocomplete remembers Pranav and Figma.
-2. **Signing while they talk.** WAIT, F-I (Figma), COLOR PROBLEM, FINISH: the sentence waits for B to stop, then "Wait, there's a color problem in the Figma design." (NOW instead of FINISH says it right away.)
+2. **Signing while they talk.** F-I (Figma), COLOR PROBLEM, FINISH: the sentence waits for B to stop, then "There's a color problem in Figma." (NOW instead of FINISH says it right away.)
 3. **Being asked.** "Sacchin, can you sort it out with Pranav?" flashes the name banner; the signer answers ME MEET, P-R (Pranav), TOMORROW, FINISH: "I'll meet with Pranav tomorrow."
 4. **The outcome:** the release is held.
 

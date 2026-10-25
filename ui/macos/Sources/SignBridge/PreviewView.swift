@@ -319,7 +319,7 @@ struct MockSignBox: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "keyboard").foregroundStyle(Brand.accent)
-            TextField("Type signs: wait ~fi /yes color problem /now · #sarah · ~pr (letters) · [q] [wh] [neg] · /send /now /yes /no /clear", text: $text)
+            TextField("Type signs: ~fi /yes color problem /now · #sarah · ~pr (letters) · [q] [wh] [neg] · /send /now /yes /no /clear", text: $text)
                 .textFieldStyle(.roundedBorder).focused($focused).onSubmit(submit)
             Button("Sign", action: submit).buttonStyle(.borderedProminent)
         }
