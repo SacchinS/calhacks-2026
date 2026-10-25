@@ -10,7 +10,6 @@
 ## Before anyone starts (lead)
 
 - [x] **Repo push access.** The repo (`SacchinS/calhacks-2026`) is public, so anyone can clone it, but only collaborators can push. Invites are sent (GitHub > Settings > Collaborators); each teammate accepts theirs (step 1 below).
-- [ ] **SignBridge access for Person A.** Person A's stretch goal ports `signbridge/gestures.py` from the earlier project, and `SacchinS/signbridge` is private. Add Person A as a collaborator there, or copy that one file over.
 - [ ] **API keys.** Send keys privately (a DM, never the repo or a public channel). Person B needs `ANTHROPIC_API_KEY` and the Moss keys (`MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`). Person C needs `CARTESIA_API_KEY`. Person A needs none.
 - [x] **Who is A, B, and C** (from the team's work-split doc):
   - Person A (Recognition): Sacchin
@@ -84,9 +83,9 @@ The glosses are drafts (`docs/asl-demo-script-research.md`, Moment 3). A Deaf si
   - **Events and config:** `shared/events.py` lost `Mode`, `ModeChanged`, `OutputReply`, and the `MODE` control sign; `ConfirmRequest` lost `target`. The `claude_code`, `siri` and `mode` config lines and the `claude_code_cli` / `type_to_siri` sections are gone, and so is pyobjc.
   - **Behavior:** every translation goes to the voice (after YES with review on). Captions start with the app. The call intro is said at startup when `meet.intro_on_start` is on. The autocomplete keeps one meeting id per run.
   - **Protocol:** the `output_mode` command and the `reply` event are gone; `status` lost `output_mode` and `claude_code_working`; `sent` lost `mode`; `test_route` is voice only.
-  - **App:** no mode picker; Preview always shows the call panel; setup lost the Accessibility, Siri, Claude and control-gesture steps (the gestures were never detected) (the API key is ours, in `.env`, not the user's); the demo phrases are the Meet greeting with fingerspelled Priyanka and Figma.
+  - **App:** no mode picker; Preview always shows the call panel; setup lost the Accessibility, Siri and Claude steps (the API key is ours, in `.env`) and the control-gesture step (the gestures were never detected), and the engine lost its gestures mode; the demo phrases are the Meet greeting with fingerspelled Priyanka and Figma.
 - **Fingerspelling autocomplete with Moss** (Oct 24). `shared/events.py` gained `Letter`, `Suggestion`, and `AutocompleteUpdate`. A new component line, `vocab_search: mock | moss`, is on `moss` in `config.demo.yaml` and needs `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY`.
-  - **Flow:** the utterance buffer hands letters to the autocompleter in order with the signs. While a word is being spelled, YES accepts it and NO dismisses it, and the confirm and cancel gestures do the same. A sign or SEND keeps the letters as spelled.
+  - **Flow:** the utterance buffer hands letters to the autocompleter in order with the signs. While a word is being spelled, YES accepts it and NO dismisses it, and the app's Send and Cancel buttons (C / X in Demo Mode) do the same. A sign or SEND keeps the letters as spelled.
   - **Storage:** the memory is `~/Library/Application Support/calhacks-2026/vocab.sqlite` (`vocab-mock.sqlite` for the mock search). The Moss session is built from it at startup, never pushed.
   - **New protocol:** status fields `autocomplete` and `autocomplete_stats`; commands `letters`, `autocomplete`, `vocab_list` and `vocab_delete`; event `vocab`.
   - **Mock and tools:** `~abc` in the mock box spells letters, the mock captions mention Priyanka and Figma (the demo call), and `make seed-vocab` loads demo words.

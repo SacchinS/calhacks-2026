@@ -81,7 +81,7 @@ The fingerspelled words were picked for letters the letter model reads well on o
 4. **Record and tune.** Record the demo phrases with `tools/record_script.py` and tune the thresholds with `tools/tune_recognition.py` (on the `person-a` branch until its PR merges). Record a real fixture to replace `fixtures/landmarks_sample.jsonl`.
 5. **Custom signs.** *(Built: `recognition/custom_signs.py`, `tools/record_signs.py`.)* Only for demo signs neither model knows (likely the MEET-you form). Learn each from the videos in `docs/asl-demo-script-research.md`.
 
-**Stretch:** facial grammar markers (built, off until a Deaf signer checks them); SignBridge's control gestures.
+**Stretch:** facial grammar markers (built, off until a Deaf signer checks them).
 
 **Test alone with:** `recognizer: camera` and everything else on `mock`. Preview shows the signs and the letters you produce.
 

@@ -25,8 +25,6 @@ final class EngineClient: ObservableObject {
     @Published var engineError: String?
     @Published var framingHint = ""
     @Published var framingOK = false
-    @Published var practiceDone: [String] = []
-    @Published var practiceTodo: [String] = []
     @Published var frame: NSImage?
     @Published var config: [String: Any] = [:]
     @Published var checks: [String: (ok: Bool, detail: String)] = [:]
@@ -283,9 +281,6 @@ final class EngineClient: ObservableObject {
             let framing = e["framing"] as? [String: Any]
             framingHint = framing?["hint"] as? String ?? ""
             framingOK = framing?["ok"] as? Bool ?? false
-            let practice = e["practice"] as? [String: Any]
-            practiceDone = practice?["done"] as? [String] ?? []
-            practiceTodo = practice?["todo"] as? [String] ?? []
             components = e["components"] as? [String: String] ?? components
             cameraOn = e["camera_on"] as? Bool ?? false
             let speech = e["speech"] as? [String: Any]
