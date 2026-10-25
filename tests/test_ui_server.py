@@ -11,14 +11,13 @@ import pytest
 
 from app import App
 from shared.config import ROOT, load_config
-from shared.events import Caption, LandmarkFrame, MockInput, OutputReply, OutputSent, SignEvent
+from shared.events import Caption, LandmarkFrame, MockInput, SignEvent
 from ui.server import EngineServer, render_preview
 
 
 @pytest.fixture
 async def engine(tmp_path):
     app = App(load_config().all_mocks())
-    app.router.claude_code.chunk_delay = 0
     app.config.sections["mock_tts"]["seconds_per_word"] = 0  # instant mock speech
     server = EngineServer(app, io.StringIO(), ui_config=tmp_path / "ui.json")
     await server.start()
@@ -53,30 +52,32 @@ async def test_ready_carries_the_apps_settings(engine):
     assert {"still", "phrase_rest", "min_conf", "voice_device"} <= set(ready["config"])
 
 
-async def test_claude_code_flow_goes_through_signbridge_states(engine):
+async def test_review_flow_goes_through_signbridge_states(engine):
+    engine.app.router.review_before_speaking = True
     await engine.handle_command({"cmd": "gesture", "name": "wake"})
     assert last_status(engine)["state"] == "listening"
 
-    await engine.handle_command({"cmd": "fake", "glosses": ["MAKE", "TITLE", "RED"]})
+    await engine.handle_command({"cmd": "fake", "glosses": ["HELLO", "NICE", "MEET-YOU"]})
     await until(lambda: last_status(engine)["state"] == "confirming")
     status = last_status(engine)
-    assert status["glosses"] == ["MAKE", "TITLE", "RED"]
-    assert status["intent"] == {"sentence": "Make title red.", "route": "text"}
-    assert status["target"] == "Claude Code"
+    assert status["glosses"] == ["HELLO", "NICE", "MEET-YOU"]
+    assert status["intent"] == {"sentence": "Hello nice meet-you.", "route": "voice"}
+    assert status["target"] == "Google Meet"
 
     await engine.handle_command({"cmd": "gesture", "name": "confirm"})  # = YES
-    await until(lambda: any(m["done"] for m in messages(engine, "reply")))
+    await until(lambda: messages(engine, "sent"))
     await until(lambda: last_status(engine)["state"] == "idle")
     assert "sent" in last_status(engine)["log"]
 
 
 async def test_cancel_while_confirming_sends_nothing(engine):
+    engine.app.router.review_before_speaking = True
     await engine.handle_command({"cmd": "fake", "glosses": ["HELLO"]})
     await until(lambda: last_status(engine)["state"] == "confirming")
     await engine.handle_command({"cmd": "gesture", "name": "cancel"})  # = NO
     await until(lambda: last_status(engine)["state"] == "idle")
     await asyncio.sleep(0.1)
-    assert messages(engine, "reply") == []
+    assert messages(engine, "sent") == []
     assert "cancelled" in last_status(engine)["log"]
 
 
@@ -89,9 +90,7 @@ async def test_cancel_while_signing_clears(engine):
     )
 
 
-async def test_voice_mode_speaks_without_confirming(engine):
-    await engine.handle_command({"cmd": "output_mode", "mode": "voice"})
-    await until(lambda: last_status(engine)["output_mode"] == "voice")
+async def test_signs_are_spoken_without_confirming(engine):
     await engine.handle_command({"cmd": "mock_input", "text": "tomorrow rain /send"})
     await until(lambda: "sent" in last_status(engine)["log"])
     states = [m["state"] for m in messages(engine, "status")]
@@ -99,41 +98,11 @@ async def test_voice_mode_speaks_without_confirming(engine):
     sending = next(m for m in messages(engine, "status") if m["state"] == "sending")
     assert sending["intent"] == {"sentence": "Tomorrow rain.", "route": "voice"}
     (sent,) = messages(engine, "sent")
-    assert (sent["mode"], sent["output"], sent["text"]) == ("voice", "tts", "Tomorrow rain.")
-
-
-async def test_siri_mode_types_to_siri(engine):
-    typed = []
-    engine.app.router.siri.send = lambda text: _record(typed, text)
-    await engine.handle_command({"cmd": "output_mode", "mode": "siri"})
-    await until(lambda: last_status(engine)["output_mode"] == "siri")
-    assert last_status(engine)["target"] == "Siri"
-    await engine.handle_command({"cmd": "mock_input", "text": "tomorrow rain /send"})
-    await until(lambda: typed == ["Tomorrow rain."])
-    sending = next(m for m in messages(engine, "status") if m["state"] == "sending")
-    assert sending["intent"] == {"sentence": "Tomorrow rain.", "route": "siri"}
-    await until(lambda: messages(engine, "sent"))
-    assert messages(engine, "sent")[0]["mode"] == "siri"
+    assert (sent["output"], sent["text"]) == ("tts", "Tomorrow rain.")
 
 
 async def _record(into, text):
     into.append(text)
-
-
-async def test_output_mode_picks_any_mode_and_meet_shows_captions(engine):
-    await engine.handle_command({"cmd": "output_mode", "mode": "meet"})
-    await until(lambda: last_status(engine)["output_mode"] == "meet")
-    await until(lambda: messages(engine, "caption"))
-    await engine.handle_command({"cmd": "output_mode", "mode": "claude_code"})
-    await until(lambda: last_status(engine)["output_mode"] == "claude_code")
-
-
-async def test_quick_mode_picks_land_on_the_last_one(engine):
-    engine.set_output_mode("siri")
-    engine.set_output_mode("voice")
-    await until(lambda: last_status(engine)["output_mode"] == "voice")
-    await asyncio.sleep(0.1)
-    assert engine.app.router.mode == "voice" and last_status(engine)["output_mode"] == "voice"
 
 
 async def test_mode_off_pauses_the_recognizer(engine):
@@ -152,14 +121,12 @@ async def test_checks_routes_and_config(engine, tmp_path):
     claude = messages(engine, "check")[0]
     assert claude["ok"] is False and "mock" in claude["detail"]  # honest: the mock isn't Claude
 
-    typed, spoken = [], []
-    engine.app.router.siri.send = lambda text: _record(typed, text)
+    spoken = []
     engine.app.router.tts.send = lambda text: _record(spoken, text)
-    await engine.handle_command({"cmd": "test_route", "route": "siri", "text": "What time is it?"})
     await engine.handle_command({"cmd": "test_route", "route": "voice", "text": "Voice test."})
-    await until(lambda: len(messages(engine, "route_tested")) == 2)
-    assert all(m["ok"] for m in messages(engine, "route_tested"))  # the mocks
-    assert (typed, spoken) == (["What time is it?"], ["Voice test."])
+    await until(lambda: messages(engine, "route_tested"))
+    assert messages(engine, "route_tested")[0]["ok"]  # the mock
+    assert spoken == ["Voice test."]
 
     await engine.handle_command({"cmd": "config", "values": {"onboarded": True}})
     assert messages(engine, "config")[-1]["config"]["onboarded"] is True
@@ -180,13 +147,10 @@ async def test_preview_frames_and_extra_events(engine):
     assert render_preview(LandmarkFrame(), engine.space, mirror=True)[:2] == b"\xff\xd8"
 
 
-async def test_extra_events_for_captions_and_replies(engine):
+async def test_extra_events_for_captions(engine):
     engine.bus.publish(Caption("Hi there"))
-    engine.bus.publish(OutputReply("claude_code", "Done.", done=True))
     engine.bus.publish(SignEvent("HELLO", 0.9, "isolated"))
-    await until(lambda: messages(engine, "caption") and messages(engine, "reply"))
-    assert messages(engine, "caption")[0]["text"] == "Hi there"
-    assert messages(engine, "reply")[0] == {"type": "reply", "text": "Done.", "done": True}
+    await until(lambda: any(m["text"] == "Hi there" for m in messages(engine, "caption")))
     await until(lambda: "saw HELLO (90%)" in last_status(engine)["log"])
 
 
@@ -216,45 +180,14 @@ async def test_engine_process_speaks_the_protocol(tmp_path):
         assert (await read_until(lambda m: m["type"] == "ready"))["config"]["onboarded"] is False
         send({"cmd": "mode", "mode": "run"})
         send({"cmd": "fake", "glosses": ["ME", "WANT", "FIX", "BUG", "LOGIN", "PAGE"]})
-        confirming = await read_until(
-            lambda m: m["type"] == "status" and m["state"] == "confirming"
-        )
-        assert confirming["intent"]["sentence"] == "I want fix bug login page."
-        send({"cmd": "gesture", "name": "confirm"})
-        await read_until(lambda m: m["type"] == "reply" and m["done"])
+        sent = await read_until(lambda m: m["type"] == "sent")
+        assert sent["text"] == "I want fix bug login page."
         send({"cmd": "quit"})
         assert await asyncio.wait_for(proc.wait(), 10) == 0
     finally:
         if proc.returncode is None:
             proc.kill()
             await proc.wait()
-
-
-async def test_claude_code_works_in_the_background_while_siri_sends(engine):
-    release = asyncio.Event()
-    mock = engine.app.router.claude_code
-    original = mock.send
-
-    async def slow_send(text):
-        await release.wait()
-        await original(text)
-
-    mock.send = slow_send
-    await engine.handle_command({"cmd": "fake", "glosses": ["FOOD", "STORE", "WW", "MAKE"]})
-    await until(lambda: last_status(engine)["state"] == "confirming")
-    await engine.handle_command({"cmd": "gesture", "name": "confirm"})
-    await until(lambda: last_status(engine)["claude_code_working"])
-    assert last_status(engine)["state"] == "idle"  # not stuck on "Sending" for minutes
-
-    await engine.handle_command({"cmd": "output_mode", "mode": "siri"})
-    await engine.handle_command({"cmd": "mock_input", "text": "tomorrow rain /send"})
-    await until(lambda: any(m["mode"] == "siri" for m in messages(engine, "sent")))
-    assert last_status(engine)["claude_code_working"]
-
-    release.set()
-    await until(lambda: not last_status(engine)["claude_code_working"])
-    (built,) = [m for m in messages(engine, "sent") if m["output"] == "claude_code"]
-    assert built["mode"] == "claude_code"  # filed under Claude Code even though we're in Siri
 
 
 def test_demo_script_phrases_in_the_app_all_parse():
@@ -266,7 +199,7 @@ def test_demo_script_phrases_in_the_app_all_parse():
     swift = (ROOT / "ui/macos/Sources/SignBridge/Theme.swift").read_text()
     block = swift.split("enum DemoScript", 1)[1].split("]\n    static func", 1)[0]
     phrases = re.findall(r"^\s*\[(.+?)\],", block, re.M)
-    assert len(phrases) == 6
+    assert phrases
     for phrase in phrases:
         tokens = [t.replace("\\\\", "\\") for t in re.findall(r'"((?:[^"\\]|\\.)*)"', phrase)]
         events = parse_line(" ".join(tokens))
@@ -274,21 +207,20 @@ def test_demo_script_phrases_in_the_app_all_parse():
 
 
 async def test_fake_phrases_carry_face_markers(engine):
+    engine.app.router.review_before_speaking = True
     await engine.handle_command({"cmd": "fake", "glosses": ["TITLE", "/\\", "RED"]})
     await until(lambda: last_status(engine)["state"] == "confirming")
     assert last_status(engine)["glosses"] == ["TITLE", "/\\", "RED"]
 
 
-async def test_review_before_speaking_in_meet(engine):
+async def test_review_before_speaking(engine):
     engine.app.router.review_before_speaking = True
-    await engine.handle_command({"cmd": "output_mode", "mode": "meet"})
     await engine.handle_command({"cmd": "mock_input", "text": "hello /send"})
     await until(lambda: last_status(engine)["state"] == "confirming")
     assert "Hello." not in [m["text"] for m in messages(engine, "sent")]
     await engine.handle_command({"cmd": "gesture", "name": "confirm"})
     await until(lambda: any(m["text"] == "Hello." for m in messages(engine, "sent")))
     await until(lambda: last_status(engine)["state"] == "idle")
-    assert not last_status(engine)["claude_code_working"]
 
 
 async def test_settings_set_the_intro_name_and_review(engine):
@@ -324,14 +256,6 @@ async def test_save_this_position_fits_the_signing_space(engine, tmp_path):
     assert again.space == engine.space
 
 
-async def test_speech_is_filed_under_meet_even_after_switching_away(engine):
-    await engine.handle_command({"cmd": "output_mode", "mode": "meet"})
-    await until(lambda: last_status(engine)["output_mode"] == "meet")
-    await engine.handle_command({"cmd": "output_mode", "mode": "claude_code"})
-    engine.on_event(OutputSent("tts", "Hello."))
-    assert messages(engine, "sent")[-1]["mode"] == "meet"
-
-
 async def test_status_shows_turn_taking(engine):
     from shared.events import SpeechStatus, TurnEvent
 
@@ -349,10 +273,9 @@ async def test_quick_replies_are_listed_and_spoken(engine):
     replies = messages(engine, "ready")[-1]["quick_replies"]
     assert {"text": "Can you repeat that?", "urgent": True} in replies
     assert {"text": "Yes.", "urgent": False} in replies
-    await engine.handle_command({"cmd": "output_mode", "mode": "meet"})
     await engine.handle_command({"cmd": "quick_reply", "text": "Can you repeat that?"})
     await until(lambda: any(m["text"] == "Can you repeat that?" for m in messages(engine, "sent")))
-    assert messages(engine, "sent")[-1]["mode"] == "meet"
+    assert messages(engine, "sent")[-1]["output"] == "tts"
 
 
 async def test_only_configured_quick_replies_can_be_spoken(engine):

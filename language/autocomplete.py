@@ -55,7 +55,6 @@ from shared.config import Config
 from shared.events import (
     AutocompleteUpdate,
     Caption,
-    ModeChanged,
     Notice,
     OutputSent,
     SignEvent,
@@ -110,7 +109,7 @@ class Autocompleter:
         self._context: dict[str, float] = {}  # last context scores, reused while refining
         self.conversation: deque[tuple[float, str]] = deque(maxlen=200)
         self.gloss: tuple[str, ...] = ()  # the utterance so far (set by the buffer): context too
-        self.meeting_id = uuid.uuid4().hex[:12] if config.mode == "meet" else ""
+        self.meeting_id = uuid.uuid4().hex[:12]  # one per run of the app
         self._heard: dict[str, tuple[str, float]] = {}  # term -> (meeting, when), from captions
         # Metrics for the pitch: accepted suggestions, letters saved, latency.
         self.accepted = 0
@@ -131,7 +130,7 @@ class Autocompleter:
         rows = await asyncio.to_thread(self.store.all)
         self.stats = build_stats(rows, self.transcript_weight)
         self.accepted, self.letters_saved = await asyncio.to_thread(self.store.letters_saved)
-        sub = self.bus.subscribe(Caption, OutputSent, ModeChanged)
+        sub = self.bus.subscribe(Caption, OutputSent)
         self._task = asyncio.create_task(self._follow(sub), name="autocomplete")
         self._spawn(self._open_search(rows))
 
@@ -184,11 +183,6 @@ class Autocompleter:
                         self._heard_say(event.text)
                 elif isinstance(event, OutputSent):
                     self._remember_text(event.text)  # what the signer said is context too
-                elif isinstance(event, ModeChanged):
-                    if event.mode == "meet" and not self.meeting_id:
-                        self.meeting_id = uuid.uuid4().hex[:12]
-                    elif event.mode != "meet":
-                        self.meeting_id = ""
         finally:
             sub.close()
 

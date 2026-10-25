@@ -1,4 +1,4 @@
-"""End to end on mocks: typed signs -> utterance -> translation -> router -> output."""
+"""End to end on mocks: typed signs -> utterance -> translation -> router -> the voice."""
 
 import asyncio
 
@@ -11,8 +11,6 @@ from shared.events import (
     ConfirmRequest,
     ConfirmResult,
     MockInput,
-    ModeChanged,
-    OutputReply,
     OutputSent,
     Translation,
 )
@@ -21,7 +19,6 @@ from shared.events import (
 @pytest.fixture
 async def app():
     app = App(load_config().all_mocks())
-    app.router.claude_code.chunk_delay = 0
     app.config.sections["mock_tts"]["seconds_per_word"] = 0  # instant mock speech
     yield app
     await app.stop()
@@ -42,10 +39,19 @@ async def settle():
         await asyncio.sleep(0.01)
 
 
+async def test_signs_are_spoken_in_the_call(app):
+    events = app.bus.subscribe()
+    await app.start()
+    app.bus.publish(MockInput("hello #priyanka nice meet-you /send"))
+    sent = await next_of(events, OutputSent)
+    assert (sent.output, sent.text) == ("tts", "Hello priyanka nice meet-you.")
+    assert not any(isinstance(e, ConfirmRequest) for e in drain(events))
+
+
 @pytest.mark.parametrize("answer", ["/yes", "/no"])
-async def test_claude_code_confirm_sends_to_console_only_on_yes(app, answer):
-    # Claude Code goes to the console output here, as when the real CLI is unavailable.
-    app.router.claude_code = app.console
+async def test_review_before_speaking_speaks_only_on_yes(app, answer):
+    app.router.review_before_speaking = True
+    app.router.tts = app.console  # as when the voice is unavailable
     events = app.bus.subscribe()
     await app.start()
 
@@ -68,19 +74,6 @@ async def test_claude_code_confirm_sends_to_console_only_on_yes(app, answer):
         assert app.console.sent == []
 
 
-async def test_mock_claude_code_streams_reply_after_yes(app):
-    events = app.bus.subscribe()
-    await app.start()
-    app.bus.publish(MockInput("make #title red /send"))
-    request = await next_of(events, ConfirmRequest)
-    assert request.english == "Make title red."
-    app.bus.publish(MockInput("/yes"))
-    replies = [await next_of(events, OutputReply) for _ in range(4)]
-    assert replies[-1].done
-    sent = await next_of(events, OutputSent)
-    assert (sent.output, sent.text) == ("claude_code", "Make title red.")
-
-
 async def test_clear_empties_the_utterance(app):
     events = app.bus.subscribe()
     await app.start()
@@ -89,57 +82,31 @@ async def test_clear_empties_the_utterance(app):
     assert translation.gloss == ["HELLO"]
 
 
-async def test_siri_mode_types_without_confirm(app):
+async def test_captions_start_with_the_app(app):
     events = app.bus.subscribe()
     await app.start()
-    app.bus.publish(MockInput("/mode"))
-    assert (await next_of(events, ModeChanged)).mode == "claude_code"  # initial mode
-    assert (await next_of(events, ModeChanged)).mode == "siri"
-    app.bus.publish(MockInput("tomorrow rain /send"))
-    sent = await next_of(events, OutputSent)
-    assert (sent.output, sent.text) == ("siri", "Tomorrow rain.")
-
-
-async def test_voice_mode_speaks_without_confirm(app):
-    events = app.bus.subscribe()
-    await app.start()
-    app.bus.publish(MockInput("/mode /mode"))
-    assert (await next_of(events, ModeChanged)).mode == "claude_code"  # initial mode
-    assert (await next_of(events, ModeChanged)).mode == "siri"
-    assert (await next_of(events, ModeChanged)).mode == "voice"
-    app.bus.publish(MockInput("tomorrow rain /send"))
-    sent = await next_of(events, OutputSent)
-    assert (sent.output, sent.text) == ("tts", "Tomorrow rain.")
-
-
-async def test_meet_mode_shows_captions_only_in_meet(app):
-    events = app.bus.subscribe()
-    await app.start()
-    await settle()
-    assert not any(isinstance(e, Caption) for e in drain(events))
-    app.bus.publish(MockInput("/mode /mode /mode"))  # claude_code -> siri -> voice -> meet
     caption = await next_of(events, Caption)
     assert caption.text
-    app.bus.publish(MockInput("/mode"))  # back to claude_code: captions stop
+    await app.captions.stop()
     await settle()
     drain(events)
     await asyncio.sleep(0.2)
     assert not any(isinstance(e, Caption) for e in drain(events))
 
 
-async def test_replay_runs_demo_script_from_fixture():
+async def test_replay_runs_the_sample_fixture():
     config = load_config().all_mocks()
     config.recognizer = "replay"
     config.sections["recognition"]["replay_fps"] = 1000
+    config.sections["mock_tts"]["seconds_per_word"] = 0
     app = App(config)
-    app.router.claude_code.chunk_delay = 0
     events = app.bus.subscribe()
     await app.start()
     try:
-        request = await next_of(events, ConfirmRequest)
-        assert request.gloss == ["MAKE", "fs-TITLE", "RED"]
-        sent = await next_of(events, OutputSent)  # fixture ends with YES
-        assert (sent.output, sent.text) == ("claude_code", "Make title red.")
+        translation = await next_of(events, Translation)
+        assert translation.gloss == ["MAKE", "fs-TITLE", "RED"]
+        sent = await next_of(events, OutputSent)
+        assert (sent.output, sent.text) == ("tts", "Make title red.")
     finally:
         await app.stop()
 
@@ -157,12 +124,11 @@ async def test_users_words_never_reach_info_logs(app, caplog):
     events = app.bus.subscribe()
     await app.start()
     app.bus.publish(MockInput("zebra purple /send"))
+    await next_of(events, OutputSent)
+    app.router.review_before_speaking = True
+    app.bus.publish(MockInput("zebra purple /send"))
     await next_of(events, ConfirmRequest)
     app.bus.publish(MockInput("/yes"))
     await next_of(events, OutputSent)
-    for mode in ("siri", "voice"):
-        app.router.set_mode(mode)
-        app.bus.publish(MockInput("zebra purple /send"))
-        await next_of(events, OutputSent)
     logged = " ".join(r.getMessage() for r in caplog.records).lower()
     assert "zebra" not in logged and "purple" not in logged

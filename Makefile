@@ -1,4 +1,4 @@
-.PHONY: install swift run mock demo test lint format app demo-reset demo-serve seed-vocab
+.PHONY: install swift run mock demo test lint format app seed-vocab
 
 MAC_APP = ui/macos/.build/debug/SignBridge
 
@@ -39,15 +39,6 @@ format:
 # Builds dist/SignBridge.app: the Swift app plus a bundled Python engine (packaging/build.sh).
 app:
 	packaging/build.sh
-
-# The website Claude Code builds in the demo (claude_code_cli.project_dir): a fresh copy of
-# demo/site (the old one is kept as a backup, and Claude Code starts a new session), and a
-# local server that reloads the page whenever Claude Code changes a file.
-demo-reset:
-	uv run python tools/demo_site.py reset
-
-demo-serve:
-	uv run python tools/demo_site.py serve
 
 # Demo words for fingerspelling autocomplete (Julian, Jupyter, June...) in the memory that
 # `make demo` and `make mock` use (tools/seed_vocab.py has --synthetic, --time, --list, --reset).

@@ -1,6 +1,6 @@
 """The scripted mock demo, through the engine protocol the Mac app uses: the other side says
 "Priyanka" and "Kubernetes", the signer spells P-R-I, Priyanka is suggested, YES puts it in
-the utterance, and the normal SEND -> translation -> approval flow carries on."""
+the utterance, and the normal SEND -> translation -> voice flow carries on."""
 
 import io
 
@@ -16,7 +16,6 @@ from ui.server import EngineServer
 @pytest.fixture
 async def engine(tmp_path):
     app = App(load_config().all_mocks())
-    app.router.claude_code.chunk_delay = 0
     server = EngineServer(app, io.StringIO(), ui_config=tmp_path / "ui.json")
     await server.start()
     await app.start()
@@ -50,8 +49,8 @@ async def test_heard_in_a_meeting_then_spelled(engine):
     assert stats["accepted"] == 1 and stats["letters_saved"] == 5
 
     await engine.handle_command({"cmd": "gesture", "name": "confirm"})  # = SEND now
-    await until(lambda: last_status(engine)["state"] == "confirming")
-    assert "Priyanka" in last_status(engine)["intent"]["sentence"]
+    await until(lambda: messages(engine, "sent") != [])  # spoken in the call
+    assert "Priyanka" in messages(engine, "sent")[0]["text"]
 
 
 async def test_app_gestures_accept_an_alternate_and_dismiss(engine):

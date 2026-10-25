@@ -1,5 +1,6 @@
-"""Engine entry point: wires the bus, recognizer, utterance buffer + translator, router, and
-captions, and serves them to the Mac app's windows (ui/macos) as JSON lines.
+"""Engine entry point: wires the bus, recognizer, utterance buffer + translator, the voice in
+the call (router, turn-taking, call manners), captions, and fingerspelling autocomplete, and
+serves them to the Mac app's windows (ui/macos) as JSON lines.
 
     make run     # build and open the Mac app; components as chosen in config.yaml
     make mock    # same, with every component forced to its mock
@@ -32,7 +33,7 @@ from recognition.base import Recognizer
 from recognition.mock import MockRecognizer
 from shared.bus import Bus
 from shared.config import CHOICES, Config, load_config
-from shared.events import ModeChanged, Notice
+from shared.events import Notice
 
 log = logging.getLogger("app")
 
@@ -46,14 +47,6 @@ REGISTRY: dict[str, dict[str, str]] = {
     "translator": {
         "mock": "language.mock:MockTranslator",
         "claude": "language.claude:ClaudeTranslator",
-    },
-    "claude_code": {
-        "mock": "outputs.mock_claude_code:MockClaudeCodeOutput",
-        "real": "outputs.claude_code:ClaudeCodeOutput",
-    },
-    "siri": {
-        "mock": "outputs.mock_siri:MockSiriOutput",
-        "real": "outputs.siri:SiriOutput",
     },
     "tts": {
         "mock": "outputs.mock_tts:MockTTSOutput",
@@ -90,11 +83,8 @@ class App:
         self.console = ConsoleOutput(self.bus, config)
         self.router = Router(
             self.bus,
-            claude_code=self._build("claude_code", self.bus, config),
-            siri=self._build("siri", self.bus, config),
             tts=self._voice(config),
             console=self.console,
-            mode=config.mode,  # type: ignore[arg-type]
             review_before_speaking=bool(config.get("meet.review_before_speaking", False)),
         )
         self.call_host = CallHost(self.bus, config, self.router)
@@ -106,7 +96,6 @@ class App:
             self.bus, config, self.vocab, self._build("vocab_search", config)
         )
         self.buffer.spelling = self.autocomplete
-        self._captions_task: asyncio.Task[None] | None = None
 
     def _voice(self, config: Config) -> Any:
         """The TTS output, turn-aware in calls (waits for the other side to finish)."""
@@ -130,8 +119,6 @@ class App:
         self.notices.append(Notice("warning", message))
 
     async def start(self) -> None:
-        mode_changes = self.bus.subscribe(ModeChanged)
-        self._captions_task = asyncio.create_task(self._captions_follow_mode(mode_changes))
         await self.buffer.start()
         await self.autocomplete.start()
         await self.router.start()
@@ -147,16 +134,17 @@ class App:
             self.chosen["recognizer"] = "mock"
             self.recognizer = MockRecognizer(self.bus, self.config)
             await self.recognizer.start()
+        try:
+            await self.captions.start()
+        except Exception as exc:
+            log.exception("captions failed to start")
+            self._warn(f"Captions '{self.captions.name}' failed: {exc}")
         for notice in self.notices:
             self.bus.publish(notice)
 
     async def stop(self) -> None:
         with contextlib.suppress(Exception):
             await self.recognizer.stop()
-        if self._captions_task is not None:
-            self._captions_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._captions_task
         with contextlib.suppress(Exception):
             await self.captions.stop()
         await self.call_host.stop()
@@ -168,23 +156,6 @@ class App:
         await self.buffer.stop()
         self.vocab.close()
 
-    async def _captions_follow_mode(self, mode_changes) -> None:
-        """Captions run only in Meet mode."""
-        try:
-            async for event in mode_changes:
-                if event.mode == "meet":
-                    try:
-                        await self.captions.start()
-                    except Exception as exc:
-                        log.exception("captions failed to start")
-                        self.bus.publish(
-                            Notice("warning", f"Captions '{self.captions.name}' failed: {exc}")
-                        )
-                else:
-                    await self.captions.stop()
-        finally:
-            mode_changes.close()
-
 
 async def run(config: Config) -> None:
     """Run as the engine of the Mac app (ui/macos), which launches this process and talks to
@@ -194,7 +165,7 @@ async def run(config: Config) -> None:
     app = App(config)
     server = EngineServer(app, protocol_stdout())
     server.send_ready()
-    await server.start()  # before the app, so the windows see the first ModeChanged and notices
+    await server.start()  # before the app, so the windows see its first notices
     await app.start()
     await server.set_mode("off")  # paused until the app starts listening, like SignBridge
     try:
@@ -205,7 +176,7 @@ async def run(config: Config) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Sign to Claude Code, Siri, and Meet (engine).")
+    parser = argparse.ArgumentParser(description="Sign in Google Meet calls (engine).")
     parser.add_argument("--mock", action="store_true", help="force every component to its mock")
     parser.add_argument("--config", help="path to config.yaml")
     parser.add_argument("--overlay", help="settings on top of config.yaml, e.g. config.demo.yaml")

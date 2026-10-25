@@ -1,11 +1,9 @@
 # The live demo: every real component, on top of config.yaml (which stays all-mock on main).
 #   make demo        # = the Mac app with `--overlay config.demo.yaml`
-# Needs .env keys, the camera extra, BlackHole 2ch + 16ch, Claude Code logged in, and Type to
-# Siri set up (README "Getting started"). Anything not ready falls back with a warning.
+# Needs .env keys, the camera extra, and BlackHole 2ch + 16ch (README "Getting started").
+# Anything not ready falls back with a warning.
 recognizer: camera
 translator: claude
-claude_code: real
-siri: real
 tts: cartesia
 captions: cartesia
 vocab_search: moss

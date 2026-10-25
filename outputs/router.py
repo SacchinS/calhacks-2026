@@ -1,16 +1,11 @@
-"""Router: sends each Translation to the output for the current mode.
+"""Router: sends each Translation to the call, spoken in the signer's voice (the TTS output
+into the virtual mic).
 
-- claude_code: publish a ConfirmRequest and wait. YES sends it to Claude Code, NO drops it.
-- siri: send straight to the Siri output (Type to Siri).
-- voice / meet: send straight to the TTS output (the virtual mic), or, with
-  `review_before_speaking`, ask for YES / NO first like Claude Code, so a misrecognized
-  sign is never spoken in the signer's name.
-- MODE cycles claude_code -> siri -> voice -> meet.
+With `review_before_speaking`, it asks for YES / NO first (a ConfirmRequest), so a
+misrecognized sign is never spoken in the signer's name. Quick replies skip the review:
+pressing one is the approval.
 
-Claude Code runs in the background: a build takes minutes, and Siri, Voice, and Meet keep
-working meanwhile. Approved requests run one at a time, in order.
-
-If an output is unavailable or fails, the text goes to the console and the UI gets a
+If the voice is unavailable or fails, the text goes to the console and the UI gets a
 warning. The router never raises.
 """
 
@@ -24,17 +19,7 @@ import uuid
 from outputs.base import Output
 from outputs.console import ConsoleOutput
 from shared.bus import Bus
-from shared.events import (
-    MODES,
-    ConfirmRequest,
-    ConfirmResult,
-    Mode,
-    ModeChanged,
-    Notice,
-    OutputSent,
-    SignEvent,
-    Translation,
-)
+from shared.events import ConfirmRequest, ConfirmResult, Notice, OutputSent, SignEvent, Translation
 
 log = logging.getLogger(__name__)
 
@@ -43,36 +28,23 @@ class Router:
     def __init__(
         self,
         bus: Bus,
-        claude_code: Output,
         tts: Output,
         console: Output | None = None,
-        mode: Mode = "claude_code",
-        siri: Output | None = None,
         review_before_speaking: bool = False,
     ) -> None:
         self.bus = bus
-        self.claude_code = claude_code
         self.tts = tts
         self.console = console or ConsoleOutput(bus)
-        self.siri = siri or self.console
-        self.mode: Mode = mode
         self.review_before_speaking = review_before_speaking
         self.pending: ConfirmRequest | None = None
         self._task: asyncio.Task[None] | None = None
-        self._claude_code_job: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
         if self._task is None:
             sub = self.bus.subscribe(Translation, SignEvent)
-            self.bus.publish(ModeChanged(self.mode))
             self._task = asyncio.create_task(self._run(sub), name="router")
 
     async def stop(self) -> None:
-        if self._claude_code_job is not None:
-            self._claude_code_job.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._claude_code_job
-            self._claude_code_job = None
         if self._task is not None:
             self._task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -98,27 +70,20 @@ class Router:
                 await self.confirm(True)
             elif event.gloss == "NO":
                 await self.confirm(False)
-            elif event.gloss == "MODE":
-                self.set_mode(MODES[(MODES.index(self.mode) + 1) % len(MODES)])
 
     async def on_translation(self, translation: Translation) -> None:
-        if self.mode == "claude_code":
-            self.ask(translation, "claude_code")
-        elif self.mode in ("voice", "meet") and self.review_before_speaking:
-            self.ask(translation, "tts")
-        elif self.mode == "siri":
-            await self.deliver(self.siri, translation.english)
+        if self.review_before_speaking:
+            self.ask(translation)
         else:
             await self.deliver(self.tts, translation.english)
 
-    def ask(self, translation: Translation, target: str) -> None:
+    def ask(self, translation: Translation) -> None:
         if self.pending is not None:
             self.bus.publish(ConfirmResult(self.pending.request_id, approved=False))
         self.pending = ConfirmRequest(
             request_id=uuid.uuid4().hex[:8],
             english=translation.english,
             gloss=list(translation.gloss),
-            target=target,
         )
         self.bus.publish(self.pending)
 
@@ -127,36 +92,8 @@ class Router:
             return  # YES/NO with nothing to confirm
         request, self.pending = self.pending, None
         self.bus.publish(ConfirmResult(request.request_id, approved))
-        if approved and request.target == "tts":
+        if approved:
             await self.deliver(self.tts, request.english)
-        elif approved:
-            self._claude_code_job = asyncio.create_task(
-                self._after(self._claude_code_job, request.english), name="claude-code"
-            )
-
-    @property
-    def claude_code_busy(self) -> bool:
-        return self._claude_code_job is not None and not self._claude_code_job.done()
-
-    async def wait_for_claude_code(self) -> None:
-        """Wait until every approved Claude Code request has finished (for tests)."""
-        while self._claude_code_job is not None and not self._claude_code_job.done():
-            await asyncio.wait([self._claude_code_job])
-
-    async def _after(self, previous: asyncio.Task[None] | None, text: str) -> None:
-        if previous is not None:
-            await asyncio.wait([previous])
-        try:
-            await self.deliver(self.claude_code, text)
-        except Exception:  # deliver never raises, but a background task must not die loudly
-            log.exception("Claude Code request failed")
-
-    def set_mode(self, mode: Mode) -> None:
-        if self.pending is not None:
-            self.bus.publish(ConfirmResult(self.pending.request_id, approved=False))
-            self.pending = None
-        self.mode = mode
-        self.bus.publish(ModeChanged(mode))
 
     async def quick_reply(self, text: str, urgent: bool = False) -> None:
         """A one-tap reply in the signer's voice. Pressing it is the approval: no YES step.

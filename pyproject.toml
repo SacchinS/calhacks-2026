@@ -1,7 +1,7 @@
 [project]
 name = "calhacks-2026"
 version = "0.1.0"
-description = "Sign to your webcam; your signing becomes English for Claude Code, Siri, dictation, and Google Meet."
+description = "Sign to your webcam in Google Meet calls; your signing is spoken as English, with captions and fingerspelling autocomplete."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
@@ -9,9 +9,6 @@ dependencies = [
     "cartesia[websockets]>=4.2.0",
     "moss>=1.21.0",
     "numpy>=2.4.6",
-    "pyobjc-framework-applicationservices>=12.2.2 ; sys_platform == 'darwin'",
-    "pyobjc-framework-cocoa>=12.2.2 ; sys_platform == 'darwin'",
-    "pyobjc-framework-quartz>=12.2.2 ; sys_platform == 'darwin'",
     "python-dotenv>=1.2.4",
     "pyyaml>=6.0.3",
     "sounddevice>=0.5.6",

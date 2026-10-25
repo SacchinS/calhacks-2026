@@ -2,14 +2,9 @@
 # Flip ONLY your own line while developing; `make mock` ignores these and forces all mocks.
 recognizer: mock        # mock | replay | camera        (Person A)
 translator: mock        # mock | claude                 (Person B)
-claude_code: mock       # mock | real                   (Person B)
-siri: mock              # mock | real                   (Person C)
 tts: mock               # mock | say | cartesia         (Person C)
 captions: mock          # mock | cartesia               (Person C)
 vocab_search: mock      # mock | moss    fingerspelling autocomplete's context search
-
-# Starting output mode: claude_code | siri | voice | meet
-mode: claude_code
 
 ui:
   mirror_camera: true           # show the camera window like a mirror (selfie view)
@@ -53,23 +48,8 @@ language:
   prompt_file: language/prompts/gloss_to_english.md
   max_tokens: 200
 
-claude_code_cli:
-  project_dir: ../demo-site      # folder Claude Code edits (make demo-reset copies demo/site there)
-  command: claude
-  # acceptEdits + only these tools, so a build never stops for an approval (no Bash).
-  allowed_tools: Read,Edit,Write,Glob,Grep
-  model: ""                      # empty = Claude Code's default model
-  timeout_seconds: 900
-  use_api_key: false             # true: Claude Code bills .env's ANTHROPIC_API_KEY, not your login
-
-type_to_siri:
-  # Siri's keyboard shortcut must be "Hold Command Space", with Type to Siri turned on.
-  hold_seconds: 0.8               # how long to hold Cmd-Space to open Siri
-  open_delay: 0.4                 # wait after opening before pasting
-
 audio:
-  # Our TTS plays into this device; select it as the microphone in dictation / Meet.
-  # (Siri can't hear a virtual mic: it gets text through Type to Siri.)
+  # Our TTS plays into this device; select it as the microphone in Meet.
   virtual_mic_device: BlackHole 2ch
   # Meet's audio is captured from a DIFFERENT device, or we'd caption ourselves.
   meet_capture_device: BlackHole 16ch
@@ -85,7 +65,7 @@ meet:
   # Signing this long unsent: "One moment, I'm signing." Off for meetings, where people can
   # see you signing (0 = off). Useful on audio-only calls.
   signing_cue_seconds: 0
-  review_before_speaking: false   # true: Meet and Voice wait for YES / NO, like Claude Code
+  review_before_speaking: false   # true: wait for a signed YES (NO drops it) before speaking
   # Turn-aware speaking (Cartesia Ink turn detection on the other side's audio): wait for
   # them to finish, or after chime_in_seconds of talking say the interjection and then speak.
   turn_taking: true

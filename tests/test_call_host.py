@@ -16,7 +16,7 @@ from tests.test_router_confirm import RecordingOutput
 async def call():
     bus = Bus()
     tts = RecordingOutput("tts")
-    router = Router(bus, claude_code=RecordingOutput("claude_code"), tts=tts)
+    router = Router(bus, tts=tts)
     meet = {"signer_name": "Sam", "signing_cue_seconds": 0.05, "intro_on_start": True}
     config = Config(sections={"meet": meet})
     host = CallHost(bus, config, router)
@@ -32,16 +32,14 @@ async def settle(seconds=0.02):
     await asyncio.sleep(seconds)
 
 
-async def test_intro_once_when_meet_starts(call):
+async def test_intro_once_when_the_app_starts(call):
     bus, router, host, tts = call
-    router.set_mode("meet")
     await settle()
     assert tts.sent == [
         "Hi, this is Sam. I'm Deaf and signing through SignBridge, "
         "so there may be a short pause before I answer."
     ]
-    router.set_mode("meet")  # already in Meet: no second intro
-    router.set_mode("voice")
+    await host.start()  # already started: no second intro
     await settle()
     assert len(tts.sent) == 1
     host.introduce()  # the "Introduce me" button
@@ -50,19 +48,14 @@ async def test_intro_once_when_meet_starts(call):
 
 
 async def test_intro_without_a_name():
-    host = CallHost(Bus(), Config(), Router(Bus(), RecordingOutput("c"), RecordingOutput("t")))
+    host = CallHost(Bus(), Config(), Router(Bus(), RecordingOutput("t")))
     assert host.intro_text().startswith("Hi. I'm Deaf and signing through SignBridge")
 
 
-async def test_signing_cue_once_per_utterance_and_only_in_meet(call):
+async def test_signing_cue_once_per_utterance(call):
     bus, router, host, tts = call
-    bus.publish(UtteranceProgress(("HELLO",)))  # not in Meet: no cue
-    await settle(0.1)
-    assert tts.sent == []
-
-    router.set_mode("meet")
     await settle()
-    tts.sent.clear()
+    tts.sent.clear()  # the intro
     bus.publish(UtteranceProgress(("HELLO",)))
     bus.publish(UtteranceProgress(("HELLO", "NICE")))
     await settle(0.1)
@@ -81,5 +74,5 @@ async def test_signing_cue_once_per_utterance_and_only_in_meet(call):
 def test_meeting_defaults_have_no_automatic_intro_or_cue():
     from shared.config import load_config
 
-    host = CallHost(Bus(), load_config(), Router(Bus(), RecordingOutput("c"), RecordingOutput("t")))
+    host = CallHost(Bus(), load_config(), Router(Bus(), RecordingOutput("t")))
     assert not host.intro_on_start and host.cue_seconds == 0

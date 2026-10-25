@@ -13,7 +13,7 @@
 #
 # API keys: the app reads ~/Library/Application Support/calhacks-2026/.env (ANTHROPIC_API_KEY,
 # CARTESIA_API_KEY); this script never copies keys into the bundle. To run real components, put a config.yaml
-# in that folder too (the bundled one keeps every line on mock), with an absolute claude_code_cli.project_dir.
+# in that folder too (the bundled one keeps every line on mock).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT=$(pwd)
