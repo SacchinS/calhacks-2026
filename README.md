@@ -46,6 +46,7 @@ flowchart LR
 | Siri by sign (Type to Siri) | Works |
 | Google Meet: Cartesia voice out, captions in, "One moment, I'm signing." cue | Built; needs a Cartesia key and BlackHole 16ch to test |
 | Call intro: says who's calling at the start of a call | Built |
+| Turn-aware speaking: waits for the other person to finish, or politely jumps in | Works (tested with Cartesia Ink on a loopback) |
 | Video stays on the laptop, camera-on indicator | Built |
 | Review the English before it's spoken in Meet | Built (off by default) |
 | Signing-area gating, fitted to the signer in setup | Built |
@@ -155,6 +156,7 @@ The packaged app reads its keys from `~/Library/Application Support/calhacks-202
 
 - **Sonic text-to-speech** (`outputs/tts_cartesia.py`): the signer's English is spoken in a Cartesia voice, streamed over the SSE endpoint as raw PCM and played into the virtual microphone (BlackHole 2ch) as it arrives, so the other side of a Meet call hears it with little delay. It also speaks the call intro and the "One moment, I'm signing." cue. If Cartesia fails, the app warns and uses macOS `say`.
 - **Ink speech-to-text** (`captions/cartesia_stt.py`): the other side's call audio, captured from a separate device (BlackHole 16ch), is streamed to Cartesia's realtime STT websocket with turn detection; partial transcripts update the caption live and the end of each turn finalizes it.
+- **Ink turn detection for turn-taking** (`outputs/turn_taking.py`): Ink's `turn.start`, `turn.eager_end`, `turn.resume`, and `turn.end` events tell our voice whether the other person has the floor. The signer's approved sentence waits for the end of their turn and is spoken the moment it comes; if they keep talking for 8 seconds, SignBridge says "Sorry, can I jump in?" first; if someone talks over our voice for more than a second, it stops and says the sentence again at the next pause. It changes when the words are spoken, never what they are.
 - Only the English to speak and the other side's call audio go to Cartesia; nothing is saved.
 
 ## Privacy
