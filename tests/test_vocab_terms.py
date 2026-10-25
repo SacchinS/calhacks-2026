@@ -25,13 +25,15 @@ def test_the_signers_name_and_nicknames_come_first():
 
 
 def test_remembered_words_are_ranked_by_uses_then_by_last_use():
+    """Names that aren't English words: keyterms skips common words, and macOS's word list
+    has "once", "twice" and "thrice"."""
     occurrences = (
-        used("Once", times=1)
-        + used("Thrice", times=3)
-        + used("Twice", times=2, days_ago=30)
-        + used("TwiceRecent", times=2, days_ago=1)
+        used("Onyeka", times=1)
+        + used("Thandiwe", times=3)
+        + used("Tobiah", times=2, days_ago=30)
+        + used("Tobiko", times=2, days_ago=1)
     )
-    assert keyterms(occurrences) == ["Thrice", "TwiceRecent", "Twice", "Once"]
+    assert keyterms(occurrences) == ["Thandiwe", "Tobiko", "Tobiah", "Onyeka"]
 
 
 def test_a_name_already_remembered_is_not_repeated():
