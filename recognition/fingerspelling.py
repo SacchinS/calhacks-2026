@@ -198,6 +198,14 @@ class LetterReader:
             return None
         return run.letter, min(1.0, (self._now - run.start) / self.hold) if self.hold else 1.0
 
+    @property
+    def held_seconds(self) -> float:
+        """How long a demo letter has been held right now (0 if none)."""
+        run = self._run
+        if run is None or not run.confidences:
+            return 0.0
+        return max(0.0, self._now - run.start)
+
     def push(self, frame: LandmarkFrame, space: SigningSpace) -> list[Letter]:
         now = self._now = frame.ts
         if self.spelling and now - self._last_time > self.end_after:
