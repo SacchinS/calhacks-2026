@@ -6,7 +6,14 @@ learned from a few recorded examples each.
 Each example is a clip of Holistic landmarks saved under models/custom_signs/<GLOSS>/
 (gitignored: it's a teammate's body-tracking data). Matching is nearest-neighbour: a clip
 becomes hand shapes and hand positions relative to the shoulders, resampled to a fixed
-length, and the live window is compared with every example. A sign is reported only when
+length, and is compared with every example.
+
+`custom_mode: segment` (the default) matches the way the examples were recorded: the frames
+from a hand entering the signing space until the hands leave it (for `custom_end_seconds`)
+are one clip, classified when the hands drop (`end_segment`; the recognizer emits it
+straight away). So rest your hands between signs. `window` instead slides over the last
+frames while signing; it lines up with a whole sign only for a frame or two at its end,
+which the segmenter's min_frames then usually misses. A sign is reported only when
 it's clearly closer than the threshold learned from the examples themselves, so unknown
 movement falls through to the Kaggle model.
 
@@ -151,6 +158,10 @@ class CustomSignModel(FrameClassifier):
                 del self.library.examples[gloss]
                 self.library.lengths.pop(gloss, None)
         self.stride = int(config.get("recognition.custom_stride", 3))
+        self.mode = str(config.get("recognition.custom_mode", "segment"))
+        self.end_gap = float(config.get("recognition.custom_end_seconds", 0.35))
+        self.segment: list[LandmarkFrame] = []  # this sign so far (segment mode)
+        self._last_in = 0.0
         self.gap_seconds = float(config.get("recognition.isolated_gap_seconds", 0.4))
         scale = float(config.get("recognition.custom_threshold_scale", 1.0))
         self.limit = self.library.threshold() * scale
@@ -165,6 +176,12 @@ class CustomSignModel(FrameClassifier):
     def predict(self, frame: LandmarkFrame) -> Prediction | None:
         if not self.library.examples:
             return None
+        if self.mode == "segment":
+            if self.segment and frame.ts - self._last_in > self.end_gap:
+                self.segment = []  # a stale clip (end_segment wasn't called): start over
+            self.segment.append(frame)
+            self._last_in = frame.ts
+            return None  # the answer comes when the hands drop (end_segment)
         if self._last_ts is not None and frame.ts - self._last_ts > self.gap_seconds:
             self.frames.clear()
             self.last = None
@@ -175,6 +192,30 @@ class CustomSignModel(FrameClassifier):
             self._since_run = 0
             self.last = self.classify(list(self.frames))
         return self.last
+
+    def end_segment(self, now: float) -> Prediction | None:
+        """Called on frames with the hands out of the signing space: once they've been out
+        for end_gap, the clip since they came in is classified (segment mode)."""
+        if self.mode != "segment" or not self.segment or now - self._last_in < self.end_gap:
+            return None
+        frames, self.segment = self.segment, []
+        return self.classify_segment(frames)
+
+    def classify_segment(self, frames: list[LandmarkFrame]) -> Prediction | None:
+        """One whole sign (hands in to hands out) against the examples."""
+        match = self.segment_match(frames)
+        if match is None:
+            return None
+        gloss, near, other = match
+        if near > self.limit or near > 0.8 * other:
+            return None
+        return Prediction(gloss, float(0.99 - 0.39 * near / self.limit), "isolated")
+
+    def segment_match(self, frames: list[LandmarkFrame]) -> tuple[str, float, float] | None:
+        """(nearest sign, its distance, the runner-up's) for a whole clip (for tools too)."""
+        longest = max(self.library.lengths.values(), default=30)
+        clip = clip_features(frames[-int(longest * 2) :]) if len(frames) >= 4 else None
+        return self.library.match(clip) if clip is not None else None
 
     def nearest(self, frames: list[LandmarkFrame]) -> list[tuple[str, float, float]]:
         """For each sign's typical length: (nearest sign, its distance, the runner-up's) for
