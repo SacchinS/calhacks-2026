@@ -158,11 +158,17 @@ class Router:
         self.mode = mode
         self.bus.publish(ModeChanged(mode))
 
-    async def deliver(self, output: Output, text: str) -> None:
+    async def quick_reply(self, text: str, urgent: bool = False) -> None:
+        """A one-tap reply in the signer's voice. Pressing it is the approval: no YES step.
+        Urgent replies skip waiting for a pause, when the voice supports that."""
+        send_now = getattr(self.tts, "send_now", None) if urgent else None
+        await self.deliver(self.tts, text, send=send_now)
+
+    async def deliver(self, output: Output, text: str, send=None) -> None:
         if output is not self.console:
             try:
                 if output.available():
-                    await output.send(text)
+                    await (send or output.send)(text)
                     self.bus.publish(OutputSent(output.name, text))
                     return
                 reason = "not available"

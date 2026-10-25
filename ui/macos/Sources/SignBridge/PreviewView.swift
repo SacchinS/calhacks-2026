@@ -182,6 +182,7 @@ struct MeetPanel: View {
                     .help("Say who's calling and that you sign through SignBridge")
             }
             FloorStatus(engine: engine)
+            QuickReplies(engine: engine)
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
@@ -208,6 +209,29 @@ struct MeetPanel: View {
         .padding(16)
         .background(Brand.surface, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.08)))
+    }
+}
+
+/// One-tap replies spoken in your voice. Urgent ones (orange) are said right away; the rest
+/// wait for a pause, like anything you sign.
+struct QuickReplies: View {
+    @ObservedObject var engine: EngineClient
+    var size: ControlSize = .regular
+    var body: some View {
+        if !engine.quickReplies.isEmpty {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: size == .large ? 220 : 150), spacing: 6)],
+                      alignment: .leading, spacing: 6) {
+                ForEach(engine.quickReplies, id: \.text) { reply in
+                    Button { engine.quickReply(reply.text) } label: {
+                        Text(reply.text).lineLimit(1).frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(reply.urgent ? .orange : nil)
+                    .help(reply.urgent ? "Said right away" : "Said at the next pause")
+                }
+            }
+            .controlSize(size)
+        }
     }
 }
 
@@ -322,7 +346,8 @@ struct OutputPanel: View {
                   font: .title3.weight(.semibold),
                   note: "Pick BlackHole 2ch as the mic in the app you're using, then start its dictation.")
         case "meet":
-            MeetPanel(engine: engine, maxHeight: maxHeight, title: "Call" + mock("captions"))
+            // Taller than the other panels: the conversation plus the quick-reply buttons.
+            MeetPanel(engine: engine, maxHeight: max(maxHeight, 320), title: "Call" + mock("captions"))
         default:
             EmptyView()
         }

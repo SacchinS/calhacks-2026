@@ -45,8 +45,9 @@ flowchart LR
 | Claude Code builds in the background while you use Siri and Meet | Works |
 | Siri by sign (Type to Siri) | Works |
 | Google Meet: Cartesia voice out, captions in, "One moment, I'm signing." cue | Built; needs a Cartesia key and BlackHole 16ch to test |
-| Call intro: says who's calling at the start of a call | Built |
+| Call intro: says who's calling ("Introduce me"; automatic only with `meet.intro_on_start`, for calls with strangers) | Built |
 | Turn-aware speaking: waits for the other person to finish, or politely jumps in | Works (tested with Cartesia Ink on a loopback) |
+| Quick replies in calls ("Can you repeat that?", "Please slow down a little.", "Yes."...) | Built; urgent ones are said right away |
 | Video stays on the laptop, camera-on indicator | Built |
 | Review the English before it's spoken in Meet | Built (off by default) |
 | Signing-area gating, fitted to the signer in setup | Built |

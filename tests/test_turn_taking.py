@@ -118,3 +118,19 @@ async def test_leaving_meet_frees_the_floor(call):
     assert out.is_floor_free()
     await out.send("Dictate this.")
     assert voice.sent == ["Dictate this."]
+
+
+async def test_urgent_quick_replies_skip_the_wait_normal_ones_wait(call):
+    from outputs.router import Router
+
+    bus, out, voice = call
+    router = Router(bus, claude_code=RecordingOutput("claude_code"), tts=out)
+    await turn(bus, "start")  # they're mid-sentence
+    await router.quick_reply("Please slow down a little.", urgent=True)
+    assert voice.sent == ["Please slow down a little."]  # said right away
+    normal = asyncio.create_task(router.quick_reply("Yes."))
+    await asyncio.sleep(0.1)
+    assert voice.sent == ["Please slow down a little."]  # "Yes." waits for the pause
+    await turn(bus, "end")
+    await normal
+    assert voice.sent[-1] == "Yes."

@@ -342,3 +342,21 @@ async def test_status_shows_turn_taking(engine):
     assert status["speech"] == {"state": "waiting", "text": "Yes, I can."}
     engine.on_event(TurnEvent("end"))
     assert not last_status(engine)["them_talking"]
+
+
+async def test_quick_replies_are_listed_and_spoken(engine):
+    engine.send_ready()
+    replies = messages(engine, "ready")[-1]["quick_replies"]
+    assert {"text": "Can you repeat that?", "urgent": True} in replies
+    assert {"text": "Yes.", "urgent": False} in replies
+    await engine.handle_command({"cmd": "output_mode", "mode": "meet"})
+    await engine.handle_command({"cmd": "quick_reply", "text": "Can you repeat that?"})
+    await until(lambda: any(m["text"] == "Can you repeat that?" for m in messages(engine, "sent")))
+    assert messages(engine, "sent")[-1]["mode"] == "meet"
+
+
+async def test_only_configured_quick_replies_can_be_spoken(engine):
+    await engine.handle_command({"cmd": "quick_reply", "text": "I quit."})
+    assert "not a quick reply" in messages(engine, "error")[-1]["message"]
+    await asyncio.sleep(0.05)
+    assert not any(m["text"] == "I quit." for m in messages(engine, "sent"))
