@@ -92,6 +92,7 @@ log = logging.getLogger(__name__)
 APP_MODES = ("off", "run", "framing", "gestures")
 PRACTICE = ["wake", "confirm", "cancel"]
 UI_CONFIG = Path("~/Library/Application Support/calhacks-2026/ui.json").expanduser()
+JOINT_BGR = (255, 132, 10)  # the tracked joints, drawn as blue dots (macOS accent blue)
 TARGET = "Google Meet"  # where the signer's English is spoken
 
 
@@ -130,13 +131,9 @@ def render_preview(frame: LandmarkFrame, space: SigningSpace, mirror: bool) -> b
         box_color,
         3 if frame.hands_in_signing_space else 1,
     )
-    for points, color in (
-        (frame.pose, (0, 200, 255)),
-        (frame.left_hand, (0, 255, 0)),
-        (frame.right_hand, (255, 0, 0)),
-    ):
+    for points in (frame.pose, frame.left_hand, frame.right_hand):
         for p in points:
-            cv2.circle(canvas, (int(p[0] * w), int(p[1] * h)), 2, color, -1)
+            cv2.circle(canvas, (int(p[0] * w), int(p[1] * h)), 3, JOINT_BGR, -1)
     if mirror:
         canvas = cv2.flip(canvas, 1)
     ok, jpeg = cv2.imencode(".jpg", canvas, [cv2.IMWRITE_JPEG_QUALITY, 70])
