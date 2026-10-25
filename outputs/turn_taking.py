@@ -11,6 +11,10 @@ Wraps the voice output. Cartesia Ink's turn detection on the other side's audio
   for the floor, and say the sentence again once.
 
 Timing only: the signer already approved the exact words, and this never changes them.
+With `chime_in_seconds: 0` it's turn-based: never interject, wait for the pause however
+long it takes. `hurry()` (the signer signed NOW) says the waiting sentence right away,
+without the interjection, and talking over it doesn't stop it.
+
 Approved sentences are spoken one at a time, in order. Without turn events (mock captions
 with no turns) the floor is always free and this passes straight through.
 """
@@ -48,6 +52,8 @@ class TurnTakingOutput(Output):
         self.floor_free.set()
         self._last_turn = 0.0
         self._lock = asyncio.Lock()
+        self._hurry = asyncio.Event()  # NOW: stop waiting for the pause
+        self._waiting = False
         self._task: asyncio.Task[None] | None = None
 
     def available(self) -> bool:
@@ -92,10 +98,10 @@ class TurnTakingOutput(Output):
     async def send(self, text: str) -> None:
         async with self._lock:
             try:
-                await self._take_floor(text)
+                hurried = await self._take_floor(text)
                 for attempt in range(2):
                     self._status("speaking", text)
-                    if await self._speak(text, interruptible=attempt == 0):
+                    if await self._speak(text, interruptible=attempt == 0 and not hurried):
                         return
                     log.info("talked over; waiting to say it again")
                     await self._take_floor(text, chime_in=False)
@@ -110,24 +116,45 @@ class TurnTakingOutput(Output):
         finally:
             self._status("idle")
 
-    async def _take_floor(self, text: str, chime_in: bool = True) -> None:
-        """Return when it's our turn: the floor is free, or we've politely jumped in."""
+    def hurry(self) -> None:
+        """The signer signed NOW: say the sentence waiting for the pause right away."""
+        if self._waiting:
+            self._hurry.set()
+
+    async def _take_floor(self, text: str, chime_in: bool = True) -> bool:
+        """Return when it's our turn: the floor is free, we've politely jumped in, or the
+        signer said NOW (then True)."""
         if self.is_floor_free():
-            return
+            return False
         self._status("waiting", text)
+        turn_based = self.chime_in_seconds <= 0
         deadline = time.monotonic() + self.chime_in_seconds
-        while not self.is_floor_free():
-            left = deadline - time.monotonic()
-            if left <= 0:
-                break
-            with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(self.floor_free.wait(), min(left, 1.0))
-        if self.is_floor_free() or not chime_in:
-            return
+        self._waiting = True
+        self._hurry.clear()
+        try:
+            while not self.is_floor_free() and not self._hurry.is_set():
+                left = 1.0 if turn_based else deadline - time.monotonic()
+                if left <= 0:
+                    break
+                free = asyncio.create_task(self.floor_free.wait())
+                hurry = asyncio.create_task(self._hurry.wait())
+                await asyncio.wait(
+                    {free, hurry}, timeout=min(left, 1.0), return_when=asyncio.FIRST_COMPLETED
+                )
+                free.cancel()
+                hurry.cancel()
+        finally:
+            self._waiting = False
+        if self._hurry.is_set():
+            self._hurry.clear()
+            return True
+        if self.is_floor_free() or not chime_in or turn_based:
+            return False
         self._status("interjecting", text)
         await self.inner.send(self.interjection)
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(self.floor_free.wait(), self.yield_seconds)
+        return False
 
     async def _speak(self, text: str, interruptible: bool) -> bool:
         """Speak; False if someone talked over us long enough that we stopped."""

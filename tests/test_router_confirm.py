@@ -122,3 +122,27 @@ async def test_started_router_processes_the_bus():
         await asyncio.sleep(0.01)
     await router.stop()
     assert tts.sent == ["Hello, nice to meet you."]
+
+
+class HurryingVoice(RecordingOutput):
+    def __init__(self):
+        super().__init__("tts")
+        self.now, self.hurried = [], 0
+
+    async def send_now(self, text):
+        self.now.append(text)
+
+    def hurry(self):
+        self.hurried += 1
+
+
+async def test_an_urgent_translation_is_said_right_away_and_now_hurries_the_voice():
+    from dataclasses import replace
+
+    voice = HurryingVoice()
+    router = Router(Bus(), tts=voice)
+    await router.handle(replace(translation("Wait."), urgent=True))
+    await router.handle(translation("Later."))
+    assert voice.now == ["Wait."] and voice.sent == ["Later."]
+    await router.handle(control("NOW"))
+    assert voice.hurried == 1

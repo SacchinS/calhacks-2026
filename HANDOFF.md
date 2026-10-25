@@ -45,10 +45,9 @@ From `MVP.md` ("Checkpoints" has the full list):
 
 A release check-in on Google Meet between two laptops (details in `MVP.md`, "What the MVP must do"):
 1. **Speech and captions.** "The dashboard's ready. Pranav redesigned the charts in Figma last night, so I think we ship tomorrow." The autocomplete remembers Pranav and Figma.
-2. **Getting the floor.** The signer taps "Sorry, can I jump in?", or turn-taking interjects for them.
-3. **Signing with fingerspelling.** WAIT, F-I (Figma), COLOR PROBLEM, FINISH: "Wait, there's a color problem in the Figma design."
-4. **Being asked.** "Sacchin, can you sort it out with Pranav?" flashes the name banner; the signer answers ME MEET, P-R (Pranav), TOMORROW: "I'll meet with Pranav tomorrow."
-5. **The outcome:** the release is held.
+2. **Signing while they talk.** WAIT, F-I (Figma), COLOR PROBLEM, FINISH: the sentence waits for B to stop, then "Wait, there's a color problem in the Figma design." (NOW instead of FINISH says it right away.)
+3. **Being asked.** "Sacchin, can you sort it out with Pranav?" flashes the name banner; the signer answers ME MEET, P-R (Pranav), TOMORROW, FINISH: "I'll meet with Pranav tomorrow."
+4. **The outcome:** the release is held.
 
 Why only calls: Professor Lance Forshay (Deaf ASL faculty at UW), who answered our survey, said video calls are the one place he'd use this. His answers and what we changed are in `docs/user-research.md`.
 
@@ -80,6 +79,7 @@ The glosses are drafts (`docs/asl-demo-script-research.md`, Moment 3). A Deaf si
 
 ## Recent changes
 
+- **Turn-based speaking and NOW** (Oct 25). `shared/events.py`: a new control sign `NOW` (SEND, said right away; on its own it says a sentence that's waiting for the pause) and `Translation.urgent`. `meet.chime_in_seconds: 0` is turn-based: a sentence waits for silence and the voice never interjects on its own. The router speaks urgent translations with `send_now`; `TurnTakingOutput.hurry()` releases a waiting one. App: a "Say now" button in Preview, N in Demo Mode, `gesture: now` in the protocol. Mock box: `/now`.
 - **Meet only** (Oct 24). Claude Code, Siri, the Voice mode and the demo website are gone from `main` (kept on `archive/claude-code-siri`).
   - **Events and config:** `shared/events.py` lost `Mode`, `ModeChanged`, `OutputReply`, and the `MODE` control sign; `ConfirmRequest` lost `target`. The `claude_code`, `siri` and `mode` config lines and the `claude_code_cli` / `type_to_siri` sections are gone, and so is pyobjc.
   - **Behavior:** every translation goes to the voice (after YES with review on). Captions start with the app. The call intro is said at startup when `meet.intro_on_start` is on. The autocomplete keeps one meeting id per run.

@@ -3,7 +3,8 @@ into the virtual mic).
 
 With `review_before_speaking`, it asks for YES / NO first (a ConfirmRequest), so a
 misrecognized sign is never spoken in the signer's name. Quick replies skip the review:
-pressing one is the approval.
+pressing one is the approval. An urgent translation (the signer ended with NOW) is said
+right away; NOW on its own tells the voice to say a sentence that's waiting for the pause.
 
 If the voice is unavailable or fails, the text goes to the console and the UI gets a
 warning. The router never raises.
@@ -37,6 +38,7 @@ class Router:
         self.console = console or ConsoleOutput(bus)
         self.review_before_speaking = review_before_speaking
         self.pending: ConfirmRequest | None = None
+        self._pending_urgent = False
         self._task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
@@ -70,12 +72,20 @@ class Router:
                 await self.confirm(True)
             elif event.gloss == "NO":
                 await self.confirm(False)
+            elif event.gloss == "NOW":
+                hurry = getattr(self.tts, "hurry", None)
+                if hurry is not None:
+                    hurry()  # a sentence waiting for the pause: say it now
 
     async def on_translation(self, translation: Translation) -> None:
         if self.review_before_speaking:
             self.ask(translation)
         else:
-            await self.deliver(self.tts, translation.english)
+            await self.speak(translation.english, urgent=translation.urgent)
+
+    async def speak(self, text: str, urgent: bool = False) -> None:
+        send_now = getattr(self.tts, "send_now", None) if urgent else None
+        await self.deliver(self.tts, text, send=send_now)
 
     def ask(self, translation: Translation) -> None:
         if self.pending is not None:
@@ -85,6 +95,7 @@ class Router:
             english=translation.english,
             gloss=list(translation.gloss),
         )
+        self._pending_urgent = translation.urgent
         self.bus.publish(self.pending)
 
     async def confirm(self, approved: bool) -> None:
@@ -93,13 +104,12 @@ class Router:
         request, self.pending = self.pending, None
         self.bus.publish(ConfirmResult(request.request_id, approved))
         if approved:
-            await self.deliver(self.tts, request.english)
+            await self.speak(request.english, urgent=self._pending_urgent)
 
     async def quick_reply(self, text: str, urgent: bool = False) -> None:
         """A one-tap reply in the signer's voice. Pressing it is the approval: no YES step.
         Urgent replies skip waiting for a pause, when the voice supports that."""
-        send_now = getattr(self.tts, "send_now", None) if urgent else None
-        await self.deliver(self.tts, text, send=send_now)
+        await self.speak(text, urgent=urgent)
 
     async def deliver(self, output: Output, text: str, send=None) -> None:
         if output is not self.console:

@@ -35,13 +35,14 @@
 **The demo** is a release check-in on Google Meet between two laptops, live, with a real webcam; Demo Mode is on the projector. A (product manager) and B (engineer) are hearing teammates; the signer is on the design side:
 
 1. **The meeting runs on speech.** B: *"The dashboard's ready. Pranav redesigned the charts in Figma last night, so I think we ship tomorrow."* The captions appear, and the autocomplete remembers Pranav and Figma.
-2. **Getting the floor.** A and B keep talking quickly. The signer taps **"Sorry, can I jump in?"** (said right away), or turn-taking says it after a few seconds of waiting.
-3. **Signing, fingerspelling, voice.** The signer signs `WAIT`, spells **F-I** (`YES` takes **Figma**), signs `COLOR PROBLEM`, `FINISH`: *"Wait, there's a color problem in the Figma design."* in the Cartesia voice, at the next pause.
-4. **Being asked.** A: *"Good catch. Sacchin, can you sort it out with Pranav?"* The name banner flashes over every window.
-5. **The answer.** The signer signs `ME MEET`, spells **P-R** (`YES` takes **Pranav**), signs `TOMORROW`, `FINISH`: *"I'll meet with Pranav tomorrow."*
-6. **The outcome.** A: *"Great, then we hold the release until that's fixed."* The signer changed the decision.
+2. **Signing while they talk.** As B keeps going, the signer signs `WAIT`, spells **F-I** (`YES` takes **Figma**), signs `COLOR PROBLEM`, `FINISH`. The app shows *"Waiting for a pause to say: Wait, there's a color problem in the Figma design."* The moment B stops, the Cartesia voice says it. (Ending with `NOW` instead of `FINISH` says it right away, over B: for when it can't wait.)
+3. **Being asked.** A: *"Good catch. Sacchin, can you sort it out with Pranav?"* The name banner flashes over every window.
+4. **The answer.** The signer signs `ME MEET`, spells **P-R** (`YES` takes **Pranav**), signs `TOMORROW`, `FINISH`: *"I'll meet with Pranav tomorrow."* (A has stopped talking, so it's said at once.)
+5. **The outcome.** A: *"Great, then we hold the release until that's fixed."* The signer changed the decision.
 
-The fingerspelled words use letters the letter model reads well on our signer (P, R, F, I; `recognition.letter_set: PRFI`), and both are heard in the meeting before they're spelled. The signs are our signer's recorded custom signs: WAIT, COLOR, PROBLEM, ME, TOMORROW still need recording (MEET, YES, FINISH are done). YES can't be a word in a sentence: it's a control sign (it takes a suggestion or approves a review). Backups: Demo Mode's keys 1–3 send the phrases, typed letters still drive the autocomplete, and a backup video is recorded the night before. The Jira agent and meeting memory from the v5 script are a "what's next" slide.
+Speaking is turn-based (`meet.chime_in_seconds: 0`): a sentence waits for silence, and the voice never interjects on its own. `NOW` (a control sign, like `FINISH`) says it right away; signed on its own, it says a sentence that's already waiting. Preview's "Say now" button and Demo Mode's N key do the same.
+
+The fingerspelled words use letters the letter model reads well on our signer (P, R, F, I; `recognition.letter_set: PRFI`), and both are heard in the meeting before they're spelled. The signs are our signer's recorded custom signs: WAIT, COLOR, PROBLEM, ME, TOMORROW and NOW still need recording (MEET, YES, FINISH are done). YES can't be a word in a sentence: it's a control sign (it takes a suggestion or approves a review). Backups: Demo Mode's keys 1–3 send the phrases, typed letters still drive the autocomplete, and a backup video is recorded the night before. The Jira agent and meeting memory from the v5 script are a "what's next" slide.
 
 **Open:** how long each letter is held in the demo (5 s now, for testing with people new to ASL; 2–3 s once the signer has practiced), and who signs, plays A and B, and presents. The signer's name in the script has to match Settings > Calls for the banner.
 

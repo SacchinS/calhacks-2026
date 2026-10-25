@@ -1,7 +1,8 @@
 """Utterance buffer: collects SignEvents until SEND, then translates them.
 
 - Isolated and fingerspelled signs are appended (UtteranceProgress shows the live gloss).
-- SEND publishes the Utterance, translates it, and publishes the Translation.
+- SEND publishes the Utterance, translates it, and publishes the Translation. NOW does the
+  same with the Translation marked urgent (said right away, not at the next pause).
 - CLEAR empties the buffer. YES / NO / MODE belong to the router and are ignored here.
 - Control signs are never passed to the translator.
 - Fingerspelled letters (Letter events) go to the autocompleter (`spelling`), in order with
@@ -15,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+from dataclasses import replace
 
 from language.base import Translator
 from language.mock import MockTranslator
@@ -66,7 +68,7 @@ class UtteranceBuffer:
                 return
             if event.gloss == "CLEAR":
                 self.spelling.clear()
-            elif event.kind != "control" or event.gloss == "SEND":
+            elif event.kind != "control" or event.gloss in ("SEND", "NOW"):
                 self._append(self.spelling.finish())  # moved on: keep the letters as spelled
         if event.kind != "control":
             self.signs.append(event)
@@ -74,12 +76,15 @@ class UtteranceBuffer:
         elif event.gloss == "CLEAR":
             self.signs.clear()
             self._progress()
-        elif event.gloss == "SEND" and self.signs:
+        elif event.gloss in ("SEND", "NOW") and self.signs:
             utterance = Utterance(signs=tuple(self.signs))
             self.signs.clear()
             self._progress()
             self.bus.publish(utterance)
-            self.bus.publish(await self.translate(utterance.gloss))
+            translation = await self.translate(utterance.gloss)
+            if event.gloss == "NOW":
+                translation = replace(translation, urgent=True)
+            self.bus.publish(translation)
 
     def accept_suggestion(self, index: int = 0) -> None:
         """YES while spelling (or a click on a suggestion in the app)."""

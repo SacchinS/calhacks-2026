@@ -71,13 +71,14 @@ struct DemoView: View {
         }
     }
 
-    /// Backup keys for a live demo: W start, C send, X cancel, 1-3 the demo script's phrases, in order.
+    /// Backup keys for a live demo: W start, C send, X cancel, N say it now, 1-3 the demo script's phrases.
     private var shortcuts: some View {
         let phrases = DemoScript.phrases
         return ZStack {
             Button("") { engine.gesture("wake") }.keyboardShortcut("w", modifiers: [])
             Button("") { engine.gesture("confirm") }.keyboardShortcut("c", modifiers: [])
             Button("") { engine.gesture("cancel") }.keyboardShortcut("x", modifiers: [])
+            Button("") { engine.gesture("now") }.keyboardShortcut("n", modifiers: [])
             ForEach(Array(phrases.enumerated()), id: \.offset) { i, p in
                 Button("") { engine.fake(p) }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: [])
             }

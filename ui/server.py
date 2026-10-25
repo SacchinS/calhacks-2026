@@ -5,7 +5,7 @@ it onto our bus. Commands (stdin, one JSON object per line):
 
   {"cmd": "mode", "mode": "off|run|framing"}   off pauses the recognizer
   {"cmd": "preview", "on": true}                        send camera frames
-  {"cmd": "gesture", "name": "wake|confirm|cancel"}     on-screen buttons and backup keys:
+  {"cmd": "gesture", "name": "wake|confirm|cancel|now"}  on-screen buttons and backup keys:
         confirm = YES (or SEND while signing), cancel = NO (or CLEAR while signing)
   {"cmd": "fake", "glosses": ["RAIN", "TOMORROW"]}      test phrases: the signs, then SEND
   {"cmd": "check", "name": "claude|voice"}              setup checks (translator, BlackHole)
@@ -467,6 +467,9 @@ class EngineServer:
                 self.app.buffer.accept_suggestion()
             elif name == "cancel":
                 self.app.autocomplete.dismiss()
+            return
+        if name == "now":  # say it right away: ends the sentence, or hurries a waiting one
+            self.control("NOW")
             return
         if name == "wake" and state == "idle":
             self.woke = True

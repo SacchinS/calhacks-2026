@@ -124,3 +124,36 @@ async def test_urgent_quick_replies_skip_the_wait_normal_ones_wait(call):
     await turn(bus, "end")
     await normal
     assert voice.sent[-1] == "Yes."
+
+
+@pytest.fixture
+async def turn_based():
+    bus = Bus()
+    voice = TimedVoice()
+    meet = {"chime_in_seconds": 0, "barge_in_seconds": 0.1}
+    out = TurnTakingOutput(bus, Config(sections={"meet": meet}), voice)
+    await out.start()
+    yield bus, out, voice
+    await out.stop()
+
+
+async def test_turn_based_waits_for_the_pause_and_never_interjects(turn_based):
+    bus, out, voice = turn_based
+    await turn(bus, "start")
+    speaking = asyncio.create_task(out.send("Wait, there's a color problem."))
+    await asyncio.sleep(1.5)  # longer than any chime-in
+    assert voice.sent == []
+    await turn(bus, "end")
+    await asyncio.wait_for(speaking, 2)
+    assert voice.sent == ["Wait, there's a color problem."]  # no "Sorry, can I jump in?"
+
+
+async def test_now_says_the_waiting_sentence_at_once_and_isnt_cut_off(turn_based):
+    bus, out, voice = turn_based
+    await turn(bus, "start")
+    speaking = asyncio.create_task(out.send("Wait, there's a color problem."))
+    await asyncio.sleep(0.2)
+    out.hurry()  # the signer signed NOW
+    await asyncio.wait_for(speaking, 2)  # they're still talking, but it's said, whole
+    assert voice.sent == ["Wait, there's a color problem."] and voice.cut == []
+    out.hurry()  # nothing waiting: nothing happens

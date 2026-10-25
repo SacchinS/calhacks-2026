@@ -26,7 +26,9 @@ TurnKind = Literal["start", "eager_end", "resume", "end"]
 SpeechState = Literal["idle", "waiting", "interjecting", "speaking"]
 
 # Control signs are ordinary SignEvents with kind="control". They are never translated.
-CONTROL_SIGNS = frozenset({"YES", "NO", "SEND", "CLEAR"})
+# NOW is SEND, said right away instead of at the next pause (and on its own, it pushes out
+# a sentence that's waiting for the pause).
+CONTROL_SIGNS = frozenset({"YES", "NO", "SEND", "CLEAR", "NOW"})
 # Signs that act as a control sign. FINISH is in the Kaggle vocabulary and means SEND.
 CONTROL_ALIASES = {"FINISH": "SEND"}
 
@@ -112,6 +114,7 @@ class Translation:
     gloss: list[str]
     english: str
     provider: str
+    urgent: bool = False  # ended with NOW: say it right away, not at the next pause
     ts: float = field(default_factory=_now)
 
 
