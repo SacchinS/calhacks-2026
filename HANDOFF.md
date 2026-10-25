@@ -62,7 +62,7 @@ The glosses are drafts (`docs/asl-demo-script-research.md`, Moment 3). A Deaf si
 | Mac app (`ui/macos`) and its engine bridge (`ui/server.py`) | C | Works on mocks: Preview with the call panel always showing (a You/Them conversation, quick replies, "Introduce me"), Demo Mode, the autocomplete bar, setup wizard (Save This Position fits the signing space), camera-on indicator, Settings > Calls, Privacy and Remembered words. |
 | Webcam and landmarks (`recognition/camera.py`, `gating.py`) | A | Camera and MediaPipe landmarks run (`uv sync --extra camera`). Not tested live since the model went in. |
 | Kaggle sign model (`recognition/isolated.py`) | A | **Built.** Downloads to `models/islr/` on first use, runs with LiteRT (~9 ms per window). Not yet tested on a real webcam: thresholds need tuning. |
-| ASL Citizen sign model (2,731 signs) | A | **Next.** Weights checked: MediaPipe Holistic points like ours, ~20 ms per sign on an M1. To be limited to the demo's signs. |
+| ASL Citizen sign model (`recognition/asl_citizen.py`, `tools/setup_asl_citizen.py`) | A | **Built on `person-a`**, not tried live: 2,731 signs, limited to the demo's (`asl_citizen_signs`), with the training code's own preprocessing (checked against it in the tests) and a "nothing" check. On in `recognition.sign_models`; each machine runs the setup tool once (it needs torch only for that). |
 | Recording and tuning tools (`tools/record_script.py`, `tools/tune_recognition.py`) | A | **Built on `person-a`**, waiting on a PR and real takes. |
 | Custom signs (`recognition/custom_signs.py`, `tools/record_signs.py`) | A | **Built.** Few-shot matching from recorded examples. Nothing recorded yet; only needed for demo signs neither model knows. |
 | Segmenter and control signs (`recognition/segmenter.py`) | A | Works. YES / NO / FINISH need a hold (2x `min_frames`), so a mid-sentence FINISH doesn't send. |
@@ -115,7 +115,7 @@ In rough demo order:
 
 1. **Keys** (lead): `ANTHROPIC_API_KEY` and `CARTESIA_API_KEY` are in `.env` on the build machine. `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY` are still needed, from a Moss project (code CALHACKS on the Portal's billing page). Then `uv run pytest --live` runs the real translator, Cartesia and Moss tests, including the 500-word startup timing.
 2. **Camera letters** (A): `uv run python tools/try_letters.py`, spell P-R and F-I, set `recognition.letter_orientation` to what it prints, and tune `letter_threshold` / `letter_hold_seconds`; then check P-R and F-I in the app bring up Priyanka and Figma.
-3. **Bigger vocabulary** (A): the ASL Citizen model next to the Kaggle one, limited to the demo's signs.
+3. **ASL Citizen live** (A): run `tools/setup_asl_citizen.py` on the demo laptop, then sign HELLO, NICE, MEET, YES and FINISH with `recognizer: camera` and check they come through.
 4. **Record and tune** (A): `uv run python tools/record_script.py` records 3 takes of each demo phrase to `models/takes/` (gitignored), with the glosses each should give; then `uv run python tools/tune_recognition.py --details` replays them through the models, tries every threshold combination, and prints the best `config.yaml` lines. Takes double as real replay fixtures. The signer who demos should record them.
 5. **Moss numbers** (B): ranking and latency with the real Moss session; tune the autocomplete weights on real letters.
 6. **The real call** (C): two laptops, BlackHole 2ch as Meet's mic, the Multi-Output Device with BlackHole 16ch as Meet's speakers (README "Audio for Meet"); captions within a couple of seconds; tune turn-taking.

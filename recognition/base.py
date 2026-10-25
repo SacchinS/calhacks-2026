@@ -81,14 +81,37 @@ class FrameClassifier(ABC):
         """Prediction for the sign in progress at this frame, or None if nothing is signed."""
 
 
+SIGN_MODELS = ("custom", "asl_citizen", "kaggle")
+
+
 def sign_classifiers(config: Config) -> list[FrameClassifier]:
-    """The real sign models, in the order tried: custom signs (only when clearly matched),
-    then the Kaggle isolated-sign model. Fingerspelled letters are read separately
+    """The real sign models in `recognition.sign_models` order (the first answer wins):
+    `custom` (recorded signs, only when clearly matched), `asl_citizen` (2,731 signs, limited
+    to the demo's), `kaggle` (250 signs). ASL Citizen needs tools/setup_asl_citizen.py
+    first; without it the Kaggle model stands in. Fingerspelled letters are read separately
     (FrameRecognizer.letter_reader)."""
     from recognition.custom_signs import CustomSignModel
     from recognition.isolated import IsolatedSignModel
 
-    return [CustomSignModel(config), IsolatedSignModel(config)]
+    names = list(config.get("recognition.sign_models", ["custom", "kaggle"]) or [])
+    out: list[FrameClassifier] = []
+    for name in names:
+        if name == "custom":
+            out.append(CustomSignModel(config))
+        elif name == "kaggle":
+            out.append(IsolatedSignModel(config))
+        elif name == "asl_citizen":
+            from recognition.asl_citizen import ASLCitizenModel
+
+            try:
+                out.append(ASLCitizenModel(config))
+            except RuntimeError as exc:
+                log.warning("%s; using the Kaggle model instead", exc)
+                if "kaggle" not in names:
+                    out.append(IsolatedSignModel(config))
+        else:
+            raise ValueError(f"recognition.sign_models: {name!r} is not one of {SIGN_MODELS}")
+    return out
 
 
 class FrameRecognizer(Recognizer):
