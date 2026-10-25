@@ -224,7 +224,7 @@ def test_a_letter_set_picks_among_its_letters_but_not_from_nothing():
             out[10 + ord(letter) - 65] = value
         return out
 
-    settings = {"letter_set": "PRIKUB", "letter_orientation": "as_is"}
+    settings = {"letter_set": "PRIKUB", "letter_orientation": "as_is"}  # needs U
     model = LetterModel(Config(sections={"recognition": settings}), run, classes)
     logits["seen"] = scores(V=8, U=6)  # V and U look alike: V isn't allowed, so U
     assert model.predict(hand("A"))[0] == "U"

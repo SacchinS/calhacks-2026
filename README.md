@@ -92,7 +92,7 @@ make mock                         # builds and opens the Mac app on mocks: no we
 The app is SignBridge's SwiftUI app (`ui/macos`); it starts the Python engine (`app.py`) itself and lives in the menu bar (the hand icon).
 - **First launch** opens the setup wizard. Click through it ("Skip for now" is fine with mocks); after that the app opens the **Preview** window.
 - **Preview:** the camera with tracking, the signs, the English, and the call: your words and the other side's captions, quick replies, and "Introduce me". With the mock recognizer, type signs in the box at the bottom (or in the terminal): `hello nice meet-you`, then `/send`. `#word` is a fingerspelled word, `~pri` spells letters one at a time (the autocomplete suggests the word; `/yes` takes it), `/clear` starts over. With review on (Settings > Calls), `/yes` or `/no` decides whether it's spoken. Face markers go after the signs they cover: `title /\ red` (raised brows, topic), `tomorrow rain [q]` (yes/no question), `[wh]`, `[neg]`, `[nod]`. The Send / Cancel buttons do the same as signing YES / NO.
-- **Demo Mode** (Preview > Demo, or the menu bar) is the fullscreen stage for the second display. Menu bar > Demo Mode On picks the display; it remembers it. Esc leaves it. Backup keys: W start, C send (YES), X cancel (NO), 1–4 the demo script's phrases in order (the same list is under Preview > Test phrases).
+- **Demo Mode** (Preview > Demo, or the menu bar) is the fullscreen stage for the second display. Menu bar > Demo Mode On picks the display; it remembers it. Esc leaves it. Backup keys: W start, C send (YES), X cancel (NO), 1–3 the demo script's phrases in order (the same list is under Preview > Test phrases).
 - Quit from the menu bar. Engine logs go to the terminal under `make mock`, and to `~/Library/Logs/calhacks-2026/engine.log` in the packaged app.
 
 To use the real pieces:
@@ -180,7 +180,7 @@ document or query text.
 **How it learns.**
 - Every word the signer spells and keeps.
 - Likely names, acronyms and jargon in the other side's captions: capitalized words that aren't
-  ordinary English, all-caps tokens, and unusual long words. So "Priyanka" or "Kubernetes",
+  ordinary English, all-caps tokens, and unusual long words. So "Priyanka" or "Figma",
   heard in a meeting, can be suggested before the signer has ever spelled them.
 
 **How ranking works.** On each letter:
@@ -207,7 +207,8 @@ latency is logged.
 - `make seed-vocab` loads Julian, Jupyter, June and a few more.
 - In `make mock`, type `tennis partner ~ju` in the mock-sign box: `~ju` spells J, U one letter
   at a time.
-- The mock captions mention Priyanka and Kubernetes, then `~pri` suggests Priyanka.
+- The mock captions are the demo call: Priyanka mentions Figma, so `~pr` suggests Priyanka and
+  `~fi` suggests Figma.
 - With the camera, fingerspell to it: hold each letter until it counts (5 s in the slow
   settings for people new to ASL, with a progress bar in the app; 0.25 s at fluent speed). `uv run python tools/try_letters.py` shows what the letter model
   sees. The "Fingerspell by typing" box still works as a backup.
