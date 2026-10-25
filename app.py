@@ -96,6 +96,7 @@ class App:
             self.bus, config, self.vocab, self._build("vocab_search", config)
         )
         self.buffer.spelling = self.autocomplete
+        self.router.spelling = self.autocomplete  # a YES on a suggestion isn't an approval
 
     def _voice(self, config: Config) -> Any:
         """The TTS output, turn-aware in calls (waits for the other side to finish)."""
