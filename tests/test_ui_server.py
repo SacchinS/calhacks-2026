@@ -19,6 +19,7 @@ from ui.server import EngineServer, render_preview
 async def engine(tmp_path):
     app = App(load_config().all_mocks())
     app.router.claude_code.chunk_delay = 0
+    app.config.sections["mock_tts"]["seconds_per_word"] = 0  # instant mock speech
     server = EngineServer(app, io.StringIO(), ui_config=tmp_path / "ui.json")
     await server.start()
     await app.start()
@@ -283,7 +284,7 @@ async def test_review_before_speaking_in_meet(engine):
     await engine.handle_command({"cmd": "output_mode", "mode": "meet"})
     await engine.handle_command({"cmd": "mock_input", "text": "hello /send"})
     await until(lambda: last_status(engine)["state"] == "confirming")
-    assert [m["text"] for m in messages(engine, "sent")] == [engine.app.call_host.intro_text()]
+    assert "Hello." not in [m["text"] for m in messages(engine, "sent")]
     await engine.handle_command({"cmd": "gesture", "name": "confirm"})
     await until(lambda: any(m["text"] == "Hello." for m in messages(engine, "sent")))
     await until(lambda: last_status(engine)["state"] == "idle")
@@ -329,3 +330,15 @@ async def test_speech_is_filed_under_meet_even_after_switching_away(engine):
     await engine.handle_command({"cmd": "output_mode", "mode": "claude_code"})
     engine.on_event(OutputSent("tts", "Hello."))
     assert messages(engine, "sent")[-1]["mode"] == "meet"
+
+
+async def test_status_shows_turn_taking(engine):
+    from shared.events import SpeechStatus, TurnEvent
+
+    engine.on_event(TurnEvent("start"))
+    engine.on_event(SpeechStatus("waiting", "Yes, I can."))
+    status = last_status(engine)
+    assert status["them_talking"]
+    assert status["speech"] == {"state": "waiting", "text": "Yes, I can."}
+    engine.on_event(TurnEvent("end"))
+    assert not last_status(engine)["them_talking"]

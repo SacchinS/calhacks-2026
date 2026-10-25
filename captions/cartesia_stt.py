@@ -4,7 +4,9 @@ Meet's speaker output has to reach a capture device that is NOT the one our voic
 or we'd caption ourselves: install BlackHole 16ch, make a Multi-Output Device in Audio MIDI
 Setup (your speakers + BlackHole 16ch), and pick it as Meet's speaker. We read
 `audio.meet_capture_device` at 16 kHz mono and stream it to Cartesia; `turn.update` events
-become partial captions and `turn.end` the final one.
+become partial captions and `turn.end` the final one. Ink's turn events (start, eager end,
+resume, end) are also published as TurnEvents, so our voice knows when the floor is free
+(outputs/turn_taking.py).
 
 Only the other side's call audio goes to Cartesia, and nothing is saved or logged at INFO.
 """
@@ -19,12 +21,18 @@ from typing import Any
 from captions.base import CaptionSource
 from shared.bus import Bus
 from shared.config import Config
-from shared.events import Caption, Notice
+from shared.events import Caption, Notice, TurnEvent
 
 log = logging.getLogger(__name__)
 
 SAMPLE_RATE = 16000
 CHUNK_FRAMES = SAMPLE_RATE // 10  # 100 ms of audio per websocket message
+TURN_KINDS = {
+    "turn.start": "start",
+    "turn.eager_end": "eager_end",
+    "turn.resume": "resume",
+    "turn.end": "end",
+}
 
 
 def find_input_device(name: str) -> int | None:
@@ -51,6 +59,18 @@ class CartesiaCaptionSource(CaptionSource):
         self.voice_device = config.get("audio.virtual_mic_device", "BlackHole 2ch")
         self._client = client
         self._task: asyncio.Task[None] | None = None
+        # Optional Ink turn-detection tuning (cartesia.turn_* in config.yaml).
+        keys = (
+            "turn_start_threshold",
+            "turn_end_threshold",
+            "turn_eager_end_threshold",
+            "turn_end_timeout_ms",
+        )
+        self.turns = {
+            k: float(config.get(f"cartesia.{k}"))
+            for k in keys
+            if config.get(f"cartesia.{k}") is not None
+        }
 
     @property
     def client(self) -> Any:
@@ -90,7 +110,7 @@ class CartesiaCaptionSource(CaptionSource):
             audio: asyncio.Queue[bytes] = asyncio.Queue(maxsize=50)
             with self._microphone(device, audio):
                 ws = self.client.stt.auto_finalize.websocket(
-                    encoding="pcm_s16le", model=self.model, sample_rate=SAMPLE_RATE
+                    encoding="pcm_s16le", model=self.model, sample_rate=SAMPLE_RATE, **self.turns
                 )
                 async with ws as connection:
                     sender = asyncio.create_task(self._send_audio(connection, audio))
@@ -114,6 +134,8 @@ class CartesiaCaptionSource(CaptionSource):
         async for event in connection:
             kind = getattr(event, "type", None)
             text = (getattr(event, "transcript", "") or "").strip()
+            if kind in TURN_KINDS:
+                self.bus.publish(TurnEvent(TURN_KINDS[kind]))
             if kind == "turn.update" and text:
                 self.bus.publish(Caption(text, is_final=False))
             elif kind == "turn.end" and text:

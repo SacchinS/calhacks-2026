@@ -85,6 +85,7 @@ class CartesiaTTSOutput(Output):
             language="en",
         )
         player = Player(device, self.sample_rate)
+        cancelled = False
         try:
             async for event in events:
                 kind = getattr(event, "type", None)
@@ -95,7 +96,12 @@ class CartesiaTTSOutput(Output):
                 elif kind == "done":
                     break
             await asyncio.to_thread(player.drain)
+        except asyncio.CancelledError:
+            cancelled = True
+            raise
         finally:
+            if cancelled:
+                player.abort()  # talked over: cut the sound now
             await asyncio.to_thread(player.close)
 
     async def voice(self) -> str:
@@ -130,6 +136,9 @@ class Player:
 
     def drain(self) -> None:
         self.stream.stop()  # waits for buffered audio to finish playing
+
+    def abort(self) -> None:
+        self.stream.abort()  # drop buffered audio
 
     def close(self) -> None:
         self.stream.close()

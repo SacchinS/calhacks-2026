@@ -1,4 +1,8 @@
-"""Mock captions: emits the lines of fixtures/captions_sample.txt on a timer, looping."""
+"""Mock captions: emits the lines of fixtures/captions_sample.txt on a timer, looping.
+
+Each line is a "turn": TurnEvent start, `talk_seconds` of talking, the caption, then
+TurnEvent end, so turn-aware speaking can be tried on mocks (it waits for the pause).
+"""
 
 from __future__ import annotations
 
@@ -8,7 +12,7 @@ import itertools
 import logging
 
 from captions.base import CaptionSource
-from shared.events import Caption
+from shared.events import Caption, TurnEvent
 
 log = logging.getLogger(__name__)
 
@@ -19,6 +23,7 @@ class MockCaptionSource(CaptionSource):
     def __init__(self, bus, config) -> None:
         super().__init__(bus, config)
         self.interval = float(config.get("captions_mock.interval_seconds", 3.0))
+        self.talk_seconds = float(config.get("captions_mock.talk_seconds", 0.0))
         self._task: asyncio.Task[None] | None = None
 
     def lines(self) -> list[str]:
@@ -41,5 +46,10 @@ class MockCaptionSource(CaptionSource):
     async def _run(self, lines: list[str]) -> None:
         for line in itertools.cycle(lines):
             log.debug("mock caption: %s", line)
-            self.bus.publish(Caption(line))
-            await asyncio.sleep(self.interval)
+            self.bus.publish(TurnEvent("start"))
+            try:
+                await asyncio.sleep(self.talk_seconds)
+                self.bus.publish(Caption(line))
+            finally:
+                self.bus.publish(TurnEvent("end"))
+            await asyncio.sleep(max(0.0, self.interval - self.talk_seconds))

@@ -64,7 +64,13 @@ class SayTTSOutput(Output):
             raise RuntimeError(f"audio device {self.device_name!r} not found")
         samples = await self.render(text)
         log.info("say -> %s (%d chars)", self.device_name, len(text))
-        await asyncio.to_thread(play_on_device, samples, SAMPLE_RATE, device)
+        try:
+            await asyncio.to_thread(play_on_device, samples, SAMPLE_RATE, device)
+        except asyncio.CancelledError:  # talked over: stop the sound, not just the wait
+            import sounddevice as sd
+
+            sd.stop()
+            raise
 
     @staticmethod
     async def render(text: str) -> np.ndarray:

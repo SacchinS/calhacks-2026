@@ -90,7 +90,8 @@ class CallHost:
     async def _cue_later(self) -> None:
         await asyncio.sleep(self.cue_seconds)
         self._cue_timer = None
-        if self.mode == "meet":
+        floor_free = getattr(self.router.tts, "is_floor_free", lambda: True)()
+        if self.mode == "meet" and floor_free:  # never talk over them just to say "one moment"
             self._cued = True
             self._say(CUE)
 

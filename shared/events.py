@@ -20,6 +20,11 @@ SignKind = Literal["isolated", "fingerspell", "control"]
 # question or a topic, furrowed brows a wh-question, a head shake negation, a nod affirmation.
 FaceMarker = Literal["brows_raised", "brows_furrowed", "head_shake", "head_nod"]
 NoticeLevel = Literal["info", "warning", "error"]
+# The other side of a call, from Cartesia Ink's turn detection: they started talking, are
+# probably finishing, weren't done after all, or finished.
+TurnKind = Literal["start", "eager_end", "resume", "end"]
+# Our voice in a call: waiting for a pause, interjecting ("Sorry, can I jump in?"), speaking.
+SpeechState = Literal["idle", "waiting", "interjecting", "speaking"]
 
 MODES: tuple[Mode, ...] = get_args(Mode)
 
@@ -143,6 +148,23 @@ class Caption:
 
     text: str
     is_final: bool = True
+    ts: float = field(default_factory=_now)
+
+
+@dataclass(frozen=True)
+class TurnEvent:
+    """Turn-taking on the other side of the call (Meet mode), from the captions' STT."""
+
+    kind: TurnKind
+    ts: float = field(default_factory=_now)
+
+
+@dataclass(frozen=True)
+class SpeechStatus:
+    """What our voice is doing in a call; `text` is the sentence it's waiting to say."""
+
+    state: SpeechState
+    text: str = ""
     ts: float = field(default_factory=_now)
 
 
