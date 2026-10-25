@@ -177,3 +177,35 @@ async def test_while_spelling_only_control_signs_get_through():
         e = events.get_nowait()
         out.append(e.letter if isinstance(e, Letter) else e.gloss)
     assert out == ["P", "R", "I", "YES", "HELLO"]
+
+
+def test_auto_orientation_sticks_with_the_surer_one():
+    classes = [*"0123456789", *"ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
+    flips = iter(range(1, 1000))
+
+    def run(x):  # as seen: always a sure R; mirrored: U, now and then a little surer
+        logits = np.zeros(36, dtype=np.float32)
+        if x[0, 3] >= 0:
+            logits[10 + ord("R") - 65] = 6
+        else:
+            logits[10 + ord("U") - 65] = 7 if next(flips) % 5 == 0 else 2
+        return logits[None]
+
+    model = LetterModel(Config(), run, classes)
+    letters = {model.predict(hand("A"))[0] for _ in range(30)}
+    assert letters == {"R"} and model.last_orientation == "as_is"
+
+
+def test_one_unsure_frame_does_not_break_a_hold():
+    class Dipping(ScriptedModel):
+        def __init__(self):
+            super().__init__()
+            self.n = 0
+
+        def predict(self, points):
+            self.n += 1
+            letter, _ = super().predict(points)
+            return (letter, 0.3 if self.n % 4 == 0 else 0.9)  # every 4th frame is unsure
+
+    r = LetterReader(Config(), Dipping())
+    assert read(r, [("P", 0.4, 0.5), ("R", 0.4, 0.5)]) == "PR"

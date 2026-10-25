@@ -17,8 +17,9 @@ word; the utterance buffer turns the accepted word into one fingerspelled sign.
   `letter_end_seconds` without a letter, or at a control sign.
 
 Which way the model expects the hand (as the camera sees it, or mirrored) isn't
-documented, so `letter_orientation: auto` tries both and keeps the surer one; set it to
-`as_is` or `mirrored` once tools/try_letters.py shows which one your hand reads as.
+documented, so `letter_orientation: auto` tries both and follows the one that has been
+surer so far (switching every frame would break up a held letter); set it to `as_is` or
+`mirrored` once tools/try_letters.py shows which one your hand reads as.
 """
 
 from __future__ import annotations
@@ -81,20 +82,30 @@ class LetterModel:
         self.classes = list(classes or [])
         self.letter_index = [i for i, c in enumerate(self.classes) if c.upper() in LETTERS]
         self.last_orientation = ""
+        self.scores = dict.fromkeys(ORIENTATIONS, 0.0)  # auto: how sure each has been
 
     def predict(self, hand: Sequence[Point]) -> tuple[str, float] | None:
         if len(hand) < 21:
             return None
         tries = ORIENTATIONS if self.orientation == "auto" else (self.orientation,)
-        best: tuple[str, float] | None = None
-        for orientation in tries:
-            logits = np.asarray(self.run(normalize(hand, orientation == "mirrored")))
-            probs = softmax(logits.reshape(-1)[self.letter_index])
-            i = int(probs.argmax())
-            if best is None or probs[i] > best[1]:
-                best = (self.classes[self.letter_index[i]].upper(), float(probs[i]))
-                self.last_orientation = orientation
-        return best
+        guesses = {o: self.guess(hand, o == "mirrored") for o in tries}
+        if len(guesses) == 1:
+            (self.last_orientation,) = guesses
+        else:
+            for o, (_, p) in guesses.items():
+                if p >= 0.5:
+                    self.scores[o] += p
+            if any(self.scores.values()):
+                self.last_orientation = max(self.scores, key=self.scores.__getitem__)
+            else:
+                self.last_orientation = max(guesses, key=lambda o: guesses[o][1])
+        return guesses[self.last_orientation]
+
+    def guess(self, hand: Sequence[Point], mirrored: bool) -> tuple[str, float]:
+        logits = np.asarray(self.run(normalize(hand, mirrored)))
+        probs = softmax(logits.reshape(-1)[self.letter_index])
+        i = int(probs.argmax())
+        return self.classes[self.letter_index[i]].upper(), float(probs[i])
 
 
 def onnx_runner(path: Path):
@@ -133,6 +144,7 @@ class LetterReader:
         self._last: str | None = None  # the last letter counted, until the hand moves
         self._pending: Letter | None = None  # a first letter, waiting for a second one
         self._last_time = 0.0
+        self.status = ""  # why the last frame did or didn't count (tools/try_letters.py)
 
     def end(self) -> None:
         """Spelling is over (a control sign, or the hands went down)."""
@@ -148,12 +160,15 @@ class LetterReader:
         if self._pending is not None and now - self._pending.ts > self.gap:
             self._pending = None
         hand = self.spelling_hand(frame, space)
-        guess = self.model.predict(hand) if hand else None
-        if guess is None or guess[1] < self.threshold:
+        if not hand:
             self._run = None
-            if hand is None:
-                self._last = None  # the hand dropped or left: the same letter may come again
+            self._last = None  # the hand dropped or left: the same letter may come again
+            self.status = "raise one hand into the box"
             return []
+        guess = self.model.predict(hand)
+        if guess is None or guess[1] < self.threshold:
+            self.status = f"unsure ({guess[1]:.0%})" if guess else "can't see the fingers"
+            return []  # one unsure frame doesn't break a hold
         letter, confidence = guess
         wrist = (hand[0][0], hand[0][1])
         size = float(np.hypot(hand[9][0] - hand[0][0], hand[9][1] - hand[0][1])) or 1.0
@@ -169,7 +184,11 @@ class LetterReader:
             run = self._run = _Run(letter, now, wrist)
         run.confidences.append(confidence)
         held = now - run.start >= self.hold and len(run.confidences) >= self.min_frames
-        if not held or run.counted or letter == self._last:
+        if not held:
+            self.status = f"holding {letter}"
+            return []
+        if run.counted or letter == self._last:
+            self.status = f"{letter} counted; next letter (slide for a double)"
             return []
         run.counted = True
         self._last = letter
@@ -178,6 +197,7 @@ class LetterReader:
 
     def _count(self, letter: Letter) -> list[Letter]:
         self._last_time = letter.ts
+        self.status = f"{letter.letter} counted"
         if self.spelling:
             return [letter]
         if self._pending is not None:
@@ -186,6 +206,7 @@ class LetterReader:
             log.debug("fingerspelling started")
             return [first, letter]
         self._pending = letter
+        self.status = f"{letter.letter} held: shows once a second letter comes"
         return []
 
     def spelling_hand(self, frame: LandmarkFrame, space: SigningSpace) -> tuple[Point, ...]:
