@@ -71,7 +71,7 @@ recognition:
   letter_end_seconds: 7           # no letter this long: spelling is over and signs count (1.5)
   letter_hand: auto               # auto (the one hand up) | right | left
   letter_below_mouth: true        # a hand up by the face is signing (HELLO), not spelling
-  letter_orientation: auto        # auto (tries both) | as_is | mirrored
+  letter_orientation: mirrored    # auto (tries both) | as_is | mirrored (try_letters: our signer reads mirrored)
   # Custom signs recorded with tools/record_signs.py (tried before the Kaggle model).
   custom_signs_dir: models/custom_signs
   # Only these recorded signs are matched (the demo's); empty = all. Quote YES / NO (YAML).
