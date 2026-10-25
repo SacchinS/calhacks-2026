@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
+import threading
 import time
 import uuid
 from collections.abc import Iterable
@@ -136,17 +137,29 @@ def build_stats(
 
 class VocabStore:
     """The SQLite file. Small and local, so calls are quick; the engine still runs them off
-    the event loop (asyncio.to_thread)."""
+    the event loop (asyncio.to_thread).
+
+    Every call holds `lock`, because the engine's background writes (a word is recorded, then
+    tagged) run in worker threads that outlive the task that started them: cancelling that
+    task doesn't stop a thread already inside asyncio.to_thread. The lock also makes close()
+    wait for an in-flight write instead of closing the connection under it, and calls after
+    close do nothing rather than crash the process."""
 
     def __init__(self, path: Path | str) -> None:
         self.path = Path(path)
         if str(path) != ":memory:":
             self.path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(str(path), check_same_thread=False)
+        self.lock = threading.RLock()
+        self.closed = False
         self.db.executescript(SCHEMA)
 
     def close(self) -> None:
-        self.db.close()
+        with self.lock:
+            if self.closed:
+                return
+            self.closed = True
+            self.db.close()
 
     def add(self, occurrences: Iterable[Occurrence]) -> None:
         rows = [
@@ -165,17 +178,23 @@ class VocabStore:
             )
             for o in occurrences
         ]
-        with self.db:
-            self.db.executemany(
-                "INSERT OR REPLACE INTO occurrences VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows
-            )
+        with self.lock:
+            if self.closed:
+                return
+            with self.db:
+                self.db.executemany(
+                    "INSERT OR REPLACE INTO occurrences VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows
+                )
 
     def set_tags(self, occ_id: str, tags: tuple[str, ...], kind: str | None = None) -> None:
-        with self.db:
-            tag_text = ",".join(tags)
-            self.db.execute("UPDATE occurrences SET tags = ? WHERE id = ?", (tag_text, occ_id))
-            if kind in KINDS:
-                self.db.execute("UPDATE occurrences SET kind = ? WHERE id = ?", (kind, occ_id))
+        with self.lock:
+            if self.closed:
+                return
+            with self.db:
+                tag_text = ",".join(tags)
+                self.db.execute("UPDATE occurrences SET tags = ? WHERE id = ?", (tag_text, occ_id))
+                if kind in KINDS:
+                    self.db.execute("UPDATE occurrences SET kind = ? WHERE id = ?", (kind, occ_id))
 
     def all(self) -> list[Occurrence]:
         return self._select("", ())
@@ -189,29 +208,42 @@ class VocabStore:
 
     def delete_term(self, term_norm: str) -> list[str]:
         """Delete every occurrence of a word. Returns the deleted ids."""
-        ids = [o.id for o in self.for_term(term_norm)]
-        with self.db:
-            self.db.execute("DELETE FROM occurrences WHERE term_norm = ?", (term_norm,))
-        return ids
+        with self.lock:
+            ids = [o.id for o in self.for_term(term_norm)]
+            if self.closed:
+                return ids
+            with self.db:
+                self.db.execute("DELETE FROM occurrences WHERE term_norm = ?", (term_norm,))
+            return ids
 
     def delete(self, ids: Iterable[str]) -> None:
-        with self.db:
-            self.db.executemany("DELETE FROM occurrences WHERE id = ?", [(i,) for i in ids])
+        with self.lock:
+            if self.closed:
+                return
+            with self.db:
+                self.db.executemany("DELETE FROM occurrences WHERE id = ?", [(i,) for i in ids])
 
     def letters_saved(self) -> tuple[int, int]:
         """(accepted suggestions, letters saved) over every accepted fingerspelled word."""
-        row = self.db.execute(
-            "SELECT COUNT(*), COALESCE(SUM(LENGTH(term_norm) - letters_spelled), 0) "
-            "FROM occurrences WHERE letters_spelled IS NOT NULL"
-        ).fetchone()
+        with self.lock:
+            if self.closed:
+                return (0, 0)
+            row = self.db.execute(
+                "SELECT COUNT(*), COALESCE(SUM(LENGTH(term_norm) - letters_spelled), 0) "
+                "FROM occurrences WHERE letters_spelled IS NOT NULL"
+            ).fetchone()
         return int(row[0]), int(row[1])
 
     def _select(self, where: str, args: tuple) -> list[Occurrence]:
-        cursor = self.db.execute(
-            "SELECT id, term, kind, source, used_at, meeting_id, tags, letters_spelled "
-            f"FROM occurrences {where} ORDER BY used_at",
-            args,
-        )
+        with self.lock:
+            if self.closed:
+                return []
+            cursor = self.db.execute(
+                "SELECT id, term, kind, source, used_at, meeting_id, tags, letters_spelled "
+                f"FROM occurrences {where} ORDER BY used_at",
+                args,
+            )
+            rows = cursor.fetchall()
         return [
             Occurrence(
                 id=row[0],
@@ -223,7 +255,7 @@ class VocabStore:
                 tags=tuple(t for t in row[6].split(",") if t),
                 letters_spelled=row[7],
             )
-            for row in cursor.fetchall()
+            for row in rows
         ]
 
 

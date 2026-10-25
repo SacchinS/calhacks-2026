@@ -104,6 +104,10 @@ class Autocompleter:
         self.stats: dict[str, TermStats] = {}
         self.letters = ""
         self.suggestions: tuple[Suggestion, ...] = ()
+        # The control signs the utterance buffer used while spelling. The router reads this
+        # to know a YES or NO was already spent on a suggestion, since the bus gives each
+        # subscriber its own copy of the event and either of them can run first.
+        self.consumed: deque[SignEvent] = deque(maxlen=16)
         self.dismissed = False
         self.search_ready = False
         self._context: dict[str, float] = {}  # last context scores, reused while refining

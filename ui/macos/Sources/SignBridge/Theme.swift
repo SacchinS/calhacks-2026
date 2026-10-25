@@ -102,7 +102,7 @@ enum RouteInfo {
 /// them. A Deaf signer must approve them before the demo.
 enum DemoScript {
     static let phrases: [[String]] = [
-        ["HELLO,", "#PRIYANKA,", "NICE", "MEET-YOU"],   // 1 greeting, with the name heard in the call
+        ["HELLO,", "#PRANAV,", "NICE", "MEET-YOU"],   // 1 greeting, with the name heard in the call
         ["#FIGMA"],                                     // 2 "where should we put the feedback?"
         ["THANK-YOU"],                                  // 3
     ]

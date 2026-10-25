@@ -15,6 +15,7 @@ import asyncio
 import contextlib
 import logging
 import uuid
+from typing import Any
 
 from outputs.base import Output
 from outputs.console import ConsoleOutput
@@ -37,6 +38,9 @@ class Router:
         self.console = console or ConsoleOutput(bus)
         self.review_before_speaking = review_before_speaking
         self.pending: ConfirmRequest | None = None
+        # The Autocompleter (set in app.py), so a YES spent on a fingerspelling suggestion
+        # doesn't also approve a sentence waiting for review.
+        self.spelling: Any = None
         self._task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
@@ -66,10 +70,22 @@ class Router:
         if isinstance(event, Translation):
             await self.on_translation(event)
         elif event.kind == "control":
-            if event.gloss == "YES":
-                await self.confirm(True)
-            elif event.gloss == "NO":
-                await self.confirm(False)
+            if event.gloss not in ("YES", "NO"):
+                return
+            if self.spent_on_spelling(event):
+                return
+            await self.confirm(event.gloss == "YES")
+
+    def spent_on_spelling(self, event: SignEvent) -> bool:
+        """Did the utterance buffer already use this YES or NO on a fingerspelling
+        suggestion? The bus hands us our own copy of the event, so we may run before the
+        buffer or after it: before, a word is still being spelled; after, the buffer has
+        recorded the event it used. Either way the suggestion wins over the review."""
+        if self.spelling is None:
+            return False
+        if self.spelling.active:
+            return True
+        return any(event is used for used in self.spelling.consumed)
 
     async def on_translation(self, translation: Translation) -> None:
         if self.review_before_speaking:

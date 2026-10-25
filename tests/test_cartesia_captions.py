@@ -91,6 +91,30 @@ async def test_partial_then_final_captions():
     assert connection.sent == [b"\x00\x01" * 1600]
 
 
+async def test_remembered_words_are_sent_as_keyterms():
+    """So Ink writes "Pranav", not "Pranov", and the mention alert matches."""
+    src, _, websocket = source([SimpleNamespace(type="connected")])
+    src.keyterms = ["Sam", "Pranav", "Figma"]
+    await src.start()
+    for _ in range(50):
+        if websocket.kwargs is not None:
+            break
+        await asyncio.sleep(0.01)
+    await src.stop()
+    assert websocket.kwargs["keyterm"] == ["Sam", "Pranav", "Figma"]
+
+
+async def test_no_keyterm_argument_when_nothing_is_remembered():
+    src, _, websocket = source([SimpleNamespace(type="connected")])
+    await src.start()
+    for _ in range(50):
+        if websocket.kwargs is not None:
+            break
+        await asyncio.sleep(0.01)
+    await src.stop()
+    assert "keyterm" not in websocket.kwargs
+
+
 async def test_refuses_to_caption_our_own_voice():
     src, _, _ = source([], meet_capture_device="BlackHole 2ch", virtual_mic_device="BlackHole 2ch")
     with pytest.raises(RuntimeError, match="our own voice"):

@@ -25,6 +25,7 @@ from language.autocomplete import Autocompleter
 from language.base import Translator
 from language.utterance import UtteranceBuffer
 from language.vocab import VocabStore, vocab_path
+from language.vocab_terms import keyterms
 from outputs.call_host import CallHost
 from outputs.console import ConsoleOutput
 from outputs.router import Router
@@ -96,6 +97,7 @@ class App:
             self.bus, config, self.vocab, self._build("vocab_search", config)
         )
         self.buffer.spelling = self.autocomplete
+        self.router.spelling = self.autocomplete  # a YES on a suggestion isn't an approval
 
     def _voice(self, config: Config) -> Any:
         """The TTS output, turn-aware in calls (waits for the other side to finish)."""
@@ -118,6 +120,16 @@ class App:
     def _warn(self, message: str) -> None:
         self.notices.append(Notice("warning", message))
 
+    def _caption_keyterms(self) -> None:
+        """Give the captions the names and jargon we remember, so they're spelled our way and
+        the mention alerts match. The mock captions have no keyterms to set."""
+        if not hasattr(self.captions, "keyterms"):
+            return
+        signer = self.config.get("meet.signer_name", "")
+        names = [signer, *self.config.get("meet.mention_names", [])]
+        self.captions.keyterms = keyterms(self.vocab.all(), names)
+        log.debug("captions: %d keyterms", len(self.captions.keyterms))
+
     async def start(self) -> None:
         await self.buffer.start()
         await self.autocomplete.start()
@@ -135,6 +147,7 @@ class App:
             self.recognizer = MockRecognizer(self.bus, self.config)
             await self.recognizer.start()
         try:
+            self._caption_keyterms()
             await self.captions.start()
         except Exception as exc:
             log.exception("captions failed to start")
