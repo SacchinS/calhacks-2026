@@ -1,5 +1,5 @@
 """The scripted mock demo, through the engine protocol the Mac app uses: the other side says
-"Priyanka" and "Kubernetes", the signer spells P-R-I, Priyanka is suggested, YES puts it in
+"Priyanka" and "Figma", the signer spells P-R-I, Priyanka is suggested, YES puts it in
 the utterance, and the normal SEND -> translation -> voice flow carries on."""
 
 import io
@@ -31,7 +31,10 @@ def autocomplete(server):
 
 async def test_heard_in_a_meeting_then_spelled(engine):
     engine.bus.publish(
-        Caption("Priyanka moved the dashboard to Kubernetes last week.", is_final=True)
+        Caption(
+            "Hi, I'm Priyanka, I'm designing the new app. The mockups are all in Figma.",
+            is_final=True,
+        )
     )
     await until(lambda: engine.app.vocab.for_term("PRIYANKA") != [])
 
