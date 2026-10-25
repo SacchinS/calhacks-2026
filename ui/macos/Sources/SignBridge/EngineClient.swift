@@ -51,6 +51,26 @@ final class EngineClient: ObservableObject {
     /// The Meet call so far: what the signer said ("you") and the other side's captions ("them").
     @Published var meetLog: [(who: String, text: String)] = []
     private var captionPartial = false
+    /// Fingerspelling autocomplete: the letters so far and the best guesses for the word.
+    struct Autocomplete: Equatable {
+        struct Word: Equatable { let term: String; let kind: String }
+        let letters: String, top: Word?, alternates: [Word], dismissed: Bool, search: String
+        var words: [Word] { (top.map { [$0] } ?? []) + alternates }
+    }
+    @Published var autocomplete: Autocomplete?
+    /// For the pitch: suggestions accepted, letters saved, and how fast suggestions come.
+    struct AutocompleteStats: Equatable {
+        var accepted = 0, lettersSaved = 0, words = 0
+        var latencyMs: Double?, searchMs: Double?, search = "letters"
+    }
+    @Published var autocompleteStats = AutocompleteStats()
+    /// The remembered words (Settings > Remembered words), after vocab_list or a delete.
+    struct VocabWord: Identifiable, Equatable {
+        struct Use: Identifiable, Equatable { let id: String; let source: String; let usedAt: Date; let tags: [String] }
+        var id: String { termNorm }
+        let term: String, termNorm: String, kind: String, count: Int, lastUsed: Date, tags: [String], uses: [Use]
+    }
+    @Published var vocab: [VocabWord] = []
     @Published var mockRecognizer = false
     @Published var captions: [String] = []
     @Published var replies: [String] = []
@@ -141,7 +161,7 @@ final class EngineClient: ObservableObject {
     /// `make mock` in a terminal: lines typed there are mock signs, like the mock-sign box.
     private func forwardTerminalInput() {
         guard isatty(STDIN_FILENO) == 1, FileHandle.standardInput.readabilityHandler == nil else { return }
-        FileHandle.standardError.write(Data("Mock signs: type gloss + Enter (#word = fingerspell, /yes /no /send ...)\n".utf8))
+        FileHandle.standardError.write(Data("Mock signs: type gloss + Enter (#word = fingerspell, ~abc = letters, /yes /no /send ...)\n".utf8))
         let splitter = LineSplitter()
         FileHandle.standardInput.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
@@ -204,6 +224,12 @@ final class EngineClient: ObservableObject {
     func introduce() { send(["cmd": "introduce"]) }
     func quickReply(_ text: String) { send(["cmd": "quick_reply", "text": text]) }
     func setOutputMode(_ mode: String) { send(["cmd": "output_mode", "mode": mode]) }
+    func letters(_ text: String) { send(["cmd": "letters", "text": text]) }
+    func acceptSuggestion(_ index: Int = 0) { send(["cmd": "autocomplete", "action": "accept", "index": index]) }
+    func dismissSuggestions() { send(["cmd": "autocomplete", "action": "dismiss"]) }
+    func listVocab() { send(["cmd": "vocab_list"]) }
+    func deleteWord(_ term: String) { send(["cmd": "vocab_delete", "term": term]) }
+    func deleteUse(_ id: String) { send(["cmd": "vocab_delete", "id": id]) }
     func mockInput(_ text: String) {
         if !text.trimmingCharacters(in: .whitespaces).isEmpty { send(["cmd": "mock_input", "text": text]) }
     }
@@ -274,6 +300,13 @@ final class EngineClient: ObservableObject {
             speechText = speech?["text"] as? String ?? ""
             themTalking = e["them_talking"] as? Bool ?? false
             mockRecognizer = e["mock"] as? Bool ?? mockRecognizer
+            autocomplete = Self.parseAutocomplete(e["autocomplete"] as? [String: Any])
+            if let s = e["autocomplete_stats"] as? [String: Any] {
+                autocompleteStats = AutocompleteStats(
+                    accepted: s["accepted"] as? Int ?? 0, lettersSaved: s["letters_saved"] as? Int ?? 0,
+                    words: s["words"] as? Int ?? 0, latencyMs: s["latency_ms"] as? Double,
+                    searchMs: s["search_ms"] as? Double, search: s["search"] as? String ?? "letters")
+            }
         case "frame":
             if let b64 = e["jpeg"] as? String, let data = Data(base64Encoded: b64) {
                 frame = NSImage(data: data)
@@ -304,11 +337,36 @@ final class EngineClient: ObservableObject {
         case "mention":
             mention = MentionAlert(text: e["text"] as? String ?? "", question: e["question"] as? Bool ?? false,
                                    final: e["final"] as? Bool ?? true, turn: e["turn"] as? Int ?? 0)
+        case "vocab":
+            vocab = (e["words"] as? [[String: Any]] ?? []).map { w in
+                VocabWord(term: w["term"] as? String ?? "", termNorm: w["term_norm"] as? String ?? "",
+                          kind: w["kind"] as? String ?? "", count: w["count"] as? Int ?? 0,
+                          lastUsed: Date(timeIntervalSince1970: w["last_used"] as? Double ?? 0),
+                          tags: w["tags"] as? [String] ?? [],
+                          uses: (w["occurrences"] as? [[String: Any]] ?? []).map { o in
+                              VocabWord.Use(id: o["id"] as? String ?? "", source: o["source"] as? String ?? "",
+                                            usedAt: Date(timeIntervalSince1970: o["used_at"] as? Double ?? 0),
+                                            tags: o["tags"] as? [String] ?? [])
+                          })
+            }
         case "error":
             engineError = e["message"] as? String
         default:
             break
         }
+    }
+}
+
+extension EngineClient {
+    static func parseAutocomplete(_ a: [String: Any]?) -> Autocomplete? {
+        guard let a, let letters = a["letters"] as? String, !letters.isEmpty else { return nil }
+        func word(_ w: Any?) -> Autocomplete.Word? {
+            guard let w = w as? [String: Any], let term = w["term"] as? String else { return nil }
+            return .init(term: term, kind: w["kind"] as? String ?? "")
+        }
+        return Autocomplete(letters: letters, top: word(a["top"]),
+                            alternates: (a["alternates"] as? [Any] ?? []).compactMap(word),
+                            dismissed: a["dismissed"] as? Bool ?? false, search: a["search"] as? String ?? "letters")
     }
 }
 

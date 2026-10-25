@@ -55,7 +55,8 @@ flowchart LR
 | ASL YES/NO confirm for Claude Code | Works |
 | Teach it your own signs (`tools/record_signs.py`) | Built |
 | Facial grammar tags (brows, head shake, nod) | Built, off by default |
-| Fingerspelling | Not yet: no released Kaggle winner model we can download |
+| Fingerspelling autocomplete with Moss: suggests the word from the first letters, the conversation, and your history | Built and tested with typed letters; needs Moss keys for the Moss search |
+| Fingerspelling recognition from the camera | Not yet: no released Kaggle winner model we can download. Type letters in the app meanwhile |
 | App-switching signs | Not yet: the mode picker is in the app |
 | Live accuracy and latency on screen | Stretch |
 
@@ -104,7 +105,7 @@ To use the real pieces:
 ```bash
 brew install blackhole-2ch                  # then restart, or log out and back in
 npm install -g @anthropic-ai/claude-code    # then run `claude` once to log in
-cp .env.example .env                        # fill in ANTHROPIC_API_KEY and CARTESIA_API_KEY
+cp .env.example .env                        # fill in ANTHROPIC_API_KEY, CARTESIA_API_KEY (and MOSS_*)
 uv sync --extra camera                      # MediaPipe + OpenCV for the webcam (Person A)
 ```
 
@@ -148,9 +149,82 @@ The packaged app reads its keys from `~/Library/Application Support/calhacks-202
 - [MediaPipe Holistic Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/holistic_landmarker): hand, pose, and face landmarks.
 - Custom signs: our own recordings (landmarks only), matched by nearest neighbour.
 
+## Autocomplete with Moss
+
+Fingerspelling names, acronyms and jargon letter by letter is slow and easy to misread. While
+the signer fingerspells, SignBridge suggests the whole word from the second letter. YES takes
+the suggestion, NO dismisses it, and continuing to spell narrows it down. The word joins the
+sentence as one fingerspelled sign. Translation, approval and turn-taking work as before.
+
+The suggestion depends on context. Say the signer once spelled "Julian" while talking about
+tennis. Weeks later, in a conversation about tennis, J-U suggests Julian ahead of Jupyter and
+June. In a conversation about data analysis, J-U suggests Jupyter.
+
+**What's stored, and where.** The memory is a local SQLite file on the Mac
+(`~/Library/Application Support/calhacks-2026/vocab.sqlite`), with one row per time a word was
+used. Each row holds:
+- the word;
+- whether it's a name, acronym or term;
+- whether the signer spelled it or someone said it in a call;
+- when it was used;
+- a meeting id;
+- 3 to 5 short topic tags ("tennis, doubles partner, weekend").
+
+Sentences, captions and transcripts are never stored. The last ~30 seconds of the
+conversation are kept in memory, used to search and to make the tags, then dropped.
+
+The tags come from Claude (Haiku), which sees that short window and the word. You can see and
+delete any word, or any single use of it, in Settings > Remembered words.
+
+**Why it stays on the Mac.** Moss's persistent indexes live in Moss's cloud. A record of the
+names and terms a Deaf person spells is personal, so we don't use a persistent index. At
+startup we build a Moss **session index** in memory on the Mac from the local file, add each
+new word to it as it's learned, and delete from it when you delete a word. We never push it.
+
+Opening the session checks the project keys (`MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY` in `.env`).
+Queries run in memory with no cloud call. Moss's telemetry sends counts and timings, never
+document or query text.
+
+**How it learns.**
+- Every word the signer spells and keeps.
+- Likely names, acronyms and jargon in the other side's captions: capitalized words that aren't
+  ordinary English, all-caps tokens, and unusual long words. So "Priyanka" or "Kubernetes",
+  heard in a meeting, can be suggested before the signer has ever spelled them.
+
+**How ranking works.** On each letter:
+1. Find the remembered words the letters could start, allowing one swap between handshapes
+   that are easy to misread: M/N, U/V/R, A/S/T/E. An exact match scores higher than a swap.
+2. Query the Moss session with the recent conversation and the signs so far (hybrid search,
+   `alpha` 0.6). Results are filtered to documents whose `prefix2` or `prefix3` metadata is
+   `$in` those words' prefixes, since Moss filters have no prefix operator.
+3. Score each word:
+   `letters × letter match + context × Moss score + frequency × log(1 + uses) + recency × 0.5^(days / 14)`.
+   - The Moss score is scaled across the candidates.
+   - Frequency is relative to the most-used candidate.
+   - A word heard in a call counts half as much as one the signer spelled.
+4. Show the top word and two alternates.
+
+Frequency and last use come from the local file, held in memory, not from Moss. All the
+weights are in `config.yaml` (`autocomplete:`).
+
+If Moss isn't available (no keys, or no network at startup) or a query takes longer than
+40 ms, suggestions are ranked by letters, frequency and recency alone. Each suggestion's
+latency is logged.
+
+**Try it.**
+- `make seed-vocab` loads Julian, Jupyter, June and a few more.
+- In `make mock`, type `tennis partner ~ju` in the mock-sign box: `~ju` spells J, U one letter
+  at a time.
+- In Meet mode, the mock captions mention Priyanka and Kubernetes, then `~pri` suggests
+  Priyanka.
+- With the camera, type letters in the "Fingerspell by typing" box until fingerspelling
+  recognition exists.
+- `tools/seed_vocab.py --synthetic 500 --time` measures the startup load.
+
 ## How we use Claude
 
 - **Translation.** Claude (Haiku 5.5, for speed) turns ASL gloss into English with the prompt in `language/prompts/gloss_to_english.md`: ASL grammar (topic first, time first, no articles), our custom signs (`WW` = website), facial grammar tags (`[yes/no question]`, `[negation]`), and how each target wants it (a direct instruction for Claude Code, a plain request for Siri). Claude only ever sees the recognized sign words, as text: never video.
+- **Topic tags for autocomplete.** When a word is remembered, Claude (Haiku, structured JSON output) gives it 3 to 5 topic tags from the last ~30 seconds of conversation, and fixes how it's written (API, Kubernetes). Only the tags are kept. It runs in the background, so suggestions never wait for it.
 - **Claude Code.** In Claude Code mode, the signer's English becomes a request to Claude Code, run headless in the demo project folder. Its reply streams into the app, it builds in the background while the signer keeps using Siri and Meet, and a follow-up continues the same session, so the signer can build something and then change it, all by signing.
 - **Where it can go wrong, and what we do about it.** A mistranslation is sent or spoken in a Deaf person's name, so the signer sees the English before anything happens: Claude Code waits for a signed YES (NO discards it), and Meet and Voice can wait too ("Review before speaking"). Claude Code is limited to file tools in one folder (`acceptEdits`, no shell, no extra directories), so a misread request can't touch anything else. If the translator fails, the app says so and falls back instead of guessing.
 
@@ -164,15 +238,15 @@ The packaged app reads its keys from `~/Library/Application Support/calhacks-202
 ## Privacy
 
 - Our app never sends video anywhere. Hand tracking and sign recognition run on your Mac. (If your camera is on in a Meet call, Google Meet sends that video as usual.)
-- Claude receives only the recognized sign words, as text. Cartesia receives only the final English to speak, plus the other side's call audio for captions.
+- Claude receives only the recognized sign words, as text, plus (for autocomplete tags) a remembered word and the last ~30 seconds of conversation. Cartesia receives only the final English to speak, plus the other side's call audio for captions.
 - Each target gets the English you send it: Claude Code (which also reads the files in its project folder, and sends them to Anthropic), Siri (Apple), or the Meet call.
 - To type to Siri, the app puts the question on the clipboard for a moment, then restores what was there. With Universal Clipboard on, your other Apple devices may briefly see it.
-- Nothing is recorded or saved: no video, no transcripts. Logs never contain what you sign or say. (Custom signs you record yourself are saved on your Mac as landmark coordinates, not images, in `models/custom_signs/`.)
+- Nothing is recorded: no video, no transcripts. Logs never contain what you sign or say. Fingerspelling autocomplete keeps only words, short topic tags and when they were used, in a file on your Mac, and you can delete any of it in Settings (see [Autocomplete with Moss](#autocomplete-with-moss)). (Custom signs you record yourself are saved on your Mac as landmark coordinates, not images, in `models/custom_signs/`.)
 - The app always shows when the camera is on.
 
 ## Limitations
 
-- Recognition covers a limited vocabulary (250 Kaggle signs plus the custom signs we record), not all of ASL. Fingerspelling isn't recognized yet. ASL grammar and regional variation are only partly handled.
+- Recognition covers a limited vocabulary (250 Kaggle signs plus the custom signs we record), not all of ASL. Fingerspelling isn't recognized from the camera yet (letters can be typed, and autocomplete works on them). ASL grammar and regional variation are only partly handled.
 - ASL grammar lives partly on the face and body. We can read brow raises and furrows, head shakes, and nods (off by default until a Deaf signer has checked it), but not mouth morphemes (size and intensity, like CHA or OOO) or body shifts (comparison, role shift), so some meaning is lost. A Deaf signer should check the output.
 - Live webcam accuracy can be much lower than benchmark scores. We'll report what we actually measure.
 - Siri can't be reached through a virtual mic. "Hey Siri" doesn't trigger from one, and even with Siri opened by ⌘Space and BlackHole set as the Mac's input, voice Siri ignores it (tested on macOS 26.2: BlackHole carried the audio, Siri heard nothing; it listens to the built-in mic). Siri uses the Type to Siri accessibility feature instead: set Siri's keyboard shortcut to Hold Command Space (Apple Intelligence & Siri settings), turn on Type to Siri (Accessibility > Siri), and give the app Accessibility permission so it can hold ⌘Space and type the question.

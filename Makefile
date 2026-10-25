@@ -1,4 +1,4 @@
-.PHONY: install swift run mock demo test lint format app demo-reset demo-serve
+.PHONY: install swift run mock demo test lint format app demo-reset demo-serve seed-vocab
 
 MAC_APP = ui/macos/.build/debug/SignBridge
 
@@ -48,3 +48,9 @@ demo-reset:
 
 demo-serve:
 	uv run python tools/demo_site.py serve
+
+# Demo words for fingerspelling autocomplete (Julian, Jupyter, June...) in the memory that
+# `make demo` and `make mock` use (tools/seed_vocab.py has --synthetic, --time, --list, --reset).
+seed-vocab:
+	uv run python tools/seed_vocab.py
+	uv run python tools/seed_vocab.py --mock
