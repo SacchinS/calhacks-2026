@@ -4,8 +4,6 @@
 - SEND publishes the Utterance, translates it, and publishes the Translation. NOW does the
   same with the Translation marked urgent (said right away, not at the next pause).
 - CLEAR empties the buffer. YES / NO / MODE belong to the router and are ignored here.
-  A SEND or NOW with nothing signed is the router's too: it approves a sentence waiting
-  for review.
 - Control signs are never passed to the translator.
 - Fingerspelled letters (Letter events) go to the autocompleter (`spelling`), in order with
   the signs: while a word is being spelled, YES accepts its suggestion and NO dismisses it,
@@ -18,7 +16,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections import deque
 from dataclasses import replace
 
 from language.base import Translator
@@ -36,9 +33,6 @@ class UtteranceBuffer:
         self.fallback = fallback or MockTranslator(translator.config)
         self.signs: list[SignEvent] = []
         self.spelling = None  # the Autocompleter (language/autocomplete.py), if any
-        # The SEND / NOW events that ended a sentence here, so the router doesn't also take
-        # them as approving the sentence that's waiting for review (outputs/router.py).
-        self.ended: deque[SignEvent] = deque(maxlen=8)
         self._task: asyncio.Task[None] | None = None
         self._warming: asyncio.Task[None] | None = None
 
@@ -104,7 +98,6 @@ class UtteranceBuffer:
             self.signs.clear()
             self._progress()
         elif event.gloss in ("SEND", "NOW") and self.signs:
-            self.ended.append(event)
             utterance = Utterance(signs=tuple(self.signs))
             self.signs.clear()
             self._progress()
