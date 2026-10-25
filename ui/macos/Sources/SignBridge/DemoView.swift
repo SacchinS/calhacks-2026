@@ -92,7 +92,7 @@ struct DemoView: View {
             switch engine.state {
             case "listening", "thinking":
                 if engine.glosses.isEmpty {
-                    hint("hand.raised", "Signing… rest your hands to finish")
+                    hint("hand.raised", "Signing… FINISH to send")
                 } else {
                     HStack(spacing: 12) {
                         ForEach(Array(engine.glosses.enumerated()), id: \.offset) { _, g in

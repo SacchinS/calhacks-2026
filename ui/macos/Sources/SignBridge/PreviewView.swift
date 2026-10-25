@@ -87,7 +87,7 @@ struct PreviewView: View {
             switch engine.state {
             case "listening", "thinking":
                 if engine.glosses.isEmpty && engine.autocomplete == nil {
-                    Text("Sign, then rest your hands.").font(.title2).foregroundStyle(.secondary)
+                    Text("Sign, then FINISH to send.").font(.title2).foregroundStyle(.secondary)
                 } else {
                     HStack(spacing: 8) {
                         ForEach(Array(engine.glosses.enumerated()), id: \.offset) { _, g in Chip(text: g) }
