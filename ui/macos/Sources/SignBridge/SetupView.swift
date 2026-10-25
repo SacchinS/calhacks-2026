@@ -3,15 +3,15 @@ import AVFoundation
 import SwiftUI
 
 enum SetupStep: Int, CaseIterable, Identifiable {
-    case welcome, camera, voice, framing, signs, done
+    case welcome, camera, speaker, voice, framing, done
     var id: Int { rawValue }
     var title: String {
         switch self {
         case .welcome: "Welcome"
         case .camera: "Camera"
-        case .voice: "Voice"
+        case .speaker: "Your voice"
+        case .voice: "Call audio"
         case .framing: "Position"
-        case .signs: "Signs"
         case .done: "Done"
         }
     }
@@ -19,9 +19,9 @@ enum SetupStep: Int, CaseIterable, Identifiable {
         switch self {
         case .welcome: "hand.wave"
         case .camera: "camera"
+        case .speaker: "person.wave.2"
         case .voice: "speaker.wave.2"
         case .framing: "person.crop.rectangle"
-        case .signs: "book"
         case .done: "checkmark.seal"
         }
     }
@@ -121,9 +121,9 @@ struct SetupView: View {
         switch step {
         case .welcome: WelcomePage()
         case .camera: CameraPage(done: { done(.camera, $0) })
+        case .speaker: SpeakerPage(engine: engine, done: { done(.speaker, $0) })
         case .voice: VoicePage(engine: engine, done: { done(.voice, $0) })
         case .framing: FramingPage(engine: engine, done: { done(.framing, $0) })
-        case .signs: SignsPage(done: { done(.signs, true) })
         case .done: DonePage(skipped: SetupStep.allCases.filter { ![.welcome, .done].contains($0) && !completed.contains($0) })
         }
     }
@@ -307,13 +307,45 @@ struct FramingPage: View {
     }
 }
 
-struct SignsPage: View {
-    let done: () -> Void
+/// "Your voice": pick the Cartesia voice that speaks for you in calls, after hearing each one.
+struct SpeakerPage: View {
+    @ObservedObject var engine: EngineClient
+    let done: (Bool) -> Void
     var body: some View {
-        PageHeader(title: "Signs to try",
-                   subtitle: "SignBridge knows these signs so far. Copy the colored hand; the arrow shows its path.")
-        SignGuideView(columns: 2).onAppear(perform: done)
-        Text("Open this guide any time from the menu bar: Sign Guide.").foregroundStyle(.secondary).padding(.top, 8)
+        PageHeader(title: "Your voice",
+                   subtitle: "This voice says what you sign in your calls. Play each one, then pick the one that sounds like you.")
+        VStack(spacing: 8) {
+            ForEach(engine.voices) { voice in
+                let picked = engine.voiceID == voice.id
+                HStack(spacing: 12) {
+                    Image(systemName: picked ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(picked ? Brand.accent : .secondary).font(.title2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(voice.name).font(.headline)
+                        Text(voice.about).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if engine.previewing == voice.id {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Button { engine.previewVoice(voice.id) } label: { Label("Play", systemImage: "play.fill") }
+                            .help("Hear \(voice.name) on this Mac's speakers")
+                    }
+                }
+                .padding(12)
+                .background(picked ? Brand.accent.opacity(0.12) : Color.primary.opacity(0.04),
+                            in: RoundedRectangle(cornerRadius: 10))
+                .contentShape(Rectangle())
+                .onTapGesture { engine.chooseVoice(voice.id) }
+            }
+        }
+        .padding(.top, 6)
+        if let p = engine.lastPreview, !p.ok {
+            StatusLine(ok: false, text: "Couldn't play it: \(p.detail). Check the Cartesia key in .env.")
+        }
+        Color.clear.frame(height: 1)
+            .onAppear { done(!engine.voiceID.isEmpty) }
+            .onChange(of: engine.voiceID) { _, id in done(!id.isEmpty) }
     }
 }
 
