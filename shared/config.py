@@ -30,6 +30,7 @@ CHOICES: dict[str, tuple[str, ...]] = {
     "siri": ("mock", "real"),
     "tts": ("mock", "say", "cartesia"),
     "captions": ("mock", "cartesia"),
+    "vocab_search": ("mock", "moss"),
 }
 
 
@@ -41,6 +42,7 @@ class Config:
     siri: str = "mock"
     tts: str = "mock"
     captions: str = "mock"
+    vocab_search: str = "mock"
     mode: str = "claude_code"
     # Every other section of config.yaml (ui, recognition, language, audio, ...), as dicts.
     sections: dict[str, dict[str, Any]] = field(default_factory=dict)

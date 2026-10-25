@@ -97,6 +97,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "cartesia", extra = ["websockets"] },
+    { name = "moss" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "pyobjc-framework-applicationservices", marker = "sys_platform == 'darwin'" },
@@ -127,6 +128,7 @@ requires-dist = [
     { name = "anthropic", specifier = ">=2.1.0" },
     { name = "cartesia", extras = ["websockets"], specifier = ">=4.2.0" },
     { name = "mediapipe", marker = "extra == 'camera'", specifier = ">=1.1.1" },
+    { name = "moss", specifier = ">=1.21.0" },
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "opencv-python", marker = "extra == 'camera'", specifier = ">=5.0.0.93" },
     { name = "pyobjc-framework-applicationservices", marker = "sys_platform == 'darwin'", specifier = ">=12.2.2" },
@@ -433,6 +435,17 @@ wheels = [
 ]
 
 [[package]]
+name = "inferedge-moss-core"
+version = "0.35.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/11/b4/5b732ff7bcbd641b44f0310cb66eaccd56568fc38e9fa48b69d3694db0d6/inferedge_moss_core-0.35.0-cp310-abi3-macosx_11_0_arm64.whl", hash = "sha256:1ba3c9317943d64672e3c16ed350d98d9a0e7517522ec8e92942c5be2b805d46", size = 4645765, upload-time = "2026-10-23T04:37:03.301Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/0b/a41bf91900f65df30655d4a77956de7f246585b787b056c1a5a73693bb89/inferedge_moss_core-0.35.0-cp310-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:2d7f3d74095ca5cbb14040cc0a2ab9734bc9e049a641918c01b934c6e5798af6", size = 5494459, upload-time = "2026-10-23T04:37:05.746Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/67/6ff1a464efacd6f3f5abac8be62d765fed051c77c8a39f573d98a19e6b55/inferedge_moss_core-0.35.0-cp310-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:4153139b20880eaa2866d53abd612f6b466592d280a155f54a437f5d493e0a61", size = 5703541, upload-time = "2026-10-23T04:37:07.651Z" },
+    { url = "https://files.pythonhosted.org/packages/71/b9/9eceb63a2f219c3bcc4083d9433104d54aaa32ff6a0174862f7eec93eee9/inferedge_moss_core-0.35.0-cp310-abi3-win_amd64.whl", hash = "sha256:e1a7fb3ebe0ff95c0cabf377245aac88a6650f0ae5a1b692932c5ed33d567cdd", size = 6148400, upload-time = "2026-10-23T04:37:09.638Z" },
+]
+
+[[package]]
 name = "iniconfig"
 version = "2.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -611,6 +624,22 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/f9/7d76c1eae866f5d4636401b31b6d6dd90e4b4ced1fa7cfdfcca9c60e4bd3/ml_dtypes-0.6.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3b4a480aa8fd54a1805b8ac10f3f91763926a74f73c0c364c10f9231854f4170", size = 409890, upload-time = "2026-08-13T14:14:04.248Z" },
     { url = "https://files.pythonhosted.org/packages/ba/db/9c61ec2760b5cbfb1c6558d5c991a6d8fd3271053c32db20506a9a90272b/ml_dtypes-0.6.0-cp312-cp312-win_amd64.whl", hash = "sha256:2a3e9d53925597fbffafd2a37048dadeddd0bdaba58058f6ae0869ed709a184d", size = 439333, upload-time = "2026-08-13T14:14:05.501Z" },
     { url = "https://files.pythonhosted.org/packages/6a/57/780ca3e5ab135b9fbdd8e5441abf5f801b30398371b691291e05ab9834c0/ml_dtypes-0.6.0-cp312-cp312-win_arm64.whl", hash = "sha256:6eaed129a4afe90694b8685e2f9b6294849f5eda4af9a15be83a4326eeebd775", size = 552268, upload-time = "2026-08-13T14:14:06.866Z" },
+]
+
+[[package]]
+name = "moss"
+version = "1.21.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "h11" },
+    { name = "httpx" },
+    { name = "inferedge-moss-core" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/84/5d/e608b11b37449c8fec90215d88d80884701ffa673652fdd77cc7b4323afb/moss-1.21.0.tar.gz", hash = "sha256:fff61d46a4edd2ef3b53c0efc0ed75e972dc1b3f05ba445bdebf29371efe687b", size = 62180, upload-time = "2026-10-23T04:42:19.764Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e9/fa/17c9be586785665b429f61e156c09ca56d6b23d8aaa2430ce723700d4ded/moss-1.21.0-py3-none-any.whl", hash = "sha256:0ff7f13757289e710ad812dc433d8ac426e016b780dd1a069c50e38780bf679c", size = 55196, upload-time = "2026-10-23T04:42:18.404Z" },
 ]
 
 [[package]]

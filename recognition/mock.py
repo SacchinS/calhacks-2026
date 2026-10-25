@@ -4,7 +4,9 @@ Input comes from the terminal (one line per Enter) and from the UI's mock-sign b
 
     hello              -> isolated sign HELLO
     me want fix bug    -> one isolated sign per word: ME, WANT, FIX, BUG
-    #sarah             -> fingerspelled SARAH
+    #sarah             -> fingerspelled SARAH (the whole word at once)
+    ~pri               -> fingerspelled letters P, R, I one at a time (autocomplete suggests
+                          the word; /yes accepts it, /no dismisses it)
     /yes /no /send /clear /mode   -> control signs (/finish is the same as /send)
 
 Facial grammar goes after the signs it covers (back to the start of the line, a comma, or
@@ -33,6 +35,7 @@ from shared.events import (
     CONTROL_ALIASES,
     CONTROL_SIGNS,
     FaceMarker,
+    Letter,
     MockInput,
     Notice,
     SignEvent,
@@ -55,15 +58,16 @@ MARKERS: dict[str, FaceMarker] = {
 }
 
 
-def parse_line(line: str) -> list[SignEvent]:
-    """Turn one typed line into SignEvents. Raises ValueError on an unknown /command or [tag]."""
+def parse_line(line: str) -> list[SignEvent | Letter]:
+    """Turn one typed line into SignEvents (and Letters for `~abc`). Raises ValueError on an
+    unknown /command or [tag]."""
     line = line.replace("[yes/no question]", "[q]")
-    events: list[SignEvent] = []
+    events: list[SignEvent | Letter] = []
     span_start = 0  # first sign the next marker covers
     for token in line.split():
         if token.lower() in MARKERS:
             span = events[span_start:]
-            if not any(e.kind != "control" for e in span):
+            if not any(isinstance(e, SignEvent) and e.kind != "control" for e in span):
                 raise ValueError(f"{token} needs signs before it")
             marker = MARKERS[token.lower()]
             events[span_start:] = [_with_marker(e, marker) for e in span]
@@ -80,6 +84,8 @@ def parse_line(line: str) -> list[SignEvent]:
                 raise ValueError(f"unknown control sign {token!r}")
             events.append(make_sign_event(command, 1.0, "control"))
             span_start = len(events)
+        elif token.startswith("~"):
+            events.extend(Letter(c.upper()) for c in token[1:] if c.isalpha())
         elif token.startswith("#"):
             if token[1:]:
                 events.append(make_sign_event(token[1:], 1.0, "fingerspell"))
@@ -90,8 +96,8 @@ def parse_line(line: str) -> list[SignEvent]:
     return events
 
 
-def _with_marker(event: SignEvent, marker: FaceMarker) -> SignEvent:
-    if event.kind == "control":
+def _with_marker(event: SignEvent | Letter, marker: FaceMarker) -> SignEvent | Letter:
+    if isinstance(event, Letter) or event.kind == "control":
         return event
     return replace(event, markers=event.markers | {marker})
 
@@ -113,7 +119,6 @@ class MockRecognizer(Recognizer):
             self.bus.publish(Notice("warning", f"Mock recognizer: {exc}"))
             return
         for event in events:
-            log.debug("mock sign %s (%s)", event.gloss, event.kind)
             self.bus.publish(event)
 
     async def start(self) -> None:
@@ -156,6 +161,6 @@ class MockRecognizer(Recognizer):
         try:
             loop.add_reader(sys.stdin.fileno(), on_line)
             self._stdin_attached = True
-            print("Mock signs: type gloss + Enter (#word = fingerspell, /yes /no /send ...)")
+            print("Mock signs: type gloss + Enter (#word = fingerspell, ~abc = letters, /send)")
         except (NotImplementedError, OSError, ValueError) as exc:
             log.warning("can't read terminal input (%s); use the UI's mock-sign box", exc)

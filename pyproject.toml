@@ -7,6 +7,7 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
     "anthropic>=2.1.0",
     "cartesia[websockets]>=4.2.0",
+    "moss>=1.21.0",
     "numpy>=2.4.6",
     "pyobjc-framework-applicationservices>=12.2.2 ; sys_platform == 'darwin'",
     "pyobjc-framework-cocoa>=12.2.2 ; sys_platform == 'darwin'",

@@ -4,6 +4,10 @@
 - SEND publishes the Utterance, translates it, and publishes the Translation.
 - CLEAR empties the buffer. YES / NO / MODE belong to the router and are ignored here.
 - Control signs are never passed to the translator.
+- Fingerspelled letters (Letter events) go to the autocompleter (`spelling`), in order with
+  the signs: while a word is being spelled, YES accepts its suggestion and NO dismisses it,
+  and the next sign or SEND keeps the letters as spelled. The word is appended as one
+  fingerspelled sign.
 """
 
 from __future__ import annotations
@@ -15,7 +19,7 @@ import logging
 from language.base import Translator
 from language.mock import MockTranslator
 from shared.bus import Bus
-from shared.events import Notice, SignEvent, Translation, Utterance, UtteranceProgress
+from shared.events import Letter, Notice, SignEvent, Translation, Utterance, UtteranceProgress
 
 log = logging.getLogger(__name__)
 
@@ -26,11 +30,12 @@ class UtteranceBuffer:
         self.translator = translator
         self.fallback = fallback or MockTranslator(translator.config)
         self.signs: list[SignEvent] = []
+        self.spelling = None  # the Autocompleter (language/autocomplete.py), if any
         self._task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
         if self._task is None:
-            sub = self.bus.subscribe(SignEvent)
+            sub = self.bus.subscribe(SignEvent, Letter)
             self._task = asyncio.create_task(self._run(sub), name="utterance-buffer")
 
     async def stop(self) -> None:
@@ -47,7 +52,22 @@ class UtteranceBuffer:
         finally:
             sub.close()
 
-    async def handle(self, event: SignEvent) -> None:
+    async def handle(self, event: SignEvent | Letter) -> None:
+        if isinstance(event, Letter):
+            if self.spelling is not None:
+                self.spelling.add(event.letter)
+            return
+        if self.spelling is not None and self.spelling.active:
+            if event.gloss == "YES" and event.kind == "control":
+                self.accept_suggestion()
+                return
+            if event.gloss == "NO" and event.kind == "control":
+                self.spelling.dismiss()
+                return
+            if event.gloss == "CLEAR":
+                self.spelling.clear()
+            elif event.kind != "control" or event.gloss == "SEND":
+                self._append(self.spelling.finish())  # moved on: keep the letters as spelled
         if event.kind != "control":
             self.signs.append(event)
             self._progress()
@@ -60,6 +80,16 @@ class UtteranceBuffer:
             self._progress()
             self.bus.publish(utterance)
             self.bus.publish(await self.translate(utterance.gloss))
+
+    def accept_suggestion(self, index: int = 0) -> None:
+        """YES while spelling (or a click on a suggestion in the app)."""
+        if self.spelling is not None:
+            self._append(self.spelling.accept(index))
+
+    def _append(self, word: SignEvent | None) -> None:
+        if word is not None:
+            self.signs.append(word)
+            self._progress()
 
     async def translate(self, gloss: list[str]) -> Translation:
         try:

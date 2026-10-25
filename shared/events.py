@@ -184,6 +184,41 @@ class Mention:
 
 
 @dataclass(frozen=True)
+class Letter:
+    """One fingerspelled letter, while a word is being spelled (autocomplete suggests the
+    rest). Not a sign: the utterance buffer gets the whole word once it's accepted."""
+
+    letter: str
+    confidence: float = 1.0
+    ts: float = field(default_factory=_now)
+
+
+@dataclass(frozen=True)
+class Suggestion:
+    """A word autocomplete thinks the signer is spelling (`kind`: name | acronym | term)."""
+
+    term: str
+    kind: str
+    score: float
+
+
+@dataclass(frozen=True)
+class AutocompleteUpdate:
+    """The word being fingerspelled and the best guesses for it (empty letters: none).
+
+    `dismissed`: the signer said NO to the suggestions for this word. `search` is how they
+    were ranked: "moss" or "keyword" (with the conversation), or "letters" (no context).
+    """
+
+    letters: str
+    suggestions: tuple[Suggestion, ...] = ()
+    dismissed: bool = False
+    search: str = "letters"
+    latency_ms: float | None = None
+    ts: float = field(default_factory=_now)
+
+
+@dataclass(frozen=True)
 class OutputSent:
     """English was sent to an output (`output` is the Output's name)."""
 

@@ -20,8 +20,10 @@ from typing import Any
 
 from captions.base import CaptionSource
 from captions.mentions import MentionDetector
+from language.autocomplete import Autocompleter
 from language.base import Translator
 from language.utterance import UtteranceBuffer
+from language.vocab import VocabStore, vocab_path
 from outputs.call_host import CallHost
 from outputs.console import ConsoleOutput
 from outputs.router import Router
@@ -62,6 +64,10 @@ REGISTRY: dict[str, dict[str, str]] = {
         "mock": "captions.mock:MockCaptionSource",
         "cartesia": "captions.cartesia_stt:CartesiaCaptionSource",
     },
+    "vocab_search": {
+        "mock": "language.vocab_search:KeywordSearch",
+        "moss": "language.vocab_search:MossSearch",
+    },
 }
 assert {k: tuple(v) for k, v in REGISTRY.items()} == CHOICES
 
@@ -94,6 +100,12 @@ class App:
         self.call_host = CallHost(self.bus, config, self.router)
         self.captions: CaptionSource = self._build("captions", self.bus, config)
         self.mentions = MentionDetector(self.bus, config)
+        # Fingerspelling autocomplete: the word memory (a local SQLite file) and its search.
+        self.vocab = VocabStore(vocab_path(config))
+        self.autocomplete = Autocompleter(
+            self.bus, config, self.vocab, self._build("vocab_search", config)
+        )
+        self.buffer.spelling = self.autocomplete
         self._captions_task: asyncio.Task[None] | None = None
 
     def _voice(self, config: Config) -> Any:
@@ -121,6 +133,7 @@ class App:
         mode_changes = self.bus.subscribe(ModeChanged)
         self._captions_task = asyncio.create_task(self._captions_follow_mode(mode_changes))
         await self.buffer.start()
+        await self.autocomplete.start()
         await self.router.start()
         await self.call_host.start()
         await self.mentions.start()
@@ -151,7 +164,9 @@ class App:
         if isinstance(self.router.tts, TurnTakingOutput):
             await self.router.tts.stop()
         await self.router.stop()
+        await self.autocomplete.stop()
         await self.buffer.stop()
+        self.vocab.close()
 
     async def _captions_follow_mode(self, mode_changes) -> None:
         """Captions run only in Meet mode."""
