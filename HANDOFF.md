@@ -1,6 +1,6 @@
 # Handoff: getting the three of us started
 
-**Start here.** If you were told "pull and read HANDOFF.md", this doc is everything you need: it gets each person from zero to working on their part. **Most of the code is now built** (Oct 24): every part has a real implementation behind its mock, and `make test`, `make mock`, and `make lint` pass on `main`. What's left is the work only a person with the hardware, the keys, or ASL can do: testing on a real webcam, a real Meet call, and real API keys, recording our custom signs, and tuning. "What's built" and "What still needs a person" below say exactly what. The plan itself is in `MVP.md`; this doc doesn't repeat it, beyond the key dates and the demo in short.
+**Start here.** If you were told "pull and read HANDOFF.md", this doc is everything you need: it gets each person from zero to working on their part. **The project is now Google Meet only** (Oct 24): signing spoken in the call, captions back, and fingerspelling autocomplete with Moss. Claude Code and Siri were cut; the old code is on the `archive/claude-code-siri` branch. Every part on `main` has a real implementation behind its mock, and `make test`, `make mock`, and `make lint` pass. What's left: camera fingerspelling, a bigger sign vocabulary, Moss with real keys, a real two-laptop call, and tuning. "What's built" and "What still needs a person" below say exactly what. The plan itself is in `MVP.md`; this doc doesn't repeat it, beyond the key dates and the demo in short.
 
 **How to use it:**
 1. The lead does the "Before anyone starts" list once.
@@ -11,11 +11,11 @@
 
 - [x] **Repo push access.** The repo (`SacchinS/calhacks-2026`) is public, so anyone can clone it, but only collaborators can push. Invites are sent (GitHub > Settings > Collaborators); each teammate accepts theirs (step 1 below).
 - [ ] **SignBridge access for Person A.** Person A's stretch goal ports `signbridge/gestures.py` from the earlier project, and `SacchinS/signbridge` is private. Add Person A as a collaborator there, or copy that one file over.
-- [ ] **API keys.** Send keys privately (a DM, never the repo or a public channel). Person B needs `ANTHROPIC_API_KEY`. Person C needs `CARTESIA_API_KEY`. Person A needs none.
-- [ ] **Who is A, B, and C.** Decide and write it here:
-  - Person A (Recognition): ____
-  - Person B (Language and Claude Code): ____
-  - Person C (Voice, Siri, Meet, and UI): ____
+- [ ] **API keys.** Send keys privately (a DM, never the repo or a public channel). Person B needs `ANTHROPIC_API_KEY` and the Moss keys (`MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`). Person C needs `CARTESIA_API_KEY`. Person A needs none.
+- [x] **Who is A, B, and C** (from the team's work-split doc):
+  - Person A (Recognition): Sacchin
+  - Person B (Language and autocomplete): Eleyn
+  - Person C (Voice, Meet, and the Mac app): Julian
 
 ## Everyone: first 15 minutes
 
@@ -27,9 +27,9 @@
    cd calhacks-2026
    make install && make test && make mock
    ```
-   `make mock` opens the Mac app (hand icon in the menu bar). Click through setup with "Skip for now", open Preview, and type `me want fix bug login page /send /yes` in the box at the bottom. You should see the English, the confirm step, and a mock Claude Code reply.
-4. Read, in this order: this file (all of it); `MVP.md` ("What the MVP must do", "How we work", "Checkpoints", then your own Person section); `SCAFFOLD.md` ("Core interfaces" and "The mock recognizer"); `README.md`; `docs/user-research.md` (why Meet is the centerpiece, and the privacy rules); and for A and B, `docs/asl-demo-script-research.md` (the draft glosses and the source video for every sign). Your starter prompt has Claude Code read the first four too.
-5. Pick your role with the team: A (Recognition), B (Language and Claude Code), or C (Voice, Siri, Meet, and UI). Write your name in "Who is A, B, and C" above, then make your branch: `git checkout -b person-a` (or `person-b`, `person-c`).
+   `make mock` opens the Mac app (hand icon in the menu bar). Click through setup with "Skip for now", open Preview, and type `hello ~pri` in the box at the bottom: the autocomplete suggests Priyanka (from the mock captions). Then `/yes nice meet-you /send`, and the call panel shows what the mock voice said.
+4. Read, in this order: this file (all of it); `MVP.md` ("What the MVP must do", "How we work", "Checkpoints", then your own Person section); `SCAFFOLD.md` ("Core interfaces" and "The mock recognizer"); `README.md`; `docs/user-research.md` (why the app is only about calls, and the privacy rules); and for A and B, `docs/asl-demo-script-research.md` (Moment 3, the Meet greeting: the draft glosses and the source video for every sign). Your starter prompt has Claude Code read the first four too.
+5. Find your role in "Who is A, B, and C" above, then make your branch from the new `main`: `git checkout -b person-a` (or `person-b`, `person-c`).
 6. If you use API keys: get yours from the lead in a DM, then `cp .env.example .env` and fill it in. `.env` is gitignored. Never commit it; Cartesia's rules disqualify that.
 7. Open Claude Code in the repo on your branch and paste your prompt from "Starter prompts" below.
 8. From then on, follow "Team rules" below: keep `config.yaml` on `mock` on `main`, merge through a PR to `main`, and run `make test` and `make lint` before every PR (without `make`: `uv run pytest -q`, `uv run ruff check .`, `uv run ruff format --check .`).
@@ -37,56 +37,60 @@
 ## Key dates
 
 From `MVP.md` ("Checkpoints" has the full list):
-- **Saturday night:** all four demo moments work on the real two-screen setup, and we record a backup demo video.
+- **Saturday night:** the whole demo call works on the real two-laptop, two-screen setup, and we record a backup demo video.
 - **Sunday ~3 AM:** feature freeze.
 - **Sunday Oct 25, 8:00 AM:** at the venue. **9:00 AM PT:** Devpost submission deadline. It's hard: nothing gets in after it.
 - **Sunday 10:30 AM–12:30 PM:** judging. The whole team is there.
 
 ## The demo, in short
 
-Four moments, in this order (details in `MVP.md`, "What the MVP must do"):
-1. **Claude Code kick-off:** sign a build request, sign YES, and leave it building.
-2. **Siri:** sign a reminder; the app types it to Siri and Siri sets it.
-3. **Google Meet, the centerpiece:** the app introduces the signer in a Cartesia voice, the signer signs a greeting the other side hears, and the reply shows as captions.
-4. **Claude Code re-prompt:** sign a small change to what it built, sign YES, and watch the page update.
+One Google Meet call between two laptops (details in `MVP.md`, "What the MVP must do"). A teammate on the other laptop plays a colleague:
+1. **They talk; captions show it.** "Hi, I'm Priyanka, I'm leading the Kubernetes migration this sprint." The autocomplete remembers Priyanka and Kubernetes.
+2. **Fingerspelling with autocomplete.** The signer signs HELLO, spells P-R-I, YES takes "Priyanka", then NICE MEET-you, FINISH: the other laptop hears it in the Cartesia voice at the next pause.
+3. **Someone asks the signer something.** Their name in the captions flashes a banner; they answer by signing (K-U-B → Kubernetes).
+4. **Meeting manners.** A one-tap "Please slow down a little." is said right away, and turn-taking waits for pauses.
 
-Why this order: Claude Code goes first so it has minutes to build while we show the rest. Siri comes before Meet so the demo builds up to the strongest part. Meet is the centerpiece because Professor Lance Forshay (Deaf ASL faculty at UW), who answered our survey, said video calls are the one place he'd use this, and that hearing people hang up on relay calls when they don't know who's calling (hence the intro). His answers and what we changed are in `docs/user-research.md`.
+Why only calls: Professor Lance Forshay (Deaf ASL faculty at UW), who answered our survey, said video calls are the one place he'd use this. His answers and what we changed are in `docs/user-research.md`.
 
-The glosses for all four moments are drafts (`docs/asl-demo-script-research.md`). A Deaf signer must approve or rewrite them before the demo. Nobody on the team knows ASL, so learn every sign from the source videos linked there (or from a Deaf signer), never by guessing.
+The glosses are drafts (`docs/asl-demo-script-research.md`, Moment 3). A Deaf signer must approve or rewrite them before the demo. Nobody on the team knows ASL, so learn every sign from the source videos linked there (or from a Deaf signer), never by guessing.
 
 ## What's built, and how well it's tested
 
 | Part | Owner | State |
 |---|---|---|
 | Bus, events, config, app wiring (`shared/`, `app.py`) | shared | Done. Change only after telling the others. |
-| Mac app (`ui/macos`) and its engine bridge (`ui/server.py`) | C | Works on mocks: Preview, Demo Mode, setup wizard (Save This Position now fits the signing space), mode picker, panels for Claude Code, Siri, Voice, and Meet (a You/Them conversation with "Introduce me"), "Claude Code is working" pill, camera-on indicator, Settings > Calls and Privacy. |
+| Mac app (`ui/macos`) and its engine bridge (`ui/server.py`) | C | Works on mocks: Preview with the call panel always showing (a You/Them conversation, quick replies, "Introduce me"), Demo Mode, the autocomplete bar, setup wizard (Save This Position fits the signing space), camera-on indicator, Settings > Calls, Privacy and Remembered words. |
 | Webcam and landmarks (`recognition/camera.py`, `gating.py`) | A | Camera and MediaPipe landmarks run (`uv sync --extra camera`). Not tested live since the model went in. |
 | Kaggle sign model (`recognition/isolated.py`) | A | **Built.** Downloads to `models/islr/` on first use, runs with LiteRT (~9 ms per window). Not yet tested on a real webcam: thresholds need tuning. |
-| Custom signs (`recognition/custom_signs.py`, `tools/record_signs.py`) | A | **Built.** Few-shot matching from recorded examples. Nothing recorded yet: WW, YOU-REMIND-ME, MEET-YOU, BUY, HOW, YOU, TITLE. |
+| ASL Citizen sign model (2,731 signs) | A | **Next.** Weights checked: MediaPipe Holistic points like ours, ~20 ms per sign on an M1. To be limited to the demo's signs. |
+| Recording and tuning tools (`tools/record_script.py`, `tools/tune_recognition.py`) | A | **Built on `person-a`**, waiting on a PR and real takes. |
+| Custom signs (`recognition/custom_signs.py`, `tools/record_signs.py`) | A | **Built.** Few-shot matching from recorded examples. Nothing recorded yet; only needed for demo signs neither model knows. |
 | Segmenter and control signs (`recognition/segmenter.py`) | A | Works. YES / NO / FINISH need a hold (2x `min_frames`), so a mid-sentence FINISH doesn't send. |
 | Face markers (`recognition/face_markers.py`) | A | **Built, off by default** (`recognition.face_markers`). Heuristic; untested on a real face. |
-| Fingerspelling (`recognition/fingerspelling.py`) | A | Stub: the camera produces no letters yet. No released Kaggle winner on Hugging Face. Autocomplete needs it to publish one `Letter` event per letter. |
+| Fingerspelling (`recognition/fingerspelling.py`) | A | **Next.** Stub: the camera produces no letters yet. Plan: a pretrained A–Z letter model on the hand landmarks (ONNX), one `Letter` per held handshape. |
 | Fingerspelling autocomplete (`language/autocomplete.py`, `vocab.py`, `vocab_search.py`, `vocab_terms.py`, `tagger.py`) | B | **Built and tested on typed letters** (`~pri` in the mock box, or the app's "Fingerspell by typing" box). It ranks words by letters, the conversation (Moss session or keyword mock), frequency and recency; learns words from your spelling and from captions; keeps its memory in a local SQLite file; and lets you list and delete words in Settings. Moss itself isn't run yet (no keys): `uv run pytest --live tests/test_moss_search.py` once they're in `.env`. |
 | Replay (`recognizer: replay`) | A | Works, but `fixtures/landmarks_sample.jsonl` is fake data. |
-| Claude translator (`language/claude.py`, prompt) | B | **Built** (Haiku 5.5, no thinking). Prompt has the glossary, face-marker tags, and demo examples. Not run against the API yet (no key on the build machine): run `uv run pytest --live tests/test_claude_translator.py`. |
-| Confirm flow and router (`outputs/router.py`) | B | Works. Claude Code runs in the background (Siri and Meet keep working during a build). Optional review before speaking in Meet and Voice. |
-| Claude Code output (`outputs/claude_code.py`) | B | **Real and tested**: "Build a website for a grocery store." built a site in 61 s, then "Make the title red." edited it in 6 s in the same session (`--resume`). |
-| Demo site (`demo/site`, `tools/demo_site.py`) | B | Works: `make demo-reset`, `make demo-serve` (auto-reload at http://localhost:8765). |
-| Type to Siri (`outputs/siri.py`) | C | **Real and tested** (`siri: real`). |
+| Claude translator (`language/claude.py`, prompt) | B | **Works**: live tests pass, 0.6 to 1.0 s each (Haiku 5.5, no thinking). The prompt is now written for speech in a meeting. |
+| Router (`outputs/router.py`) | B | Works. Everything goes to the voice; optional review before speaking (YES / NO). |
 | `say` voice into BlackHole (`outputs/tts_say.py`) | C | Real (`tts: say`). |
-| Cartesia voice (`outputs/tts_cartesia.py`) | C | **Built**: Sonic over SSE, streamed into BlackHole 2ch, falls back to `say`. Playback into BlackHole tested; Cartesia itself not run yet (no key). Set `cartesia.voice_id`. |
-| Meet captions (`captions/cartesia_stt.py`) | C | **Built**: Ink realtime STT from BlackHole 16ch, partial captions update in place. Not run yet (no key, BlackHole 16ch not installed on the build machine). |
+| Cartesia voice (`outputs/tts_cartesia.py`) | C | **Works** on a loopback (voice "Skylar"): Sonic over SSE, streamed into BlackHole 2ch, falls back to `say`. |
+| Meet captions (`captions/cartesia_stt.py`) | C | **Works** on a loopback: Ink realtime STT from BlackHole 16ch, partial captions update in place. They start with the app now. A real two-laptop call is next. |
 | Turn-aware speaking (`outputs/turn_taking.py`) | C | **Works**, tested live with Cartesia Ink on a BlackHole loopback: the approved sentence waited for the other side's `turn.end` and started the moment it came. Chime-in and talked-over handling are unit-tested. Tune `meet.chime_in_seconds` and `barge_in_seconds` in a real call. |
-| Call intro and signing cue (`outputs/call_host.py`) | C | Works on mocks: the intro when Meet starts, "Introduce me", and "One moment, I'm signing." after 5 s of unsent signing. |
+| Call intro and signing cue (`outputs/call_host.py`) | C | Works on mocks: "Introduce me", the intro at startup with `meet.intro_on_start`, and "One moment, I'm signing." with `meet.signing_cue_seconds`. |
 
 ## Recent changes
 
+- **Meet only** (Oct 24). Claude Code, Siri, the Voice mode and the demo website are gone from `main` (kept on `archive/claude-code-siri`).
+  - **Events and config:** `shared/events.py` lost `Mode`, `ModeChanged`, `OutputReply`, and the `MODE` control sign; `ConfirmRequest` lost `target`. The `claude_code`, `siri` and `mode` config lines and the `claude_code_cli` / `type_to_siri` sections are gone, and so is pyobjc.
+  - **Behavior:** every translation goes to the voice (after YES with review on). Captions start with the app. The call intro is said at startup when `meet.intro_on_start` is on. The autocomplete keeps one meeting id per run.
+  - **Protocol:** the `output_mode` command and the `reply` event are gone; `status` lost `output_mode` and `claude_code_working`; `sent` lost `mode`; `test_route` is voice only.
+  - **App:** no mode picker; Preview always shows the call panel; setup lost the Accessibility and Siri steps; the demo phrases are the Meet greeting with fingerspelled Priyanka and Kubernetes.
 - **Fingerspelling autocomplete with Moss** (Oct 24). `shared/events.py` gained `Letter`, `Suggestion`, and `AutocompleteUpdate`. A new component line, `vocab_search: mock | moss`, is on `moss` in `config.demo.yaml` and needs `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY`.
   - **Flow:** the utterance buffer hands letters to the autocompleter in order with the signs. While a word is being spelled, YES accepts it and NO dismisses it, and the confirm and cancel gestures do the same. A sign or SEND keeps the letters as spelled.
   - **Storage:** the memory is `~/Library/Application Support/calhacks-2026/vocab.sqlite` (`vocab-mock.sqlite` for the mock search). The Moss session is built from it at startup, never pushed.
   - **New protocol:** status fields `autocomplete` and `autocomplete_stats`; commands `letters`, `autocomplete`, `vocab_list` and `vocab_delete`; event `vocab`.
   - **Mock and tools:** `~abc` in the mock box spells letters, the mock captions mention Priyanka and Kubernetes, and `make seed-vocab` loads demo words.
-  - **Known edge:** YES while spelling and while a Claude Code confirmation is pending acts on both.
+  - **Known edge:** with review before speaking, YES while spelling and while a sentence waits for review acts on both.
 
 - **Mention alerts** (Oct 24). `captions/mentions.py` watches the captions for the signer's name (Settings > Calls, plus `meet.mention_names`) and publishes a new `Mention` event in `shared/events.py`: once per turn as soon as the name is heard, then again with the full sentence and whether it's a question. The app shows a flashing yellow banner above every window, fullscreen Meet included, without taking focus (`MentionBanner.swift`). `meet.alert_on_questions` alerts on every question, for 1:1 calls. New protocol event `mention`. The mock captions are now a short sprint check-in that says "Sam, can you take the filters ticket by Friday?".
 - **Meetings first: quick replies, quieter defaults** (Oct 24). The Meet panel has one-tap replies (`meet.quick_replies`): pressing one is the approval, normal ones wait for a pause, urgent ones ("Can you repeat that?", "Please slow down a little.", "One at a time, please.") are said right away. New command `quick_reply`; `ready` now lists the replies. The call intro and "One moment, I'm signing." are off by default (`meet.intro_on_start`, `meet.signing_cue_seconds`): they help on calls with strangers, not team meetings where people know you and can see you sign. "Introduce me" still works.
@@ -107,23 +111,20 @@ The glosses for all four moments are drafts (`docs/asl-demo-script-research.md`)
 
 ## What still needs a person
 
-These need hardware, keys, or ASL, so they couldn't be done on the build machine. In rough demo order:
+In rough demo order:
 
-1. **Keys** (lead): put `ANTHROPIC_API_KEY` and `CARTESIA_API_KEY` in `.env` on the demo laptop (done on the build machine). `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY` are still needed, from a Moss project (code CALHACKS on the Portal's billing page). Then `uv run pytest --live` runs the real translator, Cartesia and Moss tests, including the 500-word startup timing.
-2. **Translator check** (B): run `uv run pytest --live tests/test_claude_translator.py` and fix the prompt where a case fails; check it's under ~2 s.
-3. **Custom signs** (A): learn WW, YOU-REMIND-ME, MEET-YOU, BUY, HOW, YOU, and TITLE from the source videos (or a Deaf signer), record 5+ takes each with `tools/record_signs.py`, and run `--check`. The signer who demos should record them.
-4. **Live recognition** (A): `recognizer: camera`, sign the demo script, and tune `confidence_threshold`, `isolated_floor`, `min_frames`, and `control_min_frames` until each phrase comes out right. Then record a real fixture to replace `fixtures/landmarks_sample.jsonl`.
-5. **Cartesia voice** (C): pick a voice (`cartesia.voice_id`), check a Meet call hears it through BlackHole 2ch.
-6. **Captions** (C): install BlackHole 16ch, set up the Multi-Output Device (README "Audio for Meet"), check captions in a real two-laptop call.
-7. **Demo rehearsal** (everyone): `make demo-reset`, `make demo-serve`, then `make demo`; run all four moments on the two-screen setup and record the backup video.
-8. **Deaf review**: the four draft glosses, the setup wizard's "Signs to try" (`signs.json`), and face markers before turning them on.
+1. **Keys** (lead): `ANTHROPIC_API_KEY` and `CARTESIA_API_KEY` are in `.env` on the build machine. `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY` are still needed, from a Moss project (code CALHACKS on the Portal's billing page). Then `uv run pytest --live` runs the real translator, Cartesia and Moss tests, including the 500-word startup timing.
+2. **Camera letters** (A): the letter model, publishing `Letter` events, until P-R-I spelled live suggests Priyanka.
+3. **Bigger vocabulary** (A): the ASL Citizen model next to the Kaggle one, limited to the demo's signs.
+4. **Record and tune** (A): `tools/record_script.py` takes of the demo phrases, then `tools/tune_recognition.py` for the thresholds. The signer who demos should record them.
+5. **Moss numbers** (B): ranking and latency with the real Moss session; tune the autocomplete weights on real letters.
+6. **The real call** (C): two laptops, BlackHole 2ch as Meet's mic, the Multi-Output Device with BlackHole 16ch as Meet's speakers (README "Audio for Meet"); captions within a couple of seconds; tune turn-taking.
+7. **Demo rehearsal** (everyone): `make demo` on the two-laptop, two-screen setup, and record the backup video.
+8. **Deaf review**: the demo glosses, the quick-reply phrases, the setup wizard's "Signs to try" (`signs.json`), and face markers before turning them on.
 
 ## Things we learned the hard way
 
-- **Siri can't hear a virtual mic.** "Hey Siri" doesn't trigger from one, and even with BlackHole set as the Mac's input, voice Siri listens only to the built-in mic (tested). So Siri gets text through Type to Siri. Type to Siri shows a text box, not the animated Siri orb; that's normal.
-- **Don't test Siri with Terminal in front.** The Siri output pastes with ⌘V, and the app in front catches it. Start the test, then click into Finder or the SignBridge window.
-- **With Siri's default shortcut, ⌘Space opens Spotlight.** Set Siri's shortcut to "Hold Command Space" first.
-- **Mode picker:** the app sets the mode directly. Don't go back to "press MODE N times"; it raced and landed on the wrong mode.
+- **Our voice and Meet's audio need different devices.** Our voice goes into BlackHole 2ch (Meet's mic); Meet's audio has to come out on BlackHole 16ch for captions, or we caption ourselves.
 - **stdout belongs to the app protocol.** The engine talks to the Mac app in JSON lines on stdout. Debug prints go to stderr (or `logging`), or the app breaks.
 
 ## Starter prompts
@@ -133,33 +134,33 @@ Paste your prompt into Claude Code, opened in the repo folder on your branch. Ea
 ### Person A: Recognition
 
 ```text
-I'm Person A: Recognition on our Cal Hacks 2026 team. Read README.md, MVP.md, and HANDOFF.md in full first. Most of the code is already built; HANDOFF.md "What's built" says what's tested and what isn't, and "What still needs a person" lists the remaining work. I own recognition/, tools/record_signs.py, tools/record_landmarks.py, fixtures/landmarks_sample.jsonl, and the `recognizer` line.
+I'm Person A: Recognition on our Cal Hacks 2026 team. Read README.md, MVP.md, and HANDOFF.md in full first. The project is Google Meet only now; HANDOFF.md "What's built" says what's tested, and "What still needs a person" lists the remaining work. I own recognition/, tools/record_*.py, tools/tune_recognition.py, fixtures/landmarks_sample.jsonl, and the `recognizer` line.
 
-My job now: get the demo script recognized live. Help me record the custom signs (WW, YOU-REMIND-ME, MEET-YOU, BUY, HOW, YOU, TITLE) with tools/record_signs.py and check they separate; then run `recognizer: camera` while I sign the four draft glosses in docs/asl-demo-script-research.md, and tune the thresholds in config.yaml (confidence_threshold, isolated_floor, min_frames, control_min_frames, custom_threshold_scale) from what we see. Add a way to mark sign boundaries in tools/record_landmarks.py and record a real fixture to replace fixtures/landmarks_sample.jsonl. Only then, and with a Deaf signer's check, try `recognition.face_markers: true`. Video and images must never be saved or sent; record only teammates who agree.
+My job now: fingerspelled letters from the camera and a bigger sign vocabulary. Add a letter recognizer on the hand landmarks (a pretrained A-Z model; check its license) that publishes one `Letter` event per held handshape, so spelling P-R-I live brings up the autocomplete's Priyanka. Then add the ASL Citizen ST-GCN model (weights in models/asl_citizen/) next to the Kaggle model, limited to the demo's signs, with a cutoff so other movement isn't forced into a demo sign. Then help me record takes with tools/record_script.py and tune the thresholds with tools/tune_recognition.py. Video and images must never be saved or sent; record only teammates who agree.
 
 How to work: I'm on branch person-a. Commit in small steps and open a PR to main when a piece works. Flip only my own config.yaml lines while testing and don't commit them (main stays on mock). `make test` and `make lint` must pass before every PR. Never print to stdout in engine code (it's the app protocol), never log what the user signs or says at INFO, and never commit .env. Don't change shared/, app.py, Makefile, or tests/contracts/ without asking me first. If something needs a live keystroke, the webcam, or a call, tell me the command and let me run it.
 
 Start by telling me in a few lines what's built in my area and your plan, then begin.
 ```
 
-### Person B: Language and Claude Code
+### Person B: Language and autocomplete
 
 ```text
-I'm Person B: Language and Claude Code on our Cal Hacks 2026 team. Read README.md, MVP.md, and HANDOFF.md in full first. Most of the code is already built; HANDOFF.md "What's built" says what's tested and what isn't, and "What still needs a person" lists the remaining work. I own language/, outputs/claude_code.py, outputs/mock_claude_code.py, outputs/router.py, demo/site, tools/demo_site.py, and the `translator` and `claude_code` lines.
+I'm Person B: Language and autocomplete on our Cal Hacks 2026 team. Read README.md, MVP.md, and HANDOFF.md in full first. The project is Google Meet only now; HANDOFF.md "What's built" says what's tested, and "What still needs a person" lists the remaining work. I own language/, outputs/router.py, tools/seed_vocab.py, and the `translator` and `vocab_search` lines.
 
-My job now: make the Claude side demo-ready with real keys. Run `uv run pytest --live tests/test_claude_translator.py` and improve language/prompts/gloss_to_english.md until every case passes and translation takes under ~2 s; add cases for anything A's live recognition gets wrong. Then rehearse demo moments 1 and 4 with `translator: claude` and `claude_code: real`: `make demo-reset`, `make demo-serve`, sign (or type) the kick-off and the re-prompt, and adjust demo/site/CLAUDE.md so the build looks good and finishes in a couple of minutes. Send A the final kick-off and re-prompt glosses as soon as they're fixed.
+My job now: make the fingerspelling autocomplete demo-ready with real keys. With MOSS_PROJECT_ID and MOSS_PROJECT_KEY in .env, run `uv run pytest --live tests/test_moss_search.py` and `uv run python tools/seed_vocab.py --synthetic 500 --time`, and write down the real numbers (suggestion latency, startup time, letters saved) for the README's "Autocomplete with Moss" section. Check Claude's tags on real words and tune the `autocomplete:` weights in config.yaml. Keep language/prompts/gloss_to_english.md matched to the demo glosses and rerun `uv run pytest --live tests/test_claude_translator.py` after any prompt change. If there's time, pass remembered names and jargon to Cartesia Ink so captions spell them right (check Ink's docs for the exact option first).
 
 How to work: I'm on branch person-b. Commit in small steps and open a PR to main when a piece works. Flip only my own config.yaml lines while testing and don't commit them (main stays on mock). `make test` and `make lint` must pass before every PR. Never print to stdout in engine code (it's the app protocol), never log what the user signs or says at INFO, and never commit .env. Don't change shared/, app.py, Makefile, or tests/contracts/ without asking me first. If something needs a live keystroke, the webcam, or a call, tell me the command and let me run it.
 
 Start by telling me in a few lines what's built in my area and your plan, then begin.
 ```
 
-### Person C: Voice, Siri, Meet, and UI
+### Person C: Voice, Meet, and the Mac app
 
 ```text
-I'm Person C: Voice, Siri, Meet, and UI on our Cal Hacks 2026 team. Read README.md, MVP.md, and HANDOFF.md in full first. Most of the code is already built; HANDOFF.md "What's built" says what's tested and what isn't, and "What still needs a person" lists the remaining work. I own outputs/tts_cartesia.py, outputs/tts_say.py, outputs/mock_tts.py, outputs/siri.py, outputs/mock_siri.py, outputs/call_host.py, captions/, ui/, fixtures/captions_sample.txt, and the `tts`, `siri`, and `captions` lines.
+I'm Person C: Voice, Meet, and the Mac app on our Cal Hacks 2026 team. Read README.md, MVP.md, and HANDOFF.md in full first. The project is Google Meet only now; HANDOFF.md "What's built" says what's tested, and "What still needs a person" lists the remaining work. I own outputs/tts_*.py, outputs/mock_tts.py, outputs/turn_taking.py, outputs/call_host.py, captions/, ui/, fixtures/captions_sample.txt, and the `tts` and `captions` lines.
 
-My job now: make the Meet call, our centerpiece, work for real. With CARTESIA_API_KEY in .env, pick a Sonic voice for cartesia.voice_id and check `tts: cartesia` is heard in a Meet call through BlackHole 2ch. Install BlackHole 16ch, set up the Multi-Output Device from the README's "Audio for Meet", and check `captions: cartesia` in a real two-laptop call (captions within a couple of seconds, partials updating in place). Check the call intro and the signing cue sound right, then polish Demo Mode fullscreen on the external display. Build the app with `swift build --package-path ui/macos` after Swift changes.
+My job now: make the real two-laptop Meet call work, the whole demo. Set Meet's microphone to BlackHole 2ch and its speakers to a Multi-Output Device with BlackHole 16ch (README "Audio for Meet"), check the other laptop hears `tts: cartesia` and our `captions: cartesia` show their speech within a couple of seconds, and tune meet.chime_in_seconds, barge_in_seconds and yield_seconds in the real call. Then polish Demo Mode fullscreen on the external display, and look over the mention banner over fullscreen Meet, the autocomplete bar, and Settings > Remembered words. Build the app with `swift build --package-path ui/macos` after Swift changes.
 
 How to work: I'm on branch person-c. Commit in small steps and open a PR to main when a piece works. Flip only my own config.yaml lines while testing and don't commit them (main stays on mock). `make test` and `make lint` must pass before every PR. Never print to stdout in engine code (it's the app protocol), never log what the user signs or says at INFO, and never commit .env. Don't change shared/, app.py, Makefile, or tests/contracts/ without asking me first. If something needs a live keystroke, the webcam, or a call, tell me the command and let me run it.
 
