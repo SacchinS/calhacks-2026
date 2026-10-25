@@ -130,3 +130,23 @@ neither is in the language or autocomplete code:
 Two contract tests also fail for missing hardware, as expected on a ThinkPad:
 `test_captions_contract[cartesia]` (no BlackHole 16ch) and `test_recognizer_contract[camera]`
 (no `cv2`, since `--extra camera` isn't installed here).
+
+## Validation run (ThinkPad, not the final demo numbers)
+
+This run was performed on the Windows ThinkPad while preparing the Apple Silicon handoff.
+It is intentionally not used for the README's final demo claims.
+
+- `uv sync --extra camera` completed; Ruff check and format check passed.
+- The equivalent of `make test` ran as `uv run pytest -q`: 207 passed, 2 known
+  Windows-only failures, 31 skipped. `make` and Swift are unavailable on Windows.
+- The Forge app's committed test suite passed 35/35 in a detached worktree.
+- Live Moss, tagger and Claude tests passed. Moss produced 50/50 correct top
+  suggestions; a live query measured 16.3 ms and a 500-word session build measured
+  6.734 s. The standalone benchmark's Moss session timed out under the 40 ms fallback
+  window, so it is not a final benchmark.
+- Claude's first warmed call was 705 ms. Across the 16 printed live cases, the derived
+  nearest-rank p50 was 748 ms and p95 was 1,171 ms.
+- Ten signed Forge context requests all returned 200: p50 548.2 ms, p95 1,549.2 ms.
+- The live contract run was stopped when it reached webcam input; Cartesia captions also
+  require BlackHole 16ch. No ticket-drafter implementation is present on `main`, so
+  draft-version timing and real-call rehearsal remain pending on the demo laptop.
