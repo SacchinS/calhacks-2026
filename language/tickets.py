@@ -458,8 +458,9 @@ class TicketAgent:
         return False
 
     async def approve(self, version: int, via: str = "button") -> bool:
+        # A failed create can be retried with the same version (and so the same Forge request_id).
         if (
-            self.update.state != "tentative"
+            self.update.state not in ("tentative", "failed")
             or self.update.draft is None
             or not self.update.ready
             or version != self.update.version

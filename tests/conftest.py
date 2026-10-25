@@ -24,3 +24,12 @@ def vocab_db(tmp_path, monkeypatch):
     path = tmp_path / "vocab.sqlite"
     monkeypatch.setenv("CALHACKS_VOCAB_DB", str(path))
     return path
+
+
+@pytest.fixture(autouse=True)
+def no_forge(request, monkeypatch):
+    """Tests not marked `live` use the mock Jira even when .env has the Forge trigger. The values
+    are set empty, not removed, because load_config()'s load_dotenv never overrides a set key."""
+    if request.node.get_closest_marker("live") is None:
+        for name in ("FORGE_TRIGGER_URL", "FORGE_SHARED_SECRET"):
+            monkeypatch.setenv(name, "")
