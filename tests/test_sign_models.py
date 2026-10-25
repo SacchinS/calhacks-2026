@@ -177,3 +177,14 @@ async def test_the_pipeline_emits_a_custom_sign_when_the_hands_drop(library):
     await recognizer.start()
     await asyncio.wait_for(recognizer._task, 5)
     assert [signs.get_nowait().gloss for _ in range(signs.queue.qsize())] == ["WW"]
+
+
+def test_a_raise_spent_fingerspelling_gives_no_sign(library):
+    model = CustomSignModel(Config(), library=library)
+    signed = sweep(0.31, 0.69, 10)
+    model.predict(signed[0])
+    model.spelled()  # the letter reader saw a letter held
+    assert all(model.predict(f) is None for f in signed[1:])  # not WW: it's spelling
+    assert model.end_segment(signed[-1].ts + 0.5) is None  # and no last try at the drop
+    again = [model.predict(f) for f in sweep(0.31, 0.69, 12)]
+    assert [p.gloss for p in again if p] == ["WW"]  # the next raise is a sign again

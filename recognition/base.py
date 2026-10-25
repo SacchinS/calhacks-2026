@@ -135,6 +135,8 @@ class FrameRecognizer(Recognizer):
         self.markers = MarkerTally()
         self.letters = None  # the letter reader, once running (the app shows its hold)
         self.sign_state = "idle"  # idle | signing | detected: the preview's box color
+        # A demo letter held this long makes the raise fingerspelling: no signs in it.
+        self.letter_raise = float(config.get("recognition.letter_raise_seconds", 0.4))
         self._task: asyncio.Task[None] | None = None
 
     @abstractmethod
@@ -178,6 +180,12 @@ class FrameRecognizer(Recognizer):
             self.bus.publish(frame)
             prediction = None
             whole = None  # a whole sign from a `direct` classifier: emitted at once
+            new_letters = letters.push(frame, self.gate) if letters is not None else []
+            if letters is not None and (new_letters or letters.held_seconds >= self.letter_raise):
+                for classifier in classifiers:  # this raise is fingerspelling, not a sign
+                    spelled = getattr(classifier, "spelled", None)
+                    if spelled is not None:
+                        spelled()
             if frame.hands_in_signing_space:
                 # Every classifier sees every frame (they keep windows); the first answer wins.
                 answers = [(c, c.predict(frame)) for c in classifiers]
@@ -199,7 +207,7 @@ class FrameRecognizer(Recognizer):
                 "signing" if frame.hands_in_signing_space else "idle",
             )
             if letters is not None:
-                for letter in letters.push(frame, self.gate):
+                for letter in new_letters:
                     self.bus.publish(letter)
                 if letters.spelling and prediction is not None and not is_control(prediction.gloss):
                     prediction = None  # spelling: a handshape isn't a sign

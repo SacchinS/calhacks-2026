@@ -168,6 +168,7 @@ class CustomSignModel(FrameClassifier):
         self.early = float(config.get("recognition.custom_early_fraction", 0.6))
         self.segment: list[LandmarkFrame] = []  # this sign so far (segment mode)
         self.locked = False  # a sign came out: wait for the hands to drop
+        self.spelling = False  # this raise of the hands is fingerspelling: not a sign
         self._last_in = 0.0
         self.gap_seconds = float(config.get("recognition.isolated_gap_seconds", 0.4))
         scale = float(config.get("recognition.custom_threshold_scale", 1.0))
@@ -185,10 +186,10 @@ class CustomSignModel(FrameClassifier):
             return None
         if self.mode == "segment":
             if frame.ts - self._last_in > self.end_gap:  # the hands were down: a new sign
-                self.segment, self.locked = [], False
+                self.segment, self.locked, self.spelling = [], False, False
             self._last_in = frame.ts
-            if self.locked:
-                return None  # one sign per raise of the hands
+            if self.locked or self.spelling:
+                return None  # one sign per raise of the hands; none while spelling
             self.segment.append(frame)
             self._since_run += 1
             if self._since_run < self.stride:
@@ -214,13 +215,21 @@ class CustomSignModel(FrameClassifier):
         for end_gap, the clip since they came in is classified (segment mode)."""
         if self.mode != "segment" or now - self._last_in < self.end_gap:
             return None
-        if self.locked:
-            self.locked = False  # the hands are down: ready for the next sign
+        if self.locked or self.spelling:
+            self.locked = self.spelling = False  # the hands are down: ready for the next sign
+            self.segment = []
             return None
         if not self.segment:
             return None
         frames, self.segment = self.segment, []
         return self.classify_segment(frames)
+
+    def spelled(self) -> None:
+        """The letter reader sees a letter held: this raise of the hands is fingerspelling,
+        so nothing in it is a sign (a held P read as ME) until the hands drop."""
+        if self.mode == "segment":
+            self.spelling = True
+            self.segment = []
 
     @property
     def direct(self) -> bool:
