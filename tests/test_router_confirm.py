@@ -109,6 +109,83 @@ async def test_unavailable_or_failing_output_falls_back_to_console(available, fa
     assert any(isinstance(e, OutputSent) and e.output == "console" for e in published)
 
 
+async def spelling_setup(review=True):
+    """A router reviewing a sentence, and a buffer spelling a word, on one bus: the state
+    the demo is in when the signer spells a name while a sentence waits for YES."""
+    from language.autocomplete import Autocompleter
+    from language.mock import MockTranslator
+    from language.tagger import MockTagger
+    from language.utterance import UtteranceBuffer
+    from language.vocab import Occurrence, VocabStore
+    from language.vocab_search import KeywordSearch
+    from shared.config import load_config
+
+    config = load_config().all_mocks()
+    bus = Bus()
+    store = VocabStore(":memory:")
+    store.add([Occurrence("Pranav", "name", "fingerspelled", tags=("design", "mockups"))])
+    autocomplete = Autocompleter(bus, config, store, KeywordSearch(config), MockTagger())
+    await autocomplete.start()
+    buffer = UtteranceBuffer(bus, MockTranslator(config))
+    buffer.spelling = autocomplete
+    tts = RecordingOutput("tts")
+    router = Router(bus, tts=tts, review_before_speaking=review)
+    router.spelling = autocomplete
+    await router.handle(translation())  # a sentence is now waiting for review
+    for letter in "PR":
+        autocomplete.add(letter)
+    if autocomplete._suggesting is not None:
+        await autocomplete._suggesting
+    assert autocomplete.active
+    return bus, router, buffer, autocomplete, tts
+
+
+@pytest.mark.parametrize("buffer_first", [True, False])
+async def test_yes_while_spelling_takes_the_word_and_leaves_the_sentence_pending(buffer_first):
+    """Both subscribe to SignEvent and each gets its own copy, so either can run first.
+    The result has to be the same: the word is accepted, the sentence still waits."""
+    bus, router, buffer, autocomplete, tts = await spelling_setup()
+    yes = control("YES")
+    handlers = [buffer.handle, router.handle]
+    for handle in handlers if buffer_first else reversed(handlers):
+        await handle(yes)
+    assert [s.gloss for s in buffer.signs] == ["PRANAV"]
+    assert router.pending is not None and router.pending.english == "Hello, nice to meet you."
+    assert tts.sent == []
+    await autocomplete.stop()
+
+
+@pytest.mark.parametrize("buffer_first", [True, False])
+async def test_no_while_spelling_only_dismisses_the_suggestion(buffer_first):
+    bus, router, buffer, autocomplete, tts = await spelling_setup()
+    no = control("NO")
+    handlers = [buffer.handle, router.handle]
+    for handle in handlers if buffer_first else reversed(handlers):
+        await handle(no)
+    assert autocomplete.dismissed and autocomplete.active  # letters kept, suggestions hidden
+    assert buffer.signs == []
+    assert router.pending is not None  # the sentence was not discarded
+    assert tts.sent == []
+    await autocomplete.stop()
+
+
+async def test_yes_with_nothing_being_spelled_still_approves_the_sentence():
+    bus, router, buffer, autocomplete, tts = await spelling_setup()
+    autocomplete.clear()
+    assert not autocomplete.active
+    await router.handle(control("YES"))
+    assert tts.sent == ["Hello, nice to meet you."] and router.pending is None
+    await autocomplete.stop()
+
+
+async def test_a_quick_reply_is_unaffected_by_spelling():
+    bus, router, buffer, autocomplete, tts = await spelling_setup()
+    await router.quick_reply("Can you repeat that?")
+    assert tts.sent == ["Can you repeat that?"]
+    assert router.pending is not None  # pressing a reply is its own approval, not the review
+    await autocomplete.stop()
+
+
 async def test_started_router_processes_the_bus():
     bus = Bus()
     tts = RecordingOutput("tts")

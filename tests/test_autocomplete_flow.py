@@ -1,5 +1,5 @@
 """The scripted mock demo, through the engine protocol the Mac app uses: the other side says
-"Priyanka" and "Figma", the signer spells P-R-I, Priyanka is suggested, YES puts it in
+"Pranav" and "Figma", the signer spells P-R, Pranav is suggested, YES puts it in
 the utterance, and the normal SEND -> translation -> voice flow carries on."""
 
 import io
@@ -32,28 +32,28 @@ def autocomplete(server):
 async def test_heard_in_a_meeting_then_spelled(engine):
     engine.bus.publish(
         Caption(
-            "Hi, I'm Priyanka, I'm designing the new app. The mockups are all in Figma.",
+            "Hi, I'm Pranav, I'm designing the new app. The mockups are all in Figma.",
             is_final=True,
         )
     )
-    await until(lambda: engine.app.vocab.for_term("PRIYANKA") != [])
+    await until(lambda: engine.app.vocab.for_term("PRANAV") != [])
 
-    await engine.handle_command({"cmd": "mock_input", "text": "~pri"})
+    await engine.handle_command({"cmd": "mock_input", "text": "~pr"})
     await until(lambda: (autocomplete(engine) or {}).get("top") is not None)
     status = last_status(engine)
     assert status["state"] == "listening"
-    assert status["autocomplete"]["letters"] == "PRI"
-    assert status["autocomplete"]["top"] == {"term": "Priyanka", "kind": "name"}
+    assert status["autocomplete"]["letters"] == "PR"
+    assert status["autocomplete"]["top"] == {"term": "Pranav", "kind": "name"}
 
     await engine.handle_command({"cmd": "mock_input", "text": "/yes"})
-    await until(lambda: last_status(engine)["glosses"] == ["PRIYANKA"])
+    await until(lambda: last_status(engine)["glosses"] == ["PRANAV"])
     assert last_status(engine)["autocomplete"] is None
     stats = last_status(engine)["autocomplete_stats"]
-    assert stats["accepted"] == 1 and stats["letters_saved"] == 5
+    assert stats["accepted"] == 1 and stats["letters_saved"] == 4  # P-R spelled, A-N-A-V saved
 
     await engine.handle_command({"cmd": "gesture", "name": "confirm"})  # = SEND now
     await until(lambda: messages(engine, "sent") != [])  # spoken in the call
-    assert "Priyanka" in messages(engine, "sent")[0]["text"]
+    assert "Pranav" in messages(engine, "sent")[0]["text"]
 
 
 async def test_app_gestures_accept_an_alternate_and_dismiss(engine):
@@ -76,21 +76,21 @@ async def test_app_gestures_accept_an_alternate_and_dismiss(engine):
 
 
 async def test_settings_list_and_delete_remembered_words(engine):
-    engine.bus.publish(Caption("Priyanka and Kubernetes.", is_final=True))
+    engine.bus.publish(Caption("Pranav and Kubernetes.", is_final=True))
     await until(lambda: len(engine.app.vocab.all()) == 2)
 
     await engine.handle_command({"cmd": "vocab_list"})
     (listing,) = messages(engine, "vocab")
-    assert {w["term"] for w in listing["words"]} == {"Priyanka", "Kubernetes"}
-    word = next(w for w in listing["words"] if w["term"] == "Priyanka")
+    assert {w["term"] for w in listing["words"]} == {"Pranav", "Kubernetes"}
+    word = next(w for w in listing["words"] if w["term"] == "Pranav")
     assert word["count"] == 1 and word["occurrences"][0]["source"] == "transcript"
 
-    await engine.handle_command({"cmd": "vocab_delete", "term": "Priyanka"})
+    await engine.handle_command({"cmd": "vocab_delete", "term": "Pranav"})
     assert {w["term"] for w in messages(engine, "vocab")[-1]["words"]} == {"Kubernetes"}
     occ_id = messages(engine, "vocab")[-1]["words"][0]["occurrences"][0]["id"]
     await engine.handle_command({"cmd": "vocab_delete", "id": occ_id})
     assert messages(engine, "vocab")[-1]["words"] == []
 
-    await engine.handle_command({"cmd": "letters", "text": "pri"})
-    await until(lambda: (autocomplete(engine) or {}).get("letters") == "PRI")
+    await engine.handle_command({"cmd": "letters", "text": "pr"})
+    await until(lambda: (autocomplete(engine) or {}).get("letters") == "PR")
     assert autocomplete(engine)["top"] is None  # deleted words aren't suggested

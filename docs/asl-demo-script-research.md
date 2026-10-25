@@ -2,7 +2,7 @@
 
 **Status: research draft. A Deaf signer has not checked any of this yet. Do not rehearse it as final.**
 
-**Scope change (Oct 24): the project is Google Meet only.** Only Moment 3 (the Meet greeting), the control signs, and the fingerspelling notes still apply. Moments 1, 2 and 4 (Claude Code and Siri) are kept as research; their code is on the `archive/claude-code-siri` branch. The live demo adds fingerspelled names and jargon (`fs-PRIYANKA`, `fs-KUBERNETES`), which the grammar notes below cover: names and technical terms are typically fingerspelled.
+**Scope change (Oct 24): the project is Google Meet only.** Only Moment 3 (the Meet greeting), the control signs, and the fingerspelling notes still apply. Moments 1, 2 and 4 (Claude Code and Siri) are kept as research; their code is on the `archive/claude-code-siri` branch. The live demo adds fingerspelled names and jargon (`fs-PRANAV`, `fs-KUBERNETES`), which the grammar notes below cover: names and technical terms are typically fingerspelled.
 
 We're a hearing team, and nobody on it knows ASL. This file collects what published ASL references say about each sign and sentence pattern in the demo, so we aren't guessing. Every sign claim links to a page we actually opened (fetched Oct 23, 2026). Anything without a source is marked **UNVERIFIED**.
 

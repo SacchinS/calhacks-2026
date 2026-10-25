@@ -304,7 +304,7 @@ struct StatePill: View {
     }
 }
 
-/// Typed signs for the mock recognizer: `hello nice meet-you`, `#sarah` (fingerspelled), `~pri` (letters
+/// Typed signs for the mock recognizer: `hello nice meet-you`, `#sarah` (fingerspelled), `~pr` (letters
 /// one at a time, for autocomplete), face markers
 /// after the signs they cover (`/\`, `[q]`, `[wh]`, `[neg]`, `[nod]`), and `/send /yes /no /clear`.
 struct MockSignBox: View {
@@ -314,7 +314,7 @@ struct MockSignBox: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "keyboard").foregroundStyle(Brand.accent)
-            TextField("Type signs: hello nice meet-you · #sarah · ~pri (letters) · [q] [wh] [neg] · /send /yes /no /clear", text: $text)
+            TextField("Type signs: hello nice meet-you · #sarah · ~pr (letters) · [q] [wh] [neg] · /send /yes /no /clear", text: $text)
                 .textFieldStyle(.roundedBorder).focused($focused).onSubmit(submit)
             Button("Sign", action: submit).buttonStyle(.borderedProminent)
         }
