@@ -59,7 +59,7 @@ recognition:
   letter_top_k: 1                 # ...and only if it's the model's top guess of A-Z (a flat
                                   # B hand put F 2nd-3rd: HELLO read as F)
   letter_threshold: 0.6           # the model's probability among the letters
-  letter_hold_seconds: 5.0        # fluent: 0.25
+  letter_hold_seconds: 2.5        # fluent: 0.25 (keep above letter_raise_seconds, 1.5)
   letter_min_frames: 3
   letter_still: 0.6               # wrist drift allowed while holding, in palm lengths (0.25)
   letter_switch_seconds: 0.3      # another letter must last this long to take over
