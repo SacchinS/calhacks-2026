@@ -13,6 +13,7 @@ import json
 import logging
 import re
 import time
+import uuid
 from collections import deque
 from dataclasses import dataclass, field, replace
 from datetime import date
@@ -314,7 +315,7 @@ class TicketAgent:
         self.update = TicketUpdate("none")
         self.dismissed: list[str] = []
         self.history: list[dict[str, Any]] = []
-        self.call_id = f"call-{int(time.time())}"
+        self.call_id = f"call-{uuid.uuid4().hex[:12]}"
         self._sub = None
         self._task: asyncio.Task[None] | None = None
         self._draft_task: asyncio.Task[None] | None = None
