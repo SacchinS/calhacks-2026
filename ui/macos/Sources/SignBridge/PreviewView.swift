@@ -181,6 +181,7 @@ struct MeetPanel: View {
                 Button { engine.introduce() } label: { Label("Introduce me", systemImage: "person.wave.2") }
                     .help("Say who's calling and that you sign through SignBridge")
             }
+            FloorStatus(engine: engine)
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
@@ -207,6 +208,32 @@ struct MeetPanel: View {
         .padding(16)
         .background(Brand.surface, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.white.opacity(0.08)))
+    }
+}
+
+/// Who has the floor in the call, and when SignBridge will speak your approved words.
+struct FloorStatus: View {
+    @ObservedObject var engine: EngineClient
+    var font: Font = .callout.weight(.semibold)
+    var body: some View {
+        if let (icon, text, color) = line {
+            Label(text, systemImage: icon)
+                .font(font).foregroundStyle(color)
+                .lineLimit(2)
+                .transition(.opacity)
+        }
+    }
+    private var line: (String, String, Color)? {
+        switch engine.speechState {
+        case "waiting":
+            return ("hourglass", "Waiting for a pause to say: \"\(engine.speechText)\"", .yellow)
+        case "interjecting":
+            return ("hand.raised.fill", "Jumping in: \"Sorry, can I jump in?\"", .orange)
+        case "speaking":
+            return ("speaker.wave.2.fill", "Speaking: \"\(engine.speechText)\"", Brand.accent)
+        default:
+            return engine.themTalking ? ("waveform", "They're talking", .secondary) : nil
+        }
     }
 }
 

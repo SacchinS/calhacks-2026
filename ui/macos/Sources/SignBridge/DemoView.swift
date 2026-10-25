@@ -43,6 +43,7 @@ struct DemoView: View {
                     }
                 }
                 stage.frame(minHeight: 190)
+                if engine.outputMode == "meet" { FloorStatus(engine: engine, font: .title2.weight(.semibold)) }
                 if engine.outputMode == "meet", let caption = engine.captions.last {
                     HStack(alignment: .firstTextBaseline, spacing: 14) {
                         Image(systemName: "captions.bubble.fill").foregroundStyle(Brand.accent)

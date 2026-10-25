@@ -23,7 +23,9 @@ Events (stdout):
    "glosses": [...], "intent": {"sentence": ..., "route": "text|siri|voice"} | null,
    "target": ..., "log": [...], "holding": null, "fps": ..., "error": null,
    "output_mode": ..., "components": {...}, "mock": bool,
-   "claude_code_working": bool, "camera_on": bool}       on change, and every second
+   "claude_code_working": bool, "camera_on": bool,
+   "speech": {"state": "idle|waiting|interjecting|speaking", "text": ...},
+   "them_talking": bool}                                 on change, and every second
   {"type": "frame", "seq": n, "jpeg": "<base64>"}   while the preview is on (mirrored, drawn)
   {"type": "check" | "route_tested" | "calibrated" | "config" | "error", ...}
   {"type": "caption", "text": ..., "final": bool}   (ours) a partial caption is replaced
@@ -62,7 +64,9 @@ from shared.events import (
     OutputReply,
     OutputSent,
     SignEvent,
+    SpeechStatus,
     Translation,
+    TurnEvent,
     Utterance,
     UtteranceProgress,
 )
@@ -153,6 +157,9 @@ class EngineServer:
         self.thinking = False
         self.sending = False
         self.claude_code_jobs: list[str] = []  # approved requests Claude Code is still working on
+        self.speech = "idle"  # our voice in a call: idle | waiting | interjecting | speaking
+        self.speech_text = ""
+        self.them_talking = False  # the other side has the floor (Ink turn detection)
         self.log: deque[str] = deque(["ready: sign, then FINISH"], maxlen=3)
         self.practice = list(PRACTICE)
         self.frame: LandmarkFrame | None = None
@@ -205,6 +212,9 @@ class EngineServer:
             "claude_code_working": bool(self.claude_code_jobs),
             # The webcam is open (only the camera recognizer opens it; the app always shows this).
             "camera_on": self.app.chosen.get("recognizer") == "camera" and self.mode != "off",
+            # Turn-aware speaking in Meet: what our voice is doing, and whether they're talking.
+            "speech": {"state": self.speech, "text": self.speech_text},
+            "them_talking": self.them_talking,
             "components": self.app.chosen,
             "mock": self.app.chosen.get("recognizer") == "mock",
         }
@@ -256,6 +266,8 @@ class EngineServer:
             OutputReply,
             Caption,
             Notice,
+            SpeechStatus,
+            TurnEvent,
         )
         frames = self.bus.subscribe(LandmarkFrame, maxsize=2)  # newest frames only
         self._tasks = [
@@ -355,6 +367,10 @@ class EngineServer:
             self.emit({"type": "caption", "text": event.text, "final": event.is_final})
         elif isinstance(event, Notice):
             self.log.append(event.message)
+        elif isinstance(event, SpeechStatus):
+            self.speech, self.speech_text = event.state, event.text
+        elif isinstance(event, TurnEvent):
+            self.them_talking = event.kind in ("start", "eager_end", "resume")
         self.emit_status()
 
     # ---- app -> bus ----

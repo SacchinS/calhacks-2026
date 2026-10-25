@@ -38,6 +38,11 @@ final class EngineClient: ObservableObject {
     @Published var components: [String: String] = [:]
     @Published var claudeCodeWorking = false
     @Published var cameraOn = false
+    /// Turn-aware speaking in Meet: our voice's state ("idle", "waiting", "interjecting",
+    /// "speaking"), the sentence it's about to say, and whether the other side is talking.
+    @Published var speechState = "idle"
+    @Published var speechText = ""
+    @Published var themTalking = false
     /// The Meet call so far: what the signer said ("you") and the other side's captions ("them").
     @Published var meetLog: [(who: String, text: String)] = []
     private var captionPartial = false
@@ -255,6 +260,10 @@ final class EngineClient: ObservableObject {
             components = e["components"] as? [String: String] ?? components
             claudeCodeWorking = e["claude_code_working"] as? Bool ?? false
             cameraOn = e["camera_on"] as? Bool ?? false
+            let speech = e["speech"] as? [String: Any]
+            speechState = speech?["state"] as? String ?? "idle"
+            speechText = speech?["text"] as? String ?? ""
+            themTalking = e["them_talking"] as? Bool ?? false
             mockRecognizer = e["mock"] as? Bool ?? mockRecognizer
         case "frame":
             if let b64 = e["jpeg"] as? String, let data = Data(base64Encoded: b64) {
