@@ -41,8 +41,8 @@ MAX_SECONDS = 15.0  # longest take
 # autocomplete's suggestion; the tuner scores only the signs. Drafts until a Deaf signer
 # approves them.
 SCRIPT = [
-    "~fi YES COLOR PROBLEM",
-    "ME MEET ~pr YES TOMORROW",
+    "~f YES COLOR PROBLEM",
+    "ME MEET ~p YES TOMORROW",
     "HELLO, NICE MEET YOU",
     "YES",
     "NO",

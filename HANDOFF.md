@@ -26,7 +26,7 @@
    cd calhacks-2026
    make install && make test && make mock
    ```
-   `make mock` opens the Mac app (hand icon in the menu bar). Click through setup with "Skip for now", open Preview, and type `~pr` in the box at the bottom: the autocomplete suggests Pranav (from the mock captions). Then `/yes nice meet-you /send`, and the call panel shows what the mock voice said.
+   `make mock` opens the Mac app (hand icon in the menu bar). Click through setup with "Skip for now", open Preview, and type `~p` in the box at the bottom: the autocomplete suggests Pranav (from the mock captions). Then `/yes nice meet-you /send`, and the call panel shows what the mock voice said.
 4. Read, in this order: this file (all of it); `MVP.md` ("What the MVP must do", "How we work", "Checkpoints", then your own Person section); `SCAFFOLD.md` ("Core interfaces" and "The mock recognizer"); `README.md`; `docs/user-research.md` (why the app is only about calls, and the privacy rules); and for A and B, `docs/asl-demo-script-research.md` (Moment 3, the Meet greeting: the draft glosses and the source video for every sign). Your starter prompt has Claude Code read the first four too.
 5. Find your role in "Who is A, B, and C" above, then make your branch from the new `main`: `git checkout -b person-a` (or `person-b`, `person-c`).
 6. If you use API keys: get yours from the lead in a DM, then `cp .env.example .env` and fill it in. `.env` is gitignored. Never commit it; Cartesia's rules disqualify that.
@@ -45,8 +45,8 @@ From `MVP.md` ("Checkpoints" has the full list):
 
 A release check-in on Google Meet between two laptops (details in `MVP.md`, "What the MVP must do"):
 1. **Speech and captions.** "The dashboard's ready. Pranav redesigned the charts in Figma last night, so I think we ship tomorrow." The autocomplete remembers Pranav and Figma.
-2. **Signing while they talk.** F-I (Figma), COLOR PROBLEM, FINISH: the sentence waits for B to stop, then "There's a color problem in Figma." (NOW instead of FINISH says it right away.)
-3. **Being asked.** "Sacchin, can you sort it out with Pranav?" flashes the name banner; the signer answers ME MEET, P-R (Pranav), TOMORROW, FINISH: "I'll meet with Pranav tomorrow."
+2. **Signing while they talk.** F (Figma), COLOR PROBLEM, FINISH: the sentence waits for B to stop, then "There's a color problem in Figma." (NOW instead of FINISH says it right away.)
+3. **Being asked.** "Sacchin, can you sort it out with Pranav?" flashes the name banner; the signer answers ME MEET, P (Pranav), TOMORROW, FINISH: "I'll meet with Pranav tomorrow."
 4. **The outcome:** the release is held.
 
 Why only calls: Professor Lance Forshay (Deaf ASL faculty at UW), who answered our survey, said video calls are the one place he'd use this. His answers and what we changed are in `docs/user-research.md`.
@@ -114,7 +114,7 @@ The glosses are drafts (`docs/asl-demo-script-research.md`, Moment 3). A Deaf si
 In rough demo order:
 
 1. **Keys** (lead): `ANTHROPIC_API_KEY` and `CARTESIA_API_KEY` are in `.env` on the build machine. `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY` are still needed, from a Moss project (code CALHACKS on the Portal's billing page). Then `uv run pytest --live` runs the real translator, Cartesia and Moss tests, including the 500-word startup timing.
-2. **Camera letters** (A): `uv run python tools/try_letters.py`, spell P-R and F-I, set `recognition.letter_orientation` to what it prints, and tune `letter_threshold` / `letter_hold_seconds`; then check P-R and F-I in the app bring up Priyanka and Figma.
+2. **Camera letters** (A): `uv run python tools/try_letters.py`, spell P and F, set `recognition.letter_orientation` to what it prints, and tune `letter_threshold` / `letter_hold_seconds`; then check P-R and F-I in the app bring up Priyanka and Figma.
 3. **Custom signs live** (A): `tools/try_signs.py`, sign HELLO, NICE, MEET, YES and FINISH, and check each comes through; the signer who demos records them (`tools/record_signs.py`).
 4. **Record and tune** (A): `uv run python tools/record_script.py` records 3 takes of each demo phrase to `models/takes/` (gitignored), with the glosses each should give; then `uv run python tools/tune_recognition.py --details` replays them through the models, tries every threshold combination, and prints the best `config.yaml` lines. Takes double as real replay fixtures. The signer who demos should record them.
 5. **Moss numbers** (B): ranking and latency with the real Moss session; tune the autocomplete weights on real letters.

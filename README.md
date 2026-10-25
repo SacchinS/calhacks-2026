@@ -209,8 +209,8 @@ latency is logged.
 - `make seed-vocab` loads Julian, Jupyter, June and a few more.
 - In `make mock`, type `tennis partner ~ju` in the mock-sign box: `~ju` spells J, U one letter
   at a time.
-- The mock captions are the demo meeting: Pranav and Figma come up, so `~pr` suggests Pranav and
-  `~fi` suggests Figma.
+- The mock captions are the demo meeting: Pranav and Figma come up, so `~p` suggests Pranav and
+  `~f` suggests Figma.
 - With the camera, fingerspell to it: hold each letter until it counts (5 s in the slow
   settings for people new to ASL, with a progress bar in the app; 0.25 s at fluent speed). `uv run python tools/try_letters.py` shows what the letter model
   sees. The "Fingerspell by typing" box still works as a backup.

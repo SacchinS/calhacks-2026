@@ -1,7 +1,7 @@
 # Scripted incoming speech for Meet mode (mock captions): the demo's release check-in, A
 # (product manager) and B (engineer). Set your name to Sam (Settings > Calls) to see the
-# mention alert. Autocomplete learns Pranav and Figma from the first line: then spell F-I
-# (~fi) to say there's a color problem in Figma, and P-R (~pr) for meeting Pranav.
+# mention alert. Autocomplete learns Pranav and Figma from the first line: then spell F
+# (~f) to say there's a color problem in Figma, and P (~p) for meeting Pranav.
 The dashboard's ready. Pranav redesigned the charts in Figma last night, so I think we ship tomorrow.
 Yeah, the tests are passing and the release notes are written, so we're basically done.
 Good catch. Sam, can you sort it out with Pranav?

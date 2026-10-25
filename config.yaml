@@ -54,7 +54,8 @@ recognition:
   # the hand down in between. Fluent values are in the comments.
   letters: true
   letter_model_dir: models/letters
-  letter_set: PRFI                # only these letters (the demo's P-R and F-I); empty = A-Z
+  letter_set: PF                  # only these letters (P for Pranav, F for Figma); empty = A-Z
+                                  # (I is out: a YES fist read as I)
   letter_top_k: 1                 # ...and only if it's the model's top guess of A-Z (a flat
                                   # B hand put F 2nd-3rd: HELLO read as F)
   letter_threshold: 0.6           # the model's probability among the letters
@@ -140,7 +141,7 @@ autocomplete:
   # built on the Mac at startup (never pushed); needs MOSS_PROJECT_ID / MOSS_PROJECT_KEY.
   enabled: true
   db_path: ""                    # empty = Application Support (see above)
-  min_letters: 2                 # suggest from the second letter
+  min_letters: 1                 # suggest from the first letter (the demo spells one: P, F)
   alternates: 2                  # shown smaller next to the top suggestion
   # score = letters * letter match + context * conversation fit (scaled across candidates)
   #       + frequency * log(1 + uses) / log(1 + most uses) + recency * 0.5^(days / half life)

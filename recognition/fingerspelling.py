@@ -229,7 +229,12 @@ class LetterReader:
             self.status = f"unsure ({guess[1]:.0%})" if guess else "not one of the letters"
             return []  # one unsure frame doesn't break a hold
         letter, confidence = guess
-        wrist = (hand[0][0], hand[0][1])
+        # Where the whole hand is (not just the wrist): YES nods at the wrist, so the wrist
+        # barely moves while the fist does.
+        wrist = (
+            float(np.mean([p[0] for p in hand[:21]])),
+            float(np.mean([p[1] for p in hand[:21]])),
+        )
         size = float(np.hypot(hand[9][0] - hand[0][0], hand[9][1] - hand[0][1])) or 1.0
         run = self._run
         if run is not None:
