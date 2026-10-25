@@ -25,7 +25,9 @@ recognition:
   control_min_frames: 0
   confidence_threshold: 0.6
   # Sign models, tried in this order (the first answer wins): custom | asl_citizen | kaggle.
-  sign_models: [custom, asl_citizen]
+  # The demo uses our signer's recorded signs only: ASL Citizen didn't recognize them live
+  # (NICE ranked 13th-1,800th of 2,731 on six takes), so it could only add wrong signs.
+  sign_models: [custom]
   # ASL Citizen (recognition/asl_citizen.py; set up with tools/setup_asl_citizen.py): 2,731
   # signs, limited to these. A sign counts if it's among the model's top_k of all 2,731,
   # has min_prob of its whole probability, and floor among the signs below.

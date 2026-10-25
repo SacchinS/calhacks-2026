@@ -38,9 +38,21 @@ def library() -> CustomSignLibrary:
     )
 
 
-def show(cv2, frame, text: str, color=(255, 255, 255)) -> bool:
-    """Draw the mirrored camera with a caption. Returns False if q was pressed."""
-    image = cv2.flip(cv2.cvtColor(frame.image, cv2.COLOR_RGB2BGR), 1)
+def show(cv2, frame, text: str, color=(255, 255, 255), space=None) -> bool:
+    """Draw the mirrored camera with the joints, the signing space (green with a hand in
+    it), and a caption. Returns False if q was pressed."""
+    from ui.server import JOINT_BGR
+
+    image = cv2.cvtColor(frame.image, cv2.COLOR_RGB2BGR)
+    h, w = image.shape[:2]
+    for points in (frame.pose, frame.left_hand, frame.right_hand):
+        for p in points:
+            cv2.circle(image, (int(p[0] * w), int(p[1] * h)), 3, JOINT_BGR, -1)
+    if space is not None:
+        box = (80, 220, 80) if frame.hands_in_signing_space else (150, 150, 150)
+        corner = (int(space.x_min * w), int(space.y_min * h))
+        cv2.rectangle(image, corner, (int(space.x_max * w), int(space.y_max * h)), box, 2)
+    image = cv2.flip(image, 1)
     cv2.putText(image, text, (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 0, 0), 8)
     cv2.putText(image, text, (30, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.4, color, 3)
     cv2.imshow("Record a sign", image)
@@ -51,11 +63,11 @@ def record(gloss: str, takes: int) -> None:
     import cv2
 
     from recognition.camera import Camera
-    from recognition.gating import SigningSpace
     from recognition.replay import frame_to_json
+    from tools.tune_recognition import signing_space
 
     config = load_config()
-    gate = SigningSpace.from_config(config)
+    gate = signing_space(config)  # the one saved in setup, like the app
     lib = library()
     camera = Camera(config)
     try:
@@ -71,14 +83,15 @@ def record(gloss: str, takes: int) -> None:
                 before.append(frame)
                 if frame.hands_in_signing_space:
                     ready_since = None
-                    if not show(cv2, frame, f"{gloss} {take}/{takes}: rest your hands"):
+                    text = f"{gloss} {take}/{takes}: rest your hands below the box"
+                    if not show(cv2, frame, text, space=gate):
                         return
                     continue
                 ready_since = ready_since or time.monotonic()
                 left = 1.5 - (time.monotonic() - ready_since)
                 if left <= 0:
                     break
-                if not show(cv2, frame, f"{gloss} {take}/{takes}: ready... {left:.1f}"):
+                if not show(cv2, frame, f"{gloss} {take}/{takes}: ready... {left:.1f}", space=gate):
                     return
             # Record from hands-in to hands-out.
             clip, started, last_in, raw = [], None, None, []
@@ -97,8 +110,9 @@ def record(gloss: str, takes: int) -> None:
                     break
                 if started and now - started > MAX_SECONDS:
                     break
-                label = "recording" if started else "GO: sign it"
-                if not show(cv2, frame, f"{gloss} {take}/{takes}: {label}", (80, 220, 80)):
+                label = "recording" if started else "GO: sign it inside the box"
+                text = f"{gloss} {take}/{takes}: {label}"
+                if not show(cv2, frame, text, (80, 220, 80), space=gate):
                     return
             try:
                 path = lib.add(gloss, clip)
