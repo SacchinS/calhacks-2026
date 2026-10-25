@@ -53,7 +53,8 @@ recognition:
   letters: true
   letter_model_dir: models/letters
   letter_set: PRFI                # only these letters (the demo's P-R and F-I); empty = A-Z
-  letter_top_k: 3                 # ...and only if it's among the model's 3 likeliest of A-Z
+  letter_top_k: 1                 # ...and only if it's the model's top guess of A-Z (a flat
+                                  # B hand put F 2nd-3rd: HELLO read as F)
   letter_threshold: 0.6           # the model's probability among the letters
   letter_hold_seconds: 5.0        # fluent: 0.25
   letter_min_frames: 3
@@ -63,8 +64,9 @@ recognition:
   letter_slide_doubles: false     # true: a small slide repeats a letter (fluent: true)
   letter_start_count: 1           # letters before spelling starts (fluent: 2)
   letter_gap_seconds: 10          # ...within this long of each other (1.5)
-  letter_end_seconds: 10          # no letter this long: spelling is over (1.5)
+  letter_end_seconds: 7           # no letter this long: spelling is over and signs count (1.5)
   letter_hand: auto               # auto (the one hand up) | right | left
+  letter_below_mouth: true        # a hand up by the face is signing (HELLO), not spelling
   letter_orientation: auto        # auto (tries both) | as_is | mirrored
   # Custom signs recorded with tools/record_signs.py (tried before the Kaggle model).
   custom_signs_dir: models/custom_signs
