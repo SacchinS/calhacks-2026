@@ -3,6 +3,8 @@
 Source: `sign_to_prediction_index_map.json` from the [1st-place model on Hugging Face](https://huggingface.co/sign/kaggle-asl-signs-1st-place) (also has a ready `model.tflite`, 11.2 MB, MIT). The sections after "Draft demo script" were a first-pass guess from the design doc's demo plan.
 
 ## Draft demo script
+**Oct 24: the project is Meet only.** Only the Meet line below still matters; the Claude Code and Siri lines are kept for the record. The ASL Citizen model (2,731 signs) is being added for the signs the Kaggle 250 lacks.
+
 From `asl-demo-script-research.md`, which links a source for every sign. These are drafts: a Deaf signer must approve them before the demo.
 - Claude Code kick-off: `FOOD STORE /\ WW MAKE`, then `YES`. In vocab: food, store, make, yes. Custom: WW.
 - Siri: `TOMORROW MORNING, you-REMIND-me BUY MILK`. In vocab: tomorrow, morning, milk. Custom: REMIND, BUY.
