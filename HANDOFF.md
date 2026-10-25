@@ -67,7 +67,7 @@ The glosses are drafts (`docs/asl-demo-script-research.md`, Moment 3). A Deaf si
 | Custom signs (`recognition/custom_signs.py`, `tools/record_signs.py`) | A | **Built.** Few-shot matching from recorded examples. Nothing recorded yet; only needed for demo signs neither model knows. |
 | Segmenter and control signs (`recognition/segmenter.py`) | A | Works. YES / NO / FINISH need a hold (2x `min_frames`), so a mid-sentence FINISH doesn't send. |
 | Face markers (`recognition/face_markers.py`) | A | **Built, off by default** (`recognition.face_markers`). Heuristic; untested on a real face. |
-| Fingerspelling (`recognition/fingerspelling.py`) | A | **Next.** Stub: the camera produces no letters yet. Plan: a pretrained A–Z letter model on the hand landmarks (ONNX), one `Letter` per held handshape. |
+| Fingerspelling (`recognition/fingerspelling.py`, `tools/try_letters.py`) | A | **Built on `person-a`**, not tried live: a pretrained letter model on the hand landmarks (ONNX, CC BY-NC) publishes one `Letter` per held handshape; spelling starts at the second letter, and other signs are ignored while spelling. Settings under `recognition.letter_*`. |
 | Fingerspelling autocomplete (`language/autocomplete.py`, `vocab.py`, `vocab_search.py`, `vocab_terms.py`, `tagger.py`) | B | **Built and tested on typed letters** (`~pri` in the mock box, or the app's "Fingerspell by typing" box). It ranks words by letters, the conversation (Moss session or keyword mock), frequency and recency; learns words from your spelling and from captions; keeps its memory in a local SQLite file; and lets you list and delete words in Settings. Moss itself isn't run yet (no keys): `uv run pytest --live tests/test_moss_search.py` once they're in `.env`. |
 | Replay (`recognizer: replay`) | A | Works, but `fixtures/landmarks_sample.jsonl` is fake data. |
 | Claude translator (`language/claude.py`, prompt) | B | **Works**: live tests pass, 0.6 to 1.0 s each (Haiku 5.5, no thinking). The prompt is now written for speech in a meeting. |
@@ -114,7 +114,7 @@ The glosses are drafts (`docs/asl-demo-script-research.md`, Moment 3). A Deaf si
 In rough demo order:
 
 1. **Keys** (lead): `ANTHROPIC_API_KEY` and `CARTESIA_API_KEY` are in `.env` on the build machine. `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY` are still needed, from a Moss project (code CALHACKS on the Portal's billing page). Then `uv run pytest --live` runs the real translator, Cartesia and Moss tests, including the 500-word startup timing.
-2. **Camera letters** (A): the letter model, publishing `Letter` events, until P-R-I spelled live suggests Priyanka.
+2. **Camera letters** (A): `uv run python tools/try_letters.py`, spell the alphabet and P-R-I, set `recognition.letter_orientation` to what it prints, and tune `letter_threshold` / `letter_hold_seconds`; then check P-R-I in the app brings up Priyanka.
 3. **Bigger vocabulary** (A): the ASL Citizen model next to the Kaggle one, limited to the demo's signs.
 4. **Record and tune** (A): `uv run python tools/record_script.py` records 3 takes of each demo phrase to `models/takes/` (gitignored), with the glosses each should give; then `uv run python tools/tune_recognition.py --details` replays them through the models, tries every threshold combination, and prints the best `config.yaml` lines. Takes double as real replay fixtures. The signer who demos should record them.
 5. **Moss numbers** (B): ranking and latency with the real Moss session; tune the autocomplete weights on real letters.
