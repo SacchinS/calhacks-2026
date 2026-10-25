@@ -91,6 +91,23 @@ language:
   prompt_file: language/prompts/gloss_to_english.md
   max_tokens: 200
 
+tickets:
+  # While enabled, final call captions are sent to Claude during the call for a tentative
+  # ticket. Notes stay in memory and nothing reaches Jira until the signer approves with YES.
+  enabled: false
+  model: claude-opus-5-5
+  effort: low
+  settle_seconds: 3
+  armed_seconds: 120
+  notes_max: 400
+  announce: true
+  announce_text: "I've added it to Jira as {key}."
+
+jira:
+  # forge is the production bridge; mock is selected automatically when its variables are absent.
+  via: forge
+  issue_type: Task
+
 audio:
   # Our TTS plays into this device; select it as the microphone in Meet.
   virtual_mic_device: BlackHole 2ch
