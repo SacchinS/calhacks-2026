@@ -7,3 +7,6 @@ translator: claude
 tts: cartesia
 captions: cartesia
 vocab_search: moss
+
+tickets:
+  enabled: true

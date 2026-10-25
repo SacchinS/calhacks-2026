@@ -489,6 +489,31 @@ class Autocompleter:
         out.sort(key=lambda w: -w["last_used"])
         return out
 
+    async def related_words(self, text: str, k: int = 8) -> list[dict[str, Any]]:
+        """Return remembered words relevant to a ticket draft without retaining the text.
+
+        Literal mentions win, followed by the current in-memory search scores when available.
+        The caller may discard the input immediately after this method returns.
+        """
+        tokens = {token.casefold() for token in text.split() if token.strip()}
+        literal: list[dict[str, Any]] = []
+        for stats in self.stats.values():
+            if stats.term.casefold() in tokens:
+                literal.append({"term": stats.term, "kind": stats.kind, "tags": list(stats.tags)})
+        literal.sort(key=lambda item: item["term"].casefold())
+        out = literal[:k]
+        if len(out) >= k:
+            return out
+        seen = {item["term"].casefold() for item in out}
+        for stats in sorted(self.stats.values(), key=lambda item: (-item.count, -item.last_used)):
+            if stats.term.casefold() in seen:
+                continue
+            out.append({"term": stats.term, "kind": stats.kind, "tags": list(stats.tags)})
+            seen.add(stats.term.casefold())
+            if len(out) >= k:
+                break
+        return out
+
     async def delete_word(self, term: str) -> int:
         term_norm = normalize(term)
         ids = await asyncio.to_thread(self.store.delete_term, term_norm)

@@ -43,6 +43,9 @@ class Router:
         # The Autocompleter (set in app.py), so a YES spent on a fingerspelling suggestion
         # doesn't also approve a sentence waiting for review.
         self.spelling: Any = None
+        # TicketAgent is attached by app.py after construction.  Keeping the dependency
+        # optional preserves the mock/voice router contract when ticket drafting is off.
+        self.tickets: Any = None
         self._task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
@@ -80,6 +83,14 @@ class Router:
             if event.gloss not in ("YES", "NO"):
                 return
             if self.spent_on_spelling(event):
+                return
+            # A pending spoken sentence has priority over a ticket, then a ready ticket
+            # has priority over an ordinary YES/NO.  A non-ready ticket consumes NO (dismiss)
+            # and YES (a no-op), so it cannot accidentally approve anything else.
+            if self.pending is not None:
+                await self.confirm(event.gloss == "YES")
+                return
+            if self.tickets is not None and await self.tickets.handle_control(event):
                 return
             await self.confirm(event.gloss == "YES")
 
@@ -127,6 +138,10 @@ class Router:
         """A one-tap reply in the signer's voice. Pressing it is the approval: no YES step.
         Urgent replies skip waiting for a pause, when the voice supports that."""
         await self.speak(text, urgent=urgent)
+
+    async def announce(self, text: str) -> None:
+        """Announce an approved ticket without opening another review prompt."""
+        await self.speak(text)
 
     async def deliver(self, output: Output, text: str, send=None) -> None:
         if output is not self.console:

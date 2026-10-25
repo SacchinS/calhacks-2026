@@ -23,11 +23,13 @@ from captions.base import CaptionSource
 from captions.mentions import MentionDetector
 from language.autocomplete import Autocompleter
 from language.base import Translator
+from language.tickets import TicketAgent
 from language.utterance import UtteranceBuffer
 from language.vocab import VocabStore, vocab_path
 from language.vocab_terms import keyterms
 from outputs.call_host import CallHost
 from outputs.console import ConsoleOutput
+from outputs.jira import JiraClient
 from outputs.router import Router
 from outputs.turn_taking import TurnTakingOutput
 from recognition.base import Recognizer
@@ -98,6 +100,15 @@ class App:
         )
         self.buffer.spelling = self.autocomplete
         self.router.spelling = self.autocomplete  # a YES on a suggestion isn't an approval
+        self.jira = JiraClient(config)
+        self.tickets = TicketAgent(
+            self.bus,
+            config,
+            self.jira,
+            autocomplete=self.autocomplete,
+            announcer=self.router,
+        )
+        self.router.tickets = self.tickets
 
     def _voice(self, config: Config) -> Any:
         """The TTS output, turn-aware in calls (waits for the other side to finish)."""
@@ -134,6 +145,7 @@ class App:
         await self.buffer.start()
         await self.autocomplete.start()
         await self.router.start()
+        await self.tickets.start()
         await self.call_host.start()
         await self.mentions.start()
         if isinstance(self.router.tts, TurnTakingOutput):
@@ -165,6 +177,7 @@ class App:
         if isinstance(self.router.tts, TurnTakingOutput):
             await self.router.tts.stop()
         await self.router.stop()
+        await self.tickets.stop()
         await self.autocomplete.stop()
         await self.buffer.stop()
         self.vocab.close()
