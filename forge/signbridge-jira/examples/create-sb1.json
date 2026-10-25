@@ -1,0 +1,22 @@
+{
+  "action": "create",
+  "request_id": "test-sb1-link-1",
+  "ticket": {
+    "summary": "SignBridge test: verify dashboard release link",
+    "description": "Verify the dashboard release dependency link.",
+    "due": "",
+    "labels": ["signbridge-test"],
+    "blocks": "SB-1",
+    "assign_to_signer": false
+  },
+  "audit": {
+    "call_id": "test-sb1-link",
+    "approved_by": "Test signer",
+    "approved_via": "signed YES",
+    "approved_at": "2026-10-25T12:00:00Z",
+    "model": "claude-haiku-5-5",
+    "draft_version": 1,
+    "reasons": ["Verifies the release dependency link."],
+    "versions": [{"version": 1, "changed": ["blocks"], "at": "2026-10-25T11:59:30Z"}]
+  }
+}
