@@ -45,7 +45,7 @@ SCRIPT = [
     "~pri YES",
     "HOW YOU [wh]",
     "FINE, THANK-YOU",
-    "~kub YES",
+    "~fi YES",
     "YES",
     "NO",
     "FINISH",
