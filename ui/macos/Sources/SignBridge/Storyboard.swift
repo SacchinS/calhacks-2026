@@ -6,10 +6,10 @@ struct Storyboard: View {
     @State private var since = Date()
     private let timer = Timer.publish(every: 2.6, on: .main, in: .common).autoconnect()
     private let steps: [(String, String)] = [
-        ("Open palms", "Both hands up, held still, to start."),
-        ("Sign", "Make your signs, then rest your hands."),
+        ("Sign", "Hands up in the green box, then sign."),
+        ("Fingerspell", "Spell a name; it suggests the word."),
         ("Claude writes it", "Your signs become a sentence."),
-        ("Thumbs up", "Sends it. Thumbs down cancels."),
+        ("Said in the call", "FINISH sends it, in your voice."),
     ]
 
     var body: some View {
@@ -45,18 +45,18 @@ struct Storyboard: View {
     @ViewBuilder private func visual(_ i: Int, on: Bool) -> some View {
         switch i {
         case 0:
-            HStack(spacing: 14) {
-                Image(systemName: "hand.raised.fill").scaleEffect(x: -1)
-                Image(systemName: "hand.raised.fill")
-            }
-            .font(.system(size: 40))
-            .foregroundStyle(on ? AnyShapeStyle(Brand.accent) : AnyShapeStyle(Color.secondary))
-            .symbolEffect(.bounce, value: on)
-        case 1:
             if let hello = GuideSign.all.first(where: { $0.name == "HELLO" }) {
                 SignDiagram(sign: hello, animate: on, start: since).padding(4)
             } else {
                 Image(systemName: "hand.wave").font(.system(size: 40)).symbolEffect(.bounce, value: on)
+            }
+        case 1:
+            VStack(spacing: 8) {
+                Text("P  R").font(.system(size: 26, weight: .bold, design: .monospaced))
+                Image(systemName: "arrow.down").foregroundStyle(.secondary).font(.caption)
+                Chip(text: "Priyanka").scaleEffect(0.8)
+                    .opacity(on ? 1 : 0.25)
+                    .animation(.easeIn(duration: 0.5).delay(on ? 0.6 : 0), value: on)
             }
         case 2:
             VStack(spacing: 8) {
@@ -68,10 +68,10 @@ struct Storyboard: View {
             }
         default:
             VStack(spacing: 6) {
-                Image(systemName: "hand.thumbsup.fill").font(.system(size: 40))
+                Image(systemName: "speaker.wave.2.fill").font(.system(size: 40))
                     .foregroundStyle(on ? AnyShapeStyle(Color.green) : AnyShapeStyle(Color.secondary))
                     .symbolEffect(.bounce, value: on)
-                Label("Sent", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold))
+                Label("Spoken", systemImage: "checkmark.circle.fill").font(.caption.weight(.semibold))
                     .foregroundStyle(.green).opacity(on ? 1 : 0)
                     .animation(.easeIn(duration: 0.3).delay(on ? 0.7 : 0), value: on)
             }

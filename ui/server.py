@@ -3,7 +3,7 @@
 The app launches `python app.py` and speaks SignBridge's engine protocol; this module maps
 it onto our bus. Commands (stdin, one JSON object per line):
 
-  {"cmd": "mode", "mode": "off|run|framing|gestures"}   off pauses the recognizer
+  {"cmd": "mode", "mode": "off|run|framing"}   off pauses the recognizer
   {"cmd": "preview", "on": true}                        send camera frames
   {"cmd": "gesture", "name": "wake|confirm|cancel"}     on-screen buttons and backup keys:
         confirm = YES (or SEND while signing), cancel = NO (or CLEAR while signing)
@@ -17,7 +17,7 @@ it onto our bus. Commands (stdin, one JSON object per line):
   {"cmd": "quick_reply", "text": "Can you repeat that?"}  (ours) one of meet.quick_replies
   {"cmd": "letters", "text": "pri"}                     (ours) fingerspelled letters, typed
   {"cmd": "autocomplete", "action": "accept|dismiss", "index": 0}   (ours) while spelling,
-        the suggestion to accept (0 = top). The confirm / cancel gestures do the same.
+        the suggestion to accept (0 = top). Send / Cancel (buttons, keys) do the same.
   {"cmd": "vocab_list"}                                 (ours) the remembered words
   {"cmd": "vocab_delete", "term": "Julian"} | {"cmd": "vocab_delete", "id": "<occurrence>"}
   {"cmd": "quit"}
@@ -26,7 +26,8 @@ Events (stdout):
   {"type": "ready", "config": {...}, "quick_replies": [{"text": ..., "urgent": bool}]}
   {"type": "status", "state": "idle|listening|thinking|confirming|sending", "mode": ...,
    "glosses": [...], "intent": {"sentence": ..., "route": "voice"} | null,
-   "target": "Google Meet", "log": [...], "holding": null, "fps": ..., "error": null,
+   "target": "Google Meet", "log": [...], "fps": ..., "error": null,
+   "holding": ["P", 0.4] | null (a fingerspelled letter being held, and how far to counting),
    "components": {...}, "mock": bool, "camera_on": bool,
    "speech": {"state": "idle|waiting|interjecting|speaking", "text": ...},
    "them_talking": bool,
@@ -88,9 +89,9 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-APP_MODES = ("off", "run", "framing", "gestures")
-PRACTICE = ["wake", "confirm", "cancel"]
+APP_MODES = ("off", "run", "framing")
 UI_CONFIG = Path("~/Library/Application Support/calhacks-2026/ui.json").expanduser()
+JOINT_BGR = (255, 132, 10)  # the tracked joints, drawn as blue dots (macOS accent blue)
 TARGET = "Google Meet"  # where the signer's English is spoken
 
 
@@ -129,13 +130,9 @@ def render_preview(frame: LandmarkFrame, space: SigningSpace, mirror: bool) -> b
         box_color,
         3 if frame.hands_in_signing_space else 1,
     )
-    for points, color in (
-        (frame.pose, (0, 200, 255)),
-        (frame.left_hand, (0, 255, 0)),
-        (frame.right_hand, (255, 0, 0)),
-    ):
+    for points in (frame.pose, frame.left_hand, frame.right_hand):
         for p in points:
-            cv2.circle(canvas, (int(p[0] * w), int(p[1] * h)), 2, color, -1)
+            cv2.circle(canvas, (int(p[0] * w), int(p[1] * h)), 3, JOINT_BGR, -1)
     if mirror:
         canvas = cv2.flip(canvas, 1)
     ok, jpeg = cv2.imencode(".jpg", canvas, [cv2.IMWRITE_JPEG_QUALITY, 70])
@@ -154,7 +151,7 @@ class EngineServer:
         self._apply_settings()
         self.mirror = bool(self.config.get("ui.mirror_camera", True))
 
-        self.mode = "off"  # the app's mode: off | run | framing | gestures
+        self.mode = "off"  # the app's mode: off | run | framing
         self.preview = False
         self.woke = False
         self.gloss: list[str] = []  # live, until SEND
@@ -168,10 +165,10 @@ class EngineServer:
         self.them_talking = False  # the other side has the floor (Ink turn detection)
         self.spelling: AutocompleteUpdate | None = None  # a word being fingerspelled
         self.log: deque[str] = deque(["ready: sign, then FINISH"], maxlen=3)
-        self.practice = list(PRACTICE)
         self.frame: LandmarkFrame | None = None
         self.frame_times: deque[float] = deque(maxlen=60)
         self.frame_seq = 0
+        self._holding: list[Any] | None = None
         self._last_status: dict[str, Any] | None = None
         self._tasks: list[asyncio.Task[None]] = []
 
@@ -223,7 +220,7 @@ class EngineServer:
             "intent": intent,
             "target": TARGET,
             "log": list(self.log),
-            "holding": None,
+            "holding": self.letter_holding(),
             "fps": float(len(recent)),
             "error": None,
             # The webcam is open (only the camera recognizer opens it; the app always shows this).
@@ -238,12 +235,13 @@ class EngineServer:
         }
         if self.mode == "framing":
             status["framing"] = self._framing_hint()
-        if self.mode == "gestures":
-            status["practice"] = {
-                "todo": list(self.practice),
-                "done": [g for g in PRACTICE if g not in self.practice],
-            }
         return status
+
+    def letter_holding(self) -> list[Any] | None:
+        """The letter being held for fingerspelling and its progress (0..1), for the app's bar."""
+        reader = getattr(self.app.recognizer, "letters", None)
+        holding = reader.holding if reader is not None else None
+        return [holding[0], round(holding[1], 2)] if holding else None
 
     def _autocomplete(self) -> dict[str, Any] | None:
         update = self.spelling
@@ -330,6 +328,10 @@ class EngineServer:
         if isinstance(event, LandmarkFrame):
             self.frame = event
             self.frame_times.append(time.monotonic())
+            holding = self.letter_holding()
+            if holding != self._holding:  # the hold bar moves with the frames
+                self._holding = holding
+                self.emit_status()
             if self.preview:
                 jpeg = render_preview(event, self.space, self.mirror)
                 if jpeg:
@@ -449,7 +451,6 @@ class EngineServer:
         if mode not in APP_MODES:
             raise ValueError(mode)
         self.mode = mode
-        self.practice = list(PRACTICE)
         if mode != "run":
             self.gesture("cancel")
         recognizer = self.app.recognizer
@@ -459,10 +460,6 @@ class EngineServer:
             await recognizer.start()
 
     def gesture(self, name: str) -> None:
-        if self.mode == "gestures":
-            if self.practice and self.practice[0] == name:
-                self.practice.pop(0)
-            return
         state = self.state()
         if state != "confirming" and self.app.autocomplete.active and name != "wake":
             # Spelling a word: thumbs up takes the suggestion, thumbs down dismisses it.

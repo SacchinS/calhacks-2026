@@ -39,7 +39,7 @@ flowchart LR
 
 | Feature | Status |
 |---|---|
-| Sign recognition (Kaggle model + custom signs) | Built; needs tuning on a live webcam |
+| Sign recognition (ASL Citizen or Kaggle model + custom signs) | Built; needs tuning on a live webcam |
 | Gloss to English with Claude | Works (live tests pass, under 1 s) |
 | Google Meet: Cartesia voice out, captions in, "One moment, I'm signing." cue | Works on a loopback; a real two-laptop call is next |
 | Call intro: says who's calling ("Introduce me"; automatic only with `meet.intro_on_start`, for calls with strangers) | Built |
@@ -52,7 +52,7 @@ flowchart LR
 | Teach it your own signs (`tools/record_signs.py`) | Built |
 | Facial grammar tags (brows, head shake, nod) | Built, off by default |
 | Fingerspelling autocomplete with Moss: suggests the word from the first letters, the conversation, and your history | Built and tested with typed letters; needs Moss keys for the Moss search |
-| Fingerspelling recognition from the camera | Not yet: a letter model on the hand landmarks is next. Type letters in the app meanwhile |
+| Fingerspelling recognition from the camera | Built (a letter model on the hand landmarks, A–Z without J and Z); not yet tried on a live webcam. Typed letters still work |
 | Live accuracy and latency on screen | Stretch |
 
 ## Repo structure
@@ -92,7 +92,7 @@ make mock                         # builds and opens the Mac app on mocks: no we
 The app is SignBridge's SwiftUI app (`ui/macos`); it starts the Python engine (`app.py`) itself and lives in the menu bar (the hand icon).
 - **First launch** opens the setup wizard. Click through it ("Skip for now" is fine with mocks); after that the app opens the **Preview** window.
 - **Preview:** the camera with tracking, the signs, the English, and the call: your words and the other side's captions, quick replies, and "Introduce me". With the mock recognizer, type signs in the box at the bottom (or in the terminal): `hello nice meet-you`, then `/send`. `#word` is a fingerspelled word, `~pri` spells letters one at a time (the autocomplete suggests the word; `/yes` takes it), `/clear` starts over. With review on (Settings > Calls), `/yes` or `/no` decides whether it's spoken. Face markers go after the signs they cover: `title /\ red` (raised brows, topic), `tomorrow rain [q]` (yes/no question), `[wh]`, `[neg]`, `[nod]`. The Send / Cancel buttons do the same as signing YES / NO.
-- **Demo Mode** (Preview > Demo, or the menu bar) is the fullscreen stage for the second display. Menu bar > Demo Mode On picks the display; it remembers it. Esc leaves it. Backup keys: W start, C send (YES), X cancel (NO), 1–4 the demo script's phrases in order (the same list is under Preview > Test phrases).
+- **Demo Mode** (Preview > Demo, or the menu bar) is the fullscreen stage for the second display. Menu bar > Demo Mode On picks the display; it remembers it. Esc leaves it. Backup keys: W start, C send (YES), X cancel (NO), 1–3 the demo script's phrases in order (the same list is under Preview > Test phrases).
 - Quit from the menu bar. Engine logs go to the terminal under `make mock`, and to `~/Library/Logs/calhacks-2026/engine.log` in the packaged app.
 
 To use the real pieces:
@@ -101,6 +101,7 @@ To use the real pieces:
 brew install blackhole-2ch blackhole-16ch   # then restart, or log out and back in
 cp .env.example .env                        # fill in ANTHROPIC_API_KEY, CARTESIA_API_KEY (and MOSS_*)
 uv sync --extra camera                      # MediaPipe + OpenCV for the webcam (Person A)
+uv run --extra camera --with torch --with onnx python tools/setup_asl_citizen.py --accept-license
 ```
 
 For the live demo, `make demo` runs every real component (`config.demo.yaml` on top of `config.yaml`). To pick components one at a time, set them in `config.yaml` (every default is the mock, and `main` keeps it that way), then `make run`:
@@ -136,8 +137,10 @@ The packaged app reads its keys from `~/Library/Application Support/calhacks-202
 
 ## Models and data
 
+- [ASL Citizen](https://www.microsoft.com/en-us/research/project/asl-citizen/) ST-GCN model (Microsoft; [code and weights](https://github.com/microsoft/ASL-citizen-code), MIT): isolated sign recognition, 2,731 signs from 52 signers, on the same MediaPipe Holistic points we track. We limit it to the demo's signs (`recognition.asl_citizen_signs`). Set up once with `uv run --extra camera --with torch --with onnx python tools/setup_asl_citizen.py --accept-license`, which downloads the weights, exports them to ONNX for ONNX Runtime (~20 ms per window), and reads the word list out of the dataset. The dataset is under the Microsoft Research License Terms (research and non-commercial use only; the data, word list included, can't be shared), so it stays in the gitignored `models/asl_citizen/`. Without it, the Kaggle model stands in.
 - [Kaggle ISLR 2023 1st-place model](https://huggingface.co/sign/kaggle-asl-signs-1st-place) (MIT license): isolated sign recognition, 250 signs. Downloaded to `models/islr/` the first time the camera runs; run with LiteRT.
 - [MediaPipe Holistic Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/holistic_landmarker): hand, pose, and face landmarks.
+- [ASL Landmark MLP](https://huggingface.co/nocontextdoruk/asl-landmark-mlp) by Doruk Doğular (CC BY-NC 4.0: non-commercial use only), trained on the [ASL-HG dataset](https://doi.org/10.17632/j4y5w2c8w9.1) (Pranto et al., 2026): fingerspelled letters from the 21 hand landmarks. Downloaded to `models/letters/` the first time the camera runs; run with ONNX Runtime (~0.05 ms per frame). Its reported 100% accuracy is on held-out photos of the same 10 people it was trained on, so expect less on a new signer.
 - Custom signs: our own recordings (landmarks only), matched by nearest neighbour.
 
 ## Autocomplete with Moss
@@ -179,7 +182,7 @@ document or query text.
 **How it learns.**
 - Every word the signer spells and keeps.
 - Likely names, acronyms and jargon in the other side's captions: capitalized words that aren't
-  ordinary English, all-caps tokens, and unusual long words. So "Priyanka" or "Kubernetes",
+  ordinary English, all-caps tokens, and unusual long words. So "Priyanka" or "Figma",
   heard in a meeting, can be suggested before the signer has ever spelled them.
 
 **How ranking works.** On each letter:
@@ -206,9 +209,11 @@ latency is logged.
 - `make seed-vocab` loads Julian, Jupyter, June and a few more.
 - In `make mock`, type `tennis partner ~ju` in the mock-sign box: `~ju` spells J, U one letter
   at a time.
-- The mock captions mention Priyanka and Kubernetes, then `~pri` suggests Priyanka.
-- With the camera, type letters in the "Fingerspell by typing" box until fingerspelling
-  recognition exists.
+- The mock captions are the demo call: Priyanka mentions Figma, so `~pr` suggests Priyanka and
+  `~fi` suggests Figma.
+- With the camera, fingerspell to it: hold each letter until it counts (5 s in the slow
+  settings for people new to ASL, with a progress bar in the app; 0.25 s at fluent speed). `uv run python tools/try_letters.py` shows what the letter model
+  sees. The "Fingerspell by typing" box still works as a backup.
 - `tools/seed_vocab.py --synthetic 500 --time` measures the startup load.
 
 ## How we use Claude
@@ -234,7 +239,7 @@ latency is logged.
 
 ## Limitations
 
-- Recognition covers a limited vocabulary (250 Kaggle signs plus the custom signs we record), not all of ASL. Fingerspelling isn't recognized from the camera yet (letters can be typed, and autocomplete works on them). ASL grammar and regional variation are only partly handled.
+- Recognition covers a limited vocabulary (250 Kaggle signs plus the custom signs we record), not all of ASL. Fingerspelled letters are read one held handshape at a time, slower than fluent fingerspelling, and J and Z (drawn in the air) aren't read; autocomplete makes up for most of it. ASL grammar and regional variation are only partly handled.
 - ASL grammar lives partly on the face and body. We can read brow raises and furrows, head shakes, and nods (off by default until a Deaf signer has checked it), but not mouth morphemes (size and intensity, like CHA or OOO) or body shifts (comparison, role shift), so some meaning is lost. A Deaf signer should check the output.
 - Live webcam accuracy can be much lower than benchmark scores. We'll report what we actually measure.
 - It's not a replacement for a qualified interpreter. It's a direct option for everyday meetings and short calls.
