@@ -20,6 +20,8 @@ final class EngineClient: ObservableObject {
     @Published var route: String?
     @Published var log: [String] = []
     @Published var holding: (String, Double)? = nil
+    /// The signing box: "idle" (gray), "signing" (yellow), "detected" (green); nil without a camera.
+    @Published var signState: String?
     @Published var target: String?
     @Published var fps = 0.0
     @Published var engineError: String?
@@ -295,6 +297,7 @@ final class EngineClient: ObservableObject {
             } else {
                 holding = nil
             }
+            signState = e["sign_state"] as? String
             let framing = e["framing"] as? [String: Any]
             framingHint = framing?["hint"] as? String ?? ""
             framingOK = framing?["ok"] as? Bool ?? false

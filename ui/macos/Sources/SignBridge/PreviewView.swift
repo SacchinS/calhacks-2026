@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// Live view for the user and for demos: camera with tracking, what was signed, Claude's sentence, and the call.
+/// The main window: the camera with tracking, what's being signed, Claude's sentence to send, and
+/// the sentences said so far. The call itself (captions, quick replies) lives in the call overlay.
 struct PreviewView: View {
     @ObservedObject var engine: EngineClient
-    var showDemo: () -> Void = {}
-    private let fakePhrases = DemoScript.phrases
 
     private var live: Bool { engine.state == "listening" }
 
@@ -18,7 +17,7 @@ struct PreviewView: View {
                         camera
                         VStack(spacing: 14) {
                             transcript
-                            call(maxHeight: .infinity)
+                            SentList(engine: engine, maxHeight: .infinity)
                             Spacer(minLength: 0)
                             if engine.mockRecognizer { MockSignBox(engine: engine) } else { SpellBox(engine: engine) }
                             controls
@@ -31,7 +30,7 @@ struct PreviewView: View {
                     topBar
                     camera
                     transcript
-                    call(maxHeight: 320)
+                    SentList(engine: engine, maxHeight: 220)
                     if engine.mockRecognizer { MockSignBox(engine: engine) } else { SpellBox(engine: engine) }
                     controls
                 }
@@ -46,12 +45,6 @@ struct PreviewView: View {
     }
 
     // MARK: pieces
-
-    /// The call: your words and their captions, quick replies, and the intro button.
-    private func call(maxHeight: CGFloat) -> some View {
-        MeetPanel(engine: engine, maxHeight: maxHeight,
-                  title: "Call" + (engine.components["captions"] == "mock" ? " (mock captions)" : ""))
-    }
 
     private var camera: some View {
         ZStack(alignment: .bottom) {
@@ -129,6 +122,7 @@ struct PreviewView: View {
                 }
             }
             AutocompleteBar(engine: engine)
+            FloorStatus(engine: engine)  // waiting for a pause, or speaking
             if engine.state == "idle", let last = engine.log.last {  // e.g. what was just sent, or an error
                 Text(last).font(.caption).foregroundStyle(.tertiary)
             }
@@ -160,61 +154,32 @@ struct PreviewView: View {
                     .help("Speak right away, without waiting for a pause (the NOW sign)")
             }
             Spacer()
-            Button(action: showDemo) { Label("Demo", systemImage: "arrow.up.left.and.arrow.down.right") }
-                .buttonStyle(.borderless)
-            Menu {
-                ForEach(fakePhrases, id: \.self) { p in
-                    Button(DemoScript.label(p)) { engine.fake(p) }
-                }
-            } label: {
-                Label("Test phrases", systemImage: "text.badge.plus")
-            }
-            .menuStyle(.borderlessButton).fixedSize()
         }
         .controlSize(.large)
     }
 }
 
-/// The Meet call as a conversation: what the signer said (spoken for them) and the other side's
-/// captions, plus the call intro button.
-struct MeetPanel: View {
+/// The sentences said for you so far, newest at the bottom.
+struct SentList: View {
     @ObservedObject var engine: EngineClient
     var maxHeight: CGFloat
-    var title: String
+    private var said: [String] { engine.meetLog.filter { $0.who == "you" }.suffix(40).map(\.text) }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label(title, systemImage: "captions.bubble").font(.headline).foregroundStyle(Brand.accent)
-                Spacer()
-                Button { engine.introduce() } label: { Label("Introduce me", systemImage: "person.wave.2") }
-                    .help("Say who's calling and that you sign through SignBridge")
-            }
-            FloorStatus(engine: engine)
-            if (engine.config["signer_name"] as? String ?? "").isEmpty {
-                Label("Set your name in Settings > Calls to get an alert when someone says it.", systemImage: "bell.badge")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            QuickReplies(engine: engine)
+            Label("Said", systemImage: RouteInfo.icon).font(.headline).foregroundStyle(Brand.accent)
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
-                        if engine.meetLog.isEmpty {
-                            Text("Your words and the other side's captions show up here.").foregroundStyle(.tertiary)
+                        if said.isEmpty {
+                            Text("Sentences you send show up here.").foregroundStyle(.tertiary)
                         }
-                        ForEach(Array(engine.meetLog.suffix(40).enumerated()), id: \.offset) { i, line in
-                            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                                Text(line.who == "you" ? "You" : "Them").font(.caption.weight(.bold))
-                                    .foregroundStyle(line.who == "you" ? Brand.accent : .secondary)
-                                    .frame(width: 40, alignment: .leading)
-                                Text(line.text).font(.title3.weight(line.who == "you" ? .regular : .semibold))
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .id(i)
+                        ForEach(Array(said.enumerated()), id: \.offset) { i, text in
+                            Text(text).font(.title3).textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading).id(i)
                         }
                     }
                 }
-                .onChange(of: engine.meetLog.count) { _, n in proxy.scrollTo(min(n, 40) - 1, anchor: .bottom) }
+                .onChange(of: said.count) { _, n in proxy.scrollTo(n - 1, anchor: .bottom) }
             }
         }
         .frame(maxWidth: .infinity, minHeight: 70, maxHeight: maxHeight, alignment: .topLeading)
