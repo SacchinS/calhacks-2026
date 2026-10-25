@@ -43,6 +43,8 @@ final class EngineClient: ObservableObject {
     @Published var speechState = "idle"
     @Published var speechText = ""
     @Published var themTalking = false
+    /// One-tap replies for calls (meet.quick_replies); urgent ones are said without waiting.
+    @Published var quickReplies: [(text: String, urgent: Bool)] = []
     /// The Meet call so far: what the signer said ("you") and the other side's captions ("them").
     @Published var meetLog: [(who: String, text: String)] = []
     private var captionPartial = false
@@ -197,6 +199,7 @@ final class EngineClient: ObservableObject {
     func calibrate() { send(["cmd": "calibrate"]) }
     func saveConfig(_ values: [String: Any]) { send(["cmd": "config", "values": values]) }
     func introduce() { send(["cmd": "introduce"]) }
+    func quickReply(_ text: String) { send(["cmd": "quick_reply", "text": text]) }
     func setOutputMode(_ mode: String) { send(["cmd": "output_mode", "mode": mode]) }
     func mockInput(_ text: String) {
         if !text.trimmingCharacters(in: .whitespaces).isEmpty { send(["cmd": "mock_input", "text": text]) }
@@ -220,6 +223,9 @@ final class EngineClient: ObservableObject {
         switch e["type"] as? String {
         case "ready":
             config = e["config"] as? [String: Any] ?? [:]
+            quickReplies = (e["quick_replies"] as? [[String: Any]] ?? []).compactMap { r in
+                (r["text"] as? String).map { (text: $0, urgent: r["urgent"] as? Bool ?? false) }
+            }
         case "config":
             config = e["config"] as? [String: Any] ?? config
         case "status":

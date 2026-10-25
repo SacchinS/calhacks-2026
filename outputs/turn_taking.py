@@ -104,6 +104,14 @@ class TurnTakingOutput(Output):
             finally:
                 self._status("idle")
 
+    async def send_now(self, text: str) -> None:
+        """Say it right away, without waiting for a pause ("Please slow down")."""
+        self._status("speaking", text)
+        try:
+            await self.inner.send(text)
+        finally:
+            self._status("idle")
+
     async def _take_floor(self, text: str, chime_in: bool = True) -> None:
         """Return when it's our turn: the floor is free, or we've politely jumped in."""
         if self.is_floor_free():

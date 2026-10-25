@@ -15,10 +15,11 @@ it onto our bus. Commands (stdin, one JSON object per line):
   {"cmd": "output_mode", "mode": "claude_code|siri|voice|meet"}   (ours) where English goes
   {"cmd": "mock_input", "text": "title /\\ red /send"}      (ours) the mock-sign box
   {"cmd": "introduce"}                                  (ours) say the Meet call intro again
+  {"cmd": "quick_reply", "text": "Can you repeat that?"}  (ours) one of meet.quick_replies
   {"cmd": "quit"}
 
 Events (stdout):
-  {"type": "ready", "config": {...}}
+  {"type": "ready", "config": {...}, "quick_replies": [{"text": ..., "urgent": bool}]}
   {"type": "status", "state": "idle|listening|thinking|confirming|sending", "mode": ...,
    "glosses": [...], "intent": {"sentence": ..., "route": "text|siri|voice"} | null,
    "target": ..., "log": [...], "holding": null, "fps": ..., "error": null,
@@ -178,7 +179,18 @@ class EngineServer:
             pass
 
     def send_ready(self) -> None:
-        self.emit({"type": "ready", "config": self.ui_config})
+        self.emit({"type": "ready", "config": self.ui_config, "quick_replies": self.quick_replies})
+
+    @property
+    def quick_replies(self) -> list[dict[str, Any]]:
+        """The Meet panel's one-tap replies (meet.quick_replies in config.yaml)."""
+        replies = []
+        for item in self.config.get("meet.quick_replies", []) or []:
+            if isinstance(item, str):
+                item = {"text": item}
+            if isinstance(item, dict) and str(item.get("text", "")).strip():
+                replies.append({"text": str(item["text"]), "urgent": bool(item.get("urgent"))})
+        return replies
 
     def state(self) -> str:
         if self.pending_id:
@@ -408,6 +420,8 @@ class EngineServer:
             self.set_output_mode(str(msg.get("mode")))
         elif cmd == "introduce":
             self.app.call_host.introduce()
+        elif cmd == "quick_reply":
+            self.quick_reply(str(msg.get("text", "")))
         elif cmd == "mock_input":
             if str(msg.get("text", "")).strip():
                 self.bus.publish(MockInput(str(msg["text"])))
@@ -546,6 +560,15 @@ class EngineServer:
         with contextlib.suppress(OSError, ValueError):
             cfg.update(json.loads(self.ui_config_path.read_text()))
         return cfg
+
+    def quick_reply(self, text: str) -> None:
+        """Speak one of the configured replies (only those: the app can't make up words)."""
+        reply = next((r for r in self.quick_replies if r["text"] == text), None)
+        if reply is None:
+            self.emit({"type": "error", "message": f"not a quick reply: {text!r}"})
+            return
+        self.log.append(f"quick reply: {text}")
+        self._background(self.app.router.quick_reply(reply["text"], urgent=reply["urgent"]))
 
     def calibrate(self) -> None:
         """Setup's "Save This Position": fit the signing space to where the signer sits."""

@@ -92,6 +92,18 @@ meet:
   interjection: "Sorry, can I jump in?"
   yield_seconds: 2.5              # after the interjection, wait this long for them to pause
   barge_in_seconds: 1.0           # talked over this long: stop, and say it again at the pause
+  # One-tap replies in the Meet panel, spoken in your voice. Pressing one is the approval
+  # (the exact words are on the button). Normal ones wait for a pause like anything else;
+  # urgent ones are about how the meeting is going, so they're said right away.
+  quick_replies:
+    - {text: "Yes."}
+    - {text: "No."}
+    - {text: "Give me a moment to answer."}
+    - {text: "Can you repeat that?", urgent: true}
+    - {text: "Please slow down a little.", urgent: true}
+    - {text: "One at a time, please.", urgent: true}
+    - {text: "Can you type that in the chat?"}
+    - {text: "I agree."}
 
 cartesia:
   tts_model: sonic-latest        # or pin one, e.g. sonic-3.5
