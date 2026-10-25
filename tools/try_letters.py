@@ -11,7 +11,7 @@ letter for `letter_hold_seconds` (5 s in the slow testing settings), then change
 next; for the same letter twice, drop your hand in between.
 
 - Line 1: the model's guess this frame, as the camera sees the hand and mirrored. Only the
-  letters in `recognition.letter_set` are read (PRFI for the demo; empty = A-Z).
+  letters in `recognition.letter_set` are read (PF for the demo; empty = A-Z).
 - Line 2: why it is or isn't counted: unsure (under `letter_threshold`), holding (not yet
   `letter_hold_seconds`), counted, or waiting for a second letter (a word's first letter
   shows only once the second is held, so a sign's handshape isn't read as a letter).

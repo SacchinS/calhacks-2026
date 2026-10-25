@@ -135,8 +135,9 @@ class FrameRecognizer(Recognizer):
         self.markers = MarkerTally()
         self.letters = None  # the letter reader, once running (the app shows its hold)
         self.sign_state = "idle"  # idle | signing | detected: the preview's box color
-        # A demo letter held this long makes the raise fingerspelling: no signs in it.
-        self.letter_raise = float(config.get("recognition.letter_raise_seconds", 0.4))
+        # A demo letter held this long makes the raise fingerspelling: no signs in it. Signs
+        # are done well within it; a letter needs letter_hold_seconds to count anyway.
+        self.letter_raise = float(config.get("recognition.letter_raise_seconds", 1.5))
         self._task: asyncio.Task[None] | None = None
 
     @abstractmethod

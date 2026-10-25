@@ -98,8 +98,8 @@ enum RouteInfo {
 
 /// The Meet demo's draft glosses (MVP.md, docs/asl-demo-script-research.md), in demo order, in
 /// the mock-sign syntax (`#word` = a fingerspelled word). Demo Mode's backup keys 1-3 and
-/// Preview's test phrases (the release check-in in MVP.md). Live, the words are spelled F-I and
-/// P-R and autocomplete finishes them. A Deaf signer must approve them before the demo.
+/// Preview's test phrases (the release check-in in MVP.md). Live, the words are spelled F and
+/// P, one letter each, and autocomplete finishes them. A Deaf signer must approve them before the demo.
 enum DemoScript {
     static let phrases: [[String]] = [
         ["#FIGMA", "COLOR", "PROBLEM"],              // 1 "There's a color problem in Figma."
