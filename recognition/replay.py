@@ -1,8 +1,10 @@
 """Replays a landmark fixture (.jsonl, one LandmarkFrame per line) as if from a webcam.
 
 Each line: {"left_hand": [[x, y, z], ...], "right_hand": [...], "pose": [...],
-"face": [...], "label": "MAKE" | "#TITLE" | null}. `label` is the ground-truth gloss
-(`#` = fingerspelled); null while no sign is being made.
+"face": [...], "label": "MAKE" | "#TITLE" | null, "t": 0.033}. `label` is the ground-truth
+gloss (`#` = fingerspelled); null while no sign is being made. `t` (optional) is seconds
+since the recording started (tools/record_script.py writes it; tools/tune_recognition.py
+uses it for frame timing).
 
 By default the replay classifies frames from their labels, so it produces the right
 SignEvents before any model works. Set `recognition.replay_classifier: model` to run the
@@ -24,17 +26,20 @@ from shared.events import LandmarkFrame, Notice
 log = logging.getLogger(__name__)
 
 
-def frame_to_json(frame: LandmarkFrame) -> dict[str, Any]:
+def frame_to_json(frame: LandmarkFrame, t: float | None = None) -> dict[str, Any]:
     def points(pts):
         return [[round(c, 4) for c in p] for p in pts]
 
-    return {
+    data = {
         "left_hand": points(frame.left_hand),
         "right_hand": points(frame.right_hand),
         "pose": points(frame.pose),
         "face": points(frame.face),
         "label": frame.label,
     }
+    if t is not None:
+        data["t"] = round(t, 4)
+    return data
 
 
 def frame_from_json(data: dict[str, Any]) -> LandmarkFrame:
@@ -87,3 +92,10 @@ class ReplayRecognizer(FrameRecognizer):
         if self.config.get("recognition.replay_classifier", "labels") == "model":
             return sign_classifiers(self.config)
         return [FixtureLabelClassifier()]
+
+    def letter_reader(self):
+        if self.config.get("recognition.replay_classifier", "labels") != "model":
+            return None  # labeled fixtures carry whole fingerspelled words
+        from recognition.fingerspelling import letter_reader
+
+        return letter_reader(self.config)

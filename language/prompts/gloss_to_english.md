@@ -33,7 +33,7 @@ One utterance of ASL gloss: uppercase sign names separated by spaces, in signing
 `HELLO NICE MEET-YOU` → Hello, nice to meet you.
 `HELLO CLEAN MEET-YOU` → Hello, nice to meet you.
 `HELLO fs-PRIYANKA NICE MEET-YOU` → Hello Priyanka, nice to meet you.
-`fs-KUBERNETES MIGRATION FINISH [yes/no question]` → Is the Kubernetes migration done?
+`fs-FIGMA` → Figma.
 `HOW YOU [wh-question]` → How are you?
 `FINE` → I'm fine.
 `THANK-YOU` → Thank you.
