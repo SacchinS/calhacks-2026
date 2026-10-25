@@ -387,7 +387,9 @@ class TicketAgent:
                 words = await self.autocomplete.related_words(notes, k=8)
         try:
             context = await self.jira.context(
-                self.current.summary if self.current else notes[-240:],
+                # Never send captions to Forge. Before the first draft there is no safe
+                # summary yet, so use a constant query and only the remembered terms.
+                self.current.summary if self.current else "meeting action",
                 [w.get("term", "") for w in words],
             )
             draft = await self.drafter.draft(
