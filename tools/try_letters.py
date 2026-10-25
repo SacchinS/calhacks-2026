@@ -110,8 +110,13 @@ def main() -> None:
 
 def draw(cv2, frame, space, lines: list[str]) -> bool:
     """The mirrored camera, the signing space, and three lines. False if q was pressed."""
+    from ui.server import JOINT_BGR
+
     image = cv2.cvtColor(frame.image, cv2.COLOR_RGB2BGR)
     h, w = image.shape[:2]
+    for points in (frame.pose, frame.left_hand, frame.right_hand):
+        for p in points:
+            cv2.circle(image, (int(p[0] * w), int(p[1] * h)), 3, JOINT_BGR, -1)
     corner = (int(space.x_min * w), int(space.y_min * h))
     cv2.rectangle(image, corner, (int(space.x_max * w), int(space.y_max * h)), (80, 220, 80), 2)
     image = cv2.flip(image, 1)
