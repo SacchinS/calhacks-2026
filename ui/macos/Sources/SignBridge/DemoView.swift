@@ -127,7 +127,7 @@ struct DemoView: View {
                             .font(.title2.weight(.semibold)).foregroundStyle(Brand.accent)
                         Spacer()
                         if engine.state == "confirming" {
-                            Text("Sign YES to send, NO to cancel").font(.title2).foregroundStyle(.secondary)
+                            Text("Sign YES or FINISH to send, NO to cancel").font(.title2).foregroundStyle(.secondary)
                         } else {
                             ProgressView()
                             Text("Speaking…").font(.title2).foregroundStyle(.secondary)

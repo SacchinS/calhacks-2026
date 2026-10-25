@@ -47,7 +47,7 @@ struct SettingsView: View {
             Section {
                 TextField("Your name", text: $signerName, prompt: Text("e.g. Sam"))
                 Toggle("Review before speaking", isOn: $review)
-                Text("\"Introduce me\" (the call overlay's replies menu) says: \"Hi, this is \(signerName.isEmpty ? "<name>" : signerName). I'm Deaf and signing through SignBridge, so there may be a short pause before I answer.\" Useful on calls with people who don't know you. With review on, SignBridge waits for you to sign YES (NO drops it) before saying anything.")
+                Text("\"Introduce me\" (the call overlay's replies menu) says: \"Hi, this is \(signerName.isEmpty ? "<name>" : signerName). I'm Deaf and signing through SignBridge, so there may be a short pause before I answer.\" Useful on calls with people who don't know you. With review on, SignBridge waits for you to sign YES or FINISH (NO drops it) before saying anything.")
                     .font(.caption).foregroundStyle(.secondary)
             } header: {
                 Label("Calls", systemImage: "video.fill")
