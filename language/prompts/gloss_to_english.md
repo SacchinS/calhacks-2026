@@ -32,8 +32,9 @@ One utterance of ASL gloss: uppercase sign names separated by spaces, in signing
 `TOMORROW RAIN [yes/no question]` → Will it rain tomorrow?
 `HELLO NICE MEET-YOU` → Hello, nice to meet you.
 `HELLO CLEAN MEET-YOU` → Hello, nice to meet you.
-`HELLO fs-PRANAV NICE MEET-YOU` → Hello Pranav, nice to meet you.
-`fs-FIGMA` → Figma.
+`HELLO fs-PRANAV NICE MEET YOU` → Hello Pranav, nice to meet you.
+`fs-FIGMA COLOR PROBLEM` → There's a color problem in Figma.
+`ME MEET fs-PRANAV TOMORROW` → I'll meet with Pranav tomorrow.
 `HOW YOU [wh-question]` → How are you?
 `FINE` → I'm fine.
 `THANK-YOU` → Thank you.

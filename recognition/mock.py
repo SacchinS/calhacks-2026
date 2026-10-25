@@ -7,7 +7,8 @@ Input comes from the terminal (one line per Enter) and from the UI's mock-sign b
     #sarah             -> fingerspelled SARAH (the whole word at once)
     ~pr                -> fingerspelled letters P, R one at a time (autocomplete suggests
                           the word; /yes accepts it, /no dismisses it)
-    /yes /no /send /clear   -> control signs (/finish is the same as /send)
+    /yes /no /send /clear /now   -> control signs (/finish is the same as /send; /now sends
+                          and says it right away)
 
 Facial grammar goes after the signs it covers (back to the start of the line, a comma, or
 the previous marker), the way the docs write it:

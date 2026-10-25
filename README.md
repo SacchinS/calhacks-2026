@@ -39,7 +39,7 @@ flowchart LR
 
 | Feature | Status |
 |---|---|
-| Sign recognition (ASL Citizen or Kaggle model + custom signs) | Built; needs tuning on a live webcam |
+| Sign recognition | The demo uses our signer's recorded custom signs (HELLO, NICE, MEET, YOU, YES, FINISH: five takes each). ASL Citizen and Kaggle models are built but didn't recognize our signer live |
 | Gloss to English with Claude | Works (live tests pass, under 1 s) |
 | Google Meet: Cartesia voice out, captions in, "One moment, I'm signing." cue | Works on a loopback; a real two-laptop call is next |
 | Call intro: says who's calling ("Introduce me"; automatic only with `meet.intro_on_start`, for calls with strangers) | Built |
@@ -122,7 +122,7 @@ vocab_search: mock      # mock | moss
 3. In Meet's settings: Microphone = BlackHole 2ch, Speakers = that Multi-Output Device.
 4. `config.yaml`: `audio.virtual_mic_device: BlackHole 2ch`, `audio.meet_capture_device: BlackHole 16ch` (the defaults).
 
-**Custom signs.** Demo signs the Kaggle model doesn't know (`MEET-YOU`, `HOW`, `YOU`) are recorded from a few examples each: `uv run python tools/record_signs.py MEET-YOU --takes 5`, then `--check` to see whether the signs separate. Learn each sign from a Deaf signer or the videos linked in `docs/asl-demo-script-research.md` first.
+**Custom signs.** The demo's signs (HELLO, NICE, MEET, YOU, YES, FINISH) are recorded from a few examples each by the signer who demos: `uv run python tools/record_signs.py YOU --takes 5`, then `--check` to see whether the signs separate. Learn each sign from a Deaf signer or the videos linked in `docs/asl-demo-script-research.md` first.
 
 **Calls.** In the app's Settings > Calls, set your name for the call intro ("Hi, this is Sam. I'm Deaf and signing through SignBridge...", said when the app starts if `meet.intro_on_start` is on; Preview's call panel has "Introduce me" to say it any time) and turn on "Review before speaking" if your words should wait for a signed YES.
 
@@ -137,7 +137,7 @@ The packaged app reads its keys from `~/Library/Application Support/calhacks-202
 
 ## Models and data
 
-- [ASL Citizen](https://www.microsoft.com/en-us/research/project/asl-citizen/) ST-GCN model (Microsoft; [code and weights](https://github.com/microsoft/ASL-citizen-code), MIT): isolated sign recognition, 2,731 signs from 52 signers, on the same MediaPipe Holistic points we track. We limit it to the demo's signs (`recognition.asl_citizen_signs`). Set up once with `uv run --extra camera --with torch --with onnx python tools/setup_asl_citizen.py --accept-license`, which downloads the weights, exports them to ONNX for ONNX Runtime (~20 ms per window), and reads the word list out of the dataset. The dataset is under the Microsoft Research License Terms (research and non-commercial use only; the data, word list included, can't be shared), so it stays in the gitignored `models/asl_citizen/`. Without it, the Kaggle model stands in.
+- [ASL Citizen](https://www.microsoft.com/en-us/research/project/asl-citizen/) ST-GCN model (Microsoft; [code and weights](https://github.com/microsoft/ASL-citizen-code), MIT): isolated sign recognition, 2,731 signs from 52 signers, on the same MediaPipe Holistic points we track. We limit it to the demo's signs (`recognition.asl_citizen_signs`). Set up once with `uv run --extra camera --with torch --with onnx python tools/setup_asl_citizen.py --accept-license`, which downloads the weights, exports them to ONNX for ONNX Runtime (~20 ms per window), and reads the word list out of the dataset. The dataset is under the Microsoft Research License Terms (research and non-commercial use only; the data, word list included, can't be shared), so it stays in the gitignored `models/asl_citizen/`. Without it, the Kaggle model stands in. It didn't recognize our signer live (NICE ranked 13th to 1,800th on six takes), so the demo uses custom signs only (`recognition.sign_models: [custom]`).
 - [Kaggle ISLR 2023 1st-place model](https://huggingface.co/sign/kaggle-asl-signs-1st-place) (MIT license): isolated sign recognition, 250 signs. Downloaded to `models/islr/` the first time the camera runs; run with LiteRT.
 - [MediaPipe Holistic Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/holistic_landmarker): hand, pose, and face landmarks.
 - [ASL Landmark MLP](https://huggingface.co/nocontextdoruk/asl-landmark-mlp) by Doruk Doğular (CC BY-NC 4.0: non-commercial use only), trained on the [ASL-HG dataset](https://doi.org/10.17632/j4y5w2c8w9.1) (Pranto et al., 2026): fingerspelled letters from the 21 hand landmarks. Downloaded to `models/letters/` the first time the camera runs; run with ONNX Runtime (~0.05 ms per frame). Its reported 100% accuracy is on held-out photos of the same 10 people it was trained on, so expect less on a new signer.
@@ -214,8 +214,8 @@ latency is logged.
 - `make seed-vocab` loads Julian, Jupyter, June and a few more.
 - In `make mock`, type `tennis partner ~ju` in the mock-sign box: `~ju` spells J, U one letter
   at a time.
-- The mock captions are the demo call: Pranav mentions Figma, so `~pr` suggests Pranav and
-  `~fi` suggests Figma.
+- The mock captions are the demo meeting: Pranav and Figma come up, so `~p` suggests Pranav and
+  `~f` suggests Figma.
 - With the camera, fingerspell to it: hold each letter until it counts (5 s in the slow
   settings for people new to ASL, with a progress bar in the app; 0.25 s at fluent speed). `uv run python tools/try_letters.py` shows what the letter model
   sees. The "Fingerspell by typing" box still works as a backup.
@@ -232,7 +232,7 @@ latency is logged.
 - **Sonic text-to-speech** (`outputs/tts_cartesia.py`): the signer's English is spoken in a Cartesia voice, streamed over the SSE endpoint as raw PCM and played into the virtual microphone (BlackHole 2ch) as it arrives, so the others in the Meet call hear it with little delay. It also speaks the call intro and the "One moment, I'm signing." cue. If Cartesia fails, the app warns and uses macOS `say`.
 - **Ink speech-to-text** (`captions/cartesia_stt.py`): the other side's call audio, captured from a separate device (BlackHole 16ch), is streamed to Cartesia's realtime STT websocket with turn detection; partial transcripts update the caption live and the end of each turn finalizes it.
 - **Ink keyterms** (`language/vocab_terms.py`): the names and jargon the autocomplete already remembers, plus your own name, are sent as Ink keyterms when captions start, so the captions spell "Pranav" and "Figma" the way you do and the mention alerts match. Ink takes them as the connection opens and they can't change mid-stream, so a word learned during a call reaches it the next time captions start.
-- **Ink turn detection for turn-taking** (`outputs/turn_taking.py`): Ink's `turn.start`, `turn.eager_end`, `turn.resume`, and `turn.end` events tell our voice whether the other person has the floor. The signer's approved sentence waits for the end of their turn and is spoken the moment it comes; if they keep talking for 8 seconds, SignBridge says "Sorry, can I jump in?" first; if someone talks over our voice for more than a second, it stops and says the sentence again at the next pause. It changes when the words are spoken, never what they are.
+- **Ink turn detection for turn-taking** (`outputs/turn_taking.py`): Ink's `turn.start`, `turn.eager_end`, `turn.resume`, and `turn.end` events tell our voice whether the other person has the floor. The signer's sentence waits for the end of their turn and is spoken the moment it comes (turn-based: it never interjects on its own, though `meet.chime_in_seconds` can make it say "Sorry, can I jump in?" after a while). Signing NOW at the end, or on its own while a sentence waits, says it right away. If someone talks over our voice for more than a second, it stops and says the sentence again at the next pause (not for NOW). It changes when the words are spoken, never what they are.
 - Only the English to speak and the other side's call audio go to Cartesia; nothing is saved.
 
 ## Privacy

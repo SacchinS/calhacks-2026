@@ -11,7 +11,7 @@ letter for `letter_hold_seconds` (5 s in the slow testing settings), then change
 next; for the same letter twice, drop your hand in between.
 
 - Line 1: the model's guess this frame, as the camera sees the hand and mirrored. Only the
-  letters in `recognition.letter_set` are read (PRFI for the demo; empty = A-Z).
+  letters in `recognition.letter_set` are read (PF for the demo; empty = A-Z).
 - Line 2: why it is or isn't counted: unsure (under `letter_threshold`), holding (not yet
   `letter_hold_seconds`), counted, or waiting for a second letter (a word's first letter
   shows only once the second is held, so a sign's handshape isn't read as a letter).
@@ -69,6 +69,7 @@ def main() -> None:
         m.orientation = orientation
     reader = LetterReader(config, model)
     wins: Counter[str] = Counter()
+    by_letter: dict[str, Counter[str]] = {}  # letter -> which view read it surely
     spelled = ""
     printed = 0.0
     camera = Camera(config)
@@ -85,16 +86,21 @@ def main() -> None:
                 surest = max(guesses, key=lambda o: guesses[o][1] if guesses[o] else 0)
                 if guesses[surest] and guesses[surest][1] >= reader.threshold:
                     wins[surest] += 1
-            if args.top and hand and frame.ts - printed >= 0.5:
-                printed = frame.ts
-                ranks = [
-                    f"{o}: "
-                    + " ".join(f"{c} {p:.0%}" for c, p in model.ranked(hand, o == "mirrored"))
-                    for o in ORIENTATIONS
-                ]
-                print(f"{reader.status:<40} | {'  |  '.join(ranks)}", flush=True)
+                    by_letter.setdefault(guesses[surest][0], Counter())[surest] += 1
             was_spelling = reader.spelling
             spelled += "".join(letter.letter for letter in reader.push(frame, space))
+            if args.top and frame.ts - printed >= 0.5:
+                printed = frame.ts
+                ranks = (
+                    [
+                        f"{o}: "
+                        + " ".join(f"{c} {p:.0%}" for c, p in model.ranked(hand, o == "mirrored"))
+                        for o in ORIENTATIONS
+                    ]
+                    if hand
+                    else ["(no letter read)"]
+                )
+                print(f"{reader.status:<45} | {'  |  '.join(ranks)}", flush=True)
             if was_spelling and not reader.spelling and not spelled.endswith(" "):
                 spelled += " "  # the word ended
             if not draw(cv2, frame, space, [line, reader.status, spelled[-24:] or "-"]):
@@ -103,13 +109,16 @@ def main() -> None:
         camera.close()
         cv2.destroyAllWindows()
     if wins:
-        best, _ = wins.most_common(1)[0]
-        print(f"Surer reads: {dict(wins)}. Set recognition.letter_orientation: {best}")
+        views = {letter: c.most_common(1)[0][0] for letter, c in by_letter.items()}
+        best = "either" if len(set(views.values())) > 1 else wins.most_common(1)[0][0]
+        read = ", ".join(f"{letter} {view}" for letter, view in sorted(views.items()))
+        print(f"Each letter read surest: {read}. Set recognition.letter_orientation: {best}")
     print(f"Counted: {spelled or '(nothing)'}")
 
 
-def draw(cv2, frame, space, lines: list[str]) -> bool:
-    """The mirrored camera, the signing space, and three lines. False if q was pressed."""
+def draw(cv2, frame, space, lines: list[str], box=(80, 220, 80)) -> bool:
+    """The mirrored camera, the signing space (`box`, BGR), and three lines. False if q was
+    pressed."""
     from ui.server import JOINT_BGR
 
     image = cv2.cvtColor(frame.image, cv2.COLOR_RGB2BGR)
@@ -118,7 +127,7 @@ def draw(cv2, frame, space, lines: list[str]) -> bool:
         for p in points:
             cv2.circle(image, (int(p[0] * w), int(p[1] * h)), 3, JOINT_BGR, -1)
     corner = (int(space.x_min * w), int(space.y_min * h))
-    cv2.rectangle(image, corner, (int(space.x_max * w), int(space.y_max * h)), (80, 220, 80), 2)
+    cv2.rectangle(image, corner, (int(space.x_max * w), int(space.y_max * h)), box, 2)
     image = cv2.flip(image, 1)
     for i, text in enumerate(lines):
         y, size = 50 + 50 * i, 1.4 if i == 2 else 0.9

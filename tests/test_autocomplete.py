@@ -109,9 +109,20 @@ async def test_without_context_frequency_and_recency_decide(config):
     await ac.stop()
 
 
-async def test_one_letter_suggests_nothing_yet(config):
-    ac = await make(config)
+def with_min_letters(config, n):
+    config.sections["autocomplete"] = {**config.section("autocomplete"), "min_letters": n}
+    return config
+
+
+async def test_one_letter_suggests_nothing_with_min_letters_2(config):
+    ac = await make(with_min_letters(config, 2))
     assert await spell(ac, "J") == []
+    await ac.stop()
+
+
+async def test_one_letter_is_enough_with_min_letters_1(config):
+    ac = await make(with_min_letters(config, 1))
+    assert (await spell(ac, "J"))[:1] in (["Julian"], ["Jupyter"], ["June"])
     await ac.stop()
 
 

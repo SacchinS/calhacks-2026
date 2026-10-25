@@ -90,15 +90,111 @@ def test_library_saves_and_reloads_examples(library):
     assert again.lengths["WW"] == 20
 
 
-def test_custom_signs_match_their_own_movement_and_ignore_others(library):
+WINDOW = Config(sections={"recognition": {"custom_mode": "window"}})
+
+
+def test_one_sign_per_raise_of_the_hands(library):
     model = CustomSignModel(Config(), library=library)
+    assert model.state(hands_up=False) == "idle"
+    signed = sweep(0.31, 0.69, 10)
+    out = [model.predict(f) for f in signed]
+    found = [p for p in out if p is not None]
+    assert [p.gloss for p in found] == ["WW"]  # once, while the hands are still up
+    assert found[0].confidence >= 0.6 and model.state(hands_up=True) == "detected"
+    more = sweep(0.31, 0.69, signed[-1].ts + 1 / 30)  # signing on, hands still up
+    assert all(model.predict(f) is None for f in more)  # locked: no more
+    end = more[-1].ts
+    assert model.end_segment(end + 0.1) is None and model.state(hands_up=False) == "detected"
+    assert model.end_segment(end + 0.5) is None  # down long enough: unlocked
+    assert model.state(hands_up=False) == "idle"
+    again = [model.predict(f) for f in sweep(0.31, 0.69, end + 1)]
+    assert [p.gloss for p in again if p] == ["WW"]  # the next raise is a new sign
+
+
+def test_a_sign_that_never_matched_gets_a_last_try_when_the_hands_drop(library):
+    model = CustomSignModel(
+        Config(sections={"recognition": {"custom_early_fraction": 5}}), library=library
+    )
+    signed = sweep(0.31, 0.69, 10)  # early matches need 5x the length: none happen
+    assert all(model.predict(f) is None for f in signed)
+    seen = model.end_segment(signed[-1].ts + 0.5)
+    assert seen is not None and seen.gloss == "WW"
+
+    for f in sweep(0.7, 0.3, 20, 20, y=0.6, spread=0.0):  # unlike either sign
+        assert model.predict(f) is None
+    assert model.end_segment(30) is None
+
+
+def test_custom_signs_in_window_mode_match_while_signing(library):
+    model = CustomSignModel(WINDOW, library=library)
     seen = [model.predict(f) for f in sweep(0.31, 0.69, 10)]
     assert seen[-1] is not None and seen[-1].gloss == "WW"
 
-    model = CustomSignModel(Config(), library=library)
+    model = CustomSignModel(WINDOW, library=library)
     other = [model.predict(f) for f in sweep(0.7, 0.3, 20, y=0.6, spread=0.0)]  # unlike either
     assert all(p is None for p in other)
 
 
 def test_features_need_a_body():
     assert frame_features(LandmarkFrame(right_hand=hand(0.5, 0.5))) is None
+
+
+def test_custom_signs_can_be_limited_to_the_ones_in_use(tmp_path):
+    from recognition.custom_signs import CustomSignLibrary, CustomSignModel
+    from shared.config import Config
+
+    library = CustomSignLibrary(tmp_path)
+    library.examples = {g: [np.zeros((24, 90))] for g in ("HELLO", "WAIT", "YES")}
+    library.lengths = dict.fromkeys(library.examples, 20)
+    config = Config(sections={"recognition": {"custom_signs": ["WAIT", True]}})  # True = YES
+    model = CustomSignModel(config, library=library)
+    assert set(model.library.examples) == {"WAIT", "YES"}
+
+
+async def test_the_pipeline_emits_a_custom_sign_when_the_hands_drop(library):
+    import asyncio
+
+    from recognition.base import FrameRecognizer
+    from shared.bus import Bus
+    from shared.events import SignEvent
+
+    rest = [LandmarkFrame(pose=POSE, ts=1.0 + i / 30) for i in range(20)]  # hands down
+
+    class Scripted(FrameRecognizer):
+        name = "scripted"
+
+        async def frames(self):
+            for f in sweep(0.31, 0.69, 0.0) + rest:
+                yield f
+            await asyncio.sleep(0)
+
+        def classifiers(self):
+            return [CustomSignModel(Config(), library=library)]
+
+    bus = Bus()
+    signs = bus.subscribe(SignEvent)
+    recognizer = Scripted(bus, Config())
+    await recognizer.start()
+    await asyncio.wait_for(recognizer._task, 5)
+    assert [signs.get_nowait().gloss for _ in range(signs.queue.qsize())] == ["WW"]
+
+
+def test_a_raise_spent_fingerspelling_gives_no_sign(library):
+    model = CustomSignModel(Config(), library=library)
+    signed = sweep(0.31, 0.69, 10)
+    model.predict(signed[0])
+    model.spelled()  # the letter reader saw a letter held
+    assert all(model.predict(f) is None for f in signed[1:])  # not WW: it's spelling
+    assert model.end_segment(signed[-1].ts + 0.5) is None  # and no last try at the drop
+    again = [model.predict(f) for f in sweep(0.31, 0.69, 12)]
+    assert [p.gloss for p in again if p] == ["WW"]  # the next raise is a sign again
+
+
+def test_a_tracking_blip_keeps_the_box_yellow(library):
+    model = CustomSignModel(Config(), library=library)
+    first = sweep(0.31, 0.69, 10)[:5]  # partway into a sign
+    for f in first:
+        model.predict(f)
+    last = first[-1].ts
+    assert model.state(False, last + 0.1) == "signing"  # lost for 0.1 s: still signing
+    assert model.state(False, last + 0.5) == "idle"  # gone: hands down

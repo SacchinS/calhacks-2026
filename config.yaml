@@ -8,6 +8,7 @@ vocab_search: mock      # mock | moss    fingerspelling autocomplete's context s
 
 ui:
   mirror_camera: true           # show the camera window like a mirror (selfie view)
+  preview_fps: 15               # preview frames per second (drawn off the tracking loop)
 
 recognition:
   replay_file: fixtures/landmarks_sample.jsonl
@@ -25,7 +26,9 @@ recognition:
   control_min_frames: 0
   confidence_threshold: 0.6
   # Sign models, tried in this order (the first answer wins): custom | asl_citizen | kaggle.
-  sign_models: [custom, asl_citizen]
+  # The demo uses our signer's recorded signs only: ASL Citizen didn't recognize them live
+  # (NICE ranked 13th-1,800th of 2,731 on six takes), so it could only add wrong signs.
+  sign_models: [custom]
   # ASL Citizen (recognition/asl_citizen.py; set up with tools/setup_asl_citizen.py): 2,731
   # signs, limited to these. A sign counts if it's among the model's top_k of all 2,731,
   # has min_prob of its whole probability, and floor among the signs below.
@@ -52,10 +55,12 @@ recognition:
   # the hand down in between. Fluent values are in the comments.
   letters: true
   letter_model_dir: models/letters
-  letter_set: PRFI                # only these letters (the demo's P-R and F-I); empty = A-Z
-  letter_top_k: 3                 # ...and only if it's among the model's 3 likeliest of A-Z
+  letter_set: PF                  # only these letters (P for Pranav, F for Figma); empty = A-Z
+                                  # (I is out: a YES fist read as I)
+  letter_top_k: 1                 # ...and only if it's the model's top guess of A-Z (a flat
+                                  # B hand put F 2nd-3rd: HELLO read as F)
   letter_threshold: 0.6           # the model's probability among the letters
-  letter_hold_seconds: 5.0        # fluent: 0.25
+  letter_hold_seconds: 2.5        # fluent: 0.25 (keep above letter_raise_seconds, 1.5)
   letter_min_frames: 3
   letter_still: 0.6               # wrist drift allowed while holding, in palm lengths (0.25)
   letter_switch_seconds: 0.3      # another letter must last this long to take over
@@ -63,11 +68,15 @@ recognition:
   letter_slide_doubles: false     # true: a small slide repeats a letter (fluent: true)
   letter_start_count: 1           # letters before spelling starts (fluent: 2)
   letter_gap_seconds: 10          # ...within this long of each other (1.5)
-  letter_end_seconds: 10          # no letter this long: spelling is over (1.5)
+  letter_end_seconds: 7           # no letter this long: spelling is over and signs count (1.5)
   letter_hand: auto               # auto (the one hand up) | right | left
-  letter_orientation: auto        # auto (tries both) | as_is | mirrored
+  letter_below_mouth: true        # a hand up by the face is signing (HELLO), not spelling
+  letter_orientation: either      # auto | as_is | mirrored | either (per frame, whichever view
+                                  # reads an allowed letter: our P reads mirrored, F as seen)
   # Custom signs recorded with tools/record_signs.py (tried before the Kaggle model).
   custom_signs_dir: models/custom_signs
+  # Only these recorded signs are matched (the demo's); empty = all. Quote YES / NO (YAML).
+  custom_signs: [COLOR, PROBLEM, ME, MEET, TOMORROW, "YES", FINISH, NOW]
   custom_threshold_scale: 1.0    # lower = stricter matching
   # Facial grammar (brows, head shake / nod) set on each sign as markers. Off until a Deaf
   # signer has checked it: a wrong [negation] flips the meaning.
@@ -101,9 +110,10 @@ meet:
   signing_cue_seconds: 0
   review_before_speaking: false   # true: wait for a signed YES (NO drops it) before speaking
   # Turn-aware speaking (Cartesia Ink turn detection on the other side's audio): wait for
-  # them to finish, or after chime_in_seconds of talking say the interjection and then speak.
+  # them to finish. chime_in_seconds > 0: after that long, say the interjection and speak;
+  # 0 = turn-based, wait for the pause however long (sign NOW to say it right away).
   turn_taking: true
-  chime_in_seconds: 8
+  chime_in_seconds: 0
   interjection: "Sorry, can I jump in?"
   yield_seconds: 2.5              # after the interjection, wait this long for them to pause
   barge_in_seconds: 1.0           # talked over this long: stop, and say it again at the pause
@@ -133,7 +143,7 @@ autocomplete:
   # built on the Mac at startup (never pushed); needs MOSS_PROJECT_ID / MOSS_PROJECT_KEY.
   enabled: true
   db_path: ""                    # empty = Application Support (see above)
-  min_letters: 2                 # suggest from the second letter
+  min_letters: 1                 # suggest from the first letter (the demo spells one: P, F)
   alternates: 2                  # shown smaller next to the top suggestion
   # score = letters * letter match + context * conversation fit (scaled across candidates)
   #       + frequency * log(1 + uses) / log(1 + most uses) + recency * 0.5^(days / half life)
@@ -169,6 +179,7 @@ mock_tts:
   say_aloud: false                # true: also speak mock TTS on your speakers with `say`
 
 captions_mock:
-  file: fixtures/captions_sample.txt
-  interval_seconds: 3.0
+  file: fixtures/captions_sample.txt   # the demo call, played once from when the app starts
+  interval_seconds: 12.0          # time to sign an answer between her lines
+  loop: false                     # true: play it over and over
   talk_seconds: 1.5               # each mock line is a 1.5 s "turn", so speech waits for it
