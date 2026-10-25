@@ -5,7 +5,7 @@ Input comes from the terminal (one line per Enter) and from the UI's mock-sign b
     hello              -> isolated sign HELLO
     me want fix bug    -> one isolated sign per word: ME, WANT, FIX, BUG
     #sarah             -> fingerspelled SARAH (the whole word at once)
-    ~pri               -> fingerspelled letters P, R, I one at a time (autocomplete suggests
+    ~pr                -> fingerspelled letters P, R one at a time (autocomplete suggests
                           the word; /yes accepts it, /no dismisses it)
     /yes /no /send /clear /now   -> control signs (/finish is the same as /send; /now sends
                           and says it right away)

@@ -34,13 +34,29 @@ class UtteranceBuffer:
         self.signs: list[SignEvent] = []
         self.spelling = None  # the Autocompleter (language/autocomplete.py), if any
         self._task: asyncio.Task[None] | None = None
+        self._warming: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
         if self._task is None:
             sub = self.bus.subscribe(SignEvent, Letter)
             self._task = asyncio.create_task(self._run(sub), name="utterance-buffer")
+            self._warming = asyncio.create_task(self._warm(), name="translator-warmup")
+
+    async def _warm(self) -> None:
+        """The first sentence of a call shouldn't pay for the connection and the prompt
+        cache. Nothing waits for this, and a failure only means the first sentence is
+        slower."""
+        try:
+            await self.translator.warm()
+        except Exception as exc:
+            log.debug("translator warm-up skipped: %s", exc)
 
     async def stop(self) -> None:
+        if self._warming is not None:
+            self._warming.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await self._warming
+            self._warming = None
         if self._task is not None:
             self._task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -61,9 +77,14 @@ class UtteranceBuffer:
             return
         if self.spelling is not None and self.spelling.active:
             if event.gloss == "YES" and event.kind == "control":
+                # Spent on the suggestion, so the router must not also approve a sentence
+                # waiting for review. Recorded before accepting, because accepting ends
+                # spelling and the router may only look afterwards.
+                self.spelling.consumed.append(event)
                 self.accept_suggestion()
                 return
             if event.gloss == "NO" and event.kind == "control":
+                self.spelling.consumed.append(event)
                 self.spelling.dismiss()
                 return
             if event.gloss == "CLEAR":

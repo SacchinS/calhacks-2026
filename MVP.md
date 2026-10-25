@@ -44,7 +44,7 @@ Speaking is turn-based (`meet.chime_in_seconds: 0`): a sentence waits for silenc
 
 Each fingerspelled word takes one letter (`recognition.letter_set: PF`, autocomplete `min_letters: 1`): the meeting teaches the autocomplete only one word starting with each, and one letter per word keeps fingerspelling from being confused with signs (a YES fist read as the letter I). Both words are heard in the meeting before they're spelled. The signs are our signer's recorded custom signs: COLOR, PROBLEM, ME, MEET, TOMORROW, YES, FINISH and NOW, all recorded (WAIT was dropped: its finger wiggle didn't record consistently). YES can't be a word in a sentence: it's a control sign (it takes a suggestion or approves a review). Backups: Demo Mode's keys 1–3 send the phrases, typed letters still drive the autocomplete, and a backup video is recorded the night before. The Jira agent and meeting memory from the v5 script are a "what's next" slide.
 
-**Open:** how long each letter is held in the demo (5 s now, for testing with people new to ASL; 2–3 s once the signer has practiced), and who signs, plays A and B, and presents. The signer's name in the script has to match Settings > Calls for the banner.
+**Open:** how long each letter is held in the demo (2.5 s now; shorter once the signer has practiced), and who signs, plays A and B, and presents. The signer's name in the script has to match Settings > Calls for the banner.
 
 **The demo glosses are drafts.** The greeting (`HELLO, NICE MEET-you`) is attested on Lifeprint (`docs/asl-demo-script-research.md`, Moment 3). The fingerspelled names are standard ASL practice. A Deaf signer must approve or rewrite the exact sentences before the demo. Nobody on the team knows ASL, so learn every demo sign from the source videos linked in the research doc (or from a Deaf signer), never by guessing, and keep the demo script short and fixed.
 
@@ -106,7 +106,7 @@ Each fingerspelled word takes one letter (`recognition.letter_set: PF`, autocomp
 
 **Stretch:** a "what's on me" recap after the call, from captions held in memory only.
 
-**Test alone with:** `recognizer: mock` (type `~pri`), `translator: claude`, `vocab_search: moss`.
+**Test alone with:** `recognizer: mock` (type `~pr`), `translator: claude`, `vocab_search: moss`.
 
 **Needs:** `ANTHROPIC_API_KEY` and the Moss keys in `.env`.
 

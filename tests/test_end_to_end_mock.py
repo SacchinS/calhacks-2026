@@ -42,9 +42,9 @@ async def settle():
 async def test_signs_are_spoken_in_the_call(app):
     events = app.bus.subscribe()
     await app.start()
-    app.bus.publish(MockInput("hello #priyanka nice meet-you /send"))
+    app.bus.publish(MockInput("hello #pranav nice meet-you /send"))
     sent = await next_of(events, OutputSent)
-    assert (sent.output, sent.text) == ("tts", "Hello priyanka nice meet-you.")
+    assert (sent.output, sent.text) == ("tts", "Hello pranav nice meet-you.")
     assert not any(isinstance(e, ConfirmRequest) for e in drain(events))
 
 
