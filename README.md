@@ -175,9 +175,14 @@ names and terms a Deaf person spells is personal, so we don't use a persistent i
 startup we build a Moss **session index** in memory on the Mac from the local file, add each
 new word to it as it's learned, and delete from it when you delete a word. We never push it.
 
-Opening the session checks the project keys (`MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY` in `.env`).
-Queries run in memory with no cloud call. Moss's telemetry sends counts and timings, never
-document or query text.
+Opening the session checks the project keys (`MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY` in `.env`)
+and fetches the embedding model the first time, so it needs the network once at startup.
+Queries then run in memory with no cloud call, which is what the SDK documents for a session
+index ("Runs entirely in-memory... No cloud round trips") and what we measure: 10 to 20 ms a
+query. Moss reports usage telemetry in the background and once more when the session closes.
+That report is assembled inside Moss's native core, so we can't read it from source; the only
+fields in the binary are operation names, counters, timings, and project, session and index
+ids, with no document or query text.
 
 **How it learns.**
 - Every word the signer spells and keeps.
