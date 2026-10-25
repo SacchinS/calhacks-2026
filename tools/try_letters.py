@@ -4,6 +4,7 @@ app would count, so you can check the model and settle `recognition.letter_orien
     uv sync --extra camera
     uv run python tools/try_letters.py                # q quits
     uv run python tools/try_letters.py --orientation mirrored
+    uv run python tools/try_letters.py --top           # also print the 5 likeliest letters
 
 Keep one hand inside the green box (the signing space you saved in setup). Hold each
 letter for `letter_hold_seconds` (5 s in the slow testing settings), then change to the
@@ -18,7 +19,10 @@ next; for the same letter twice, drop your hand in between.
   sign: a word ends when you pause (`letter_end_seconds`) or sign something else, shown
   here as a space.
 
-On quitting it prints which orientation read your hand more surely: put that in
+With --top, the terminal gets a line twice a second: the model's 5 likeliest of all 26
+letters, both ways, ignoring letter_set. Hold a letter that never counts and paste those
+lines: they show what the model takes it for. On quitting it prints which orientation read
+your hand more surely: put that in
 config.yaml. Nothing is saved.
 """
 
@@ -39,6 +43,7 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument("--orientation", choices=["auto", "as_is", "mirrored"])
+    parser.add_argument("--top", action="store_true", help="print the 5 likeliest letters")
     args = parser.parse_args()
 
     import json
@@ -65,6 +70,7 @@ def main() -> None:
     reader = LetterReader(config, model)
     wins: Counter[str] = Counter()
     spelled = ""
+    printed = 0.0
     camera = Camera(config)
     try:
         while True:
@@ -79,6 +85,14 @@ def main() -> None:
                 surest = max(guesses, key=lambda o: guesses[o][1] if guesses[o] else 0)
                 if guesses[surest] and guesses[surest][1] >= reader.threshold:
                     wins[surest] += 1
+            if args.top and hand and frame.ts - printed >= 0.5:
+                printed = frame.ts
+                ranks = [
+                    f"{o}: "
+                    + " ".join(f"{c} {p:.0%}" for c, p in model.ranked(hand, o == "mirrored"))
+                    for o in ORIENTATIONS
+                ]
+                print(f"{reader.status:<40} | {'  |  '.join(ranks)}", flush=True)
             was_spelling = reader.spelling
             spelled += "".join(letter.letter for letter in reader.push(frame, space))
             if was_spelling and not reader.spelling and not spelled.endswith(" "):

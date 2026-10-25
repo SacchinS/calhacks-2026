@@ -113,6 +113,13 @@ class LetterModel:
                 self.last_orientation = max(guesses, key=lambda o: (guesses[o] or ("", 0))[1])
         return guesses[self.last_orientation]
 
+    def ranked(self, hand: Sequence[Point], mirrored: bool, n: int = 5) -> list[tuple[str, float]]:
+        """The model's n likeliest of all 26 letters, ignoring letter_set (for diagnosis)."""
+        logits = np.asarray(self.run(normalize(hand, mirrored))).reshape(-1)[self.letter_index]
+        probs = softmax(logits)
+        order = np.argsort(probs)[::-1][:n]
+        return [(self.classes[self.letter_index[i]].upper(), float(probs[i])) for i in order]
+
     def guess(self, hand: Sequence[Point], mirrored: bool) -> tuple[str, float] | None:
         """The likeliest allowed letter and its probability among the allowed letters, or
         None when no allowed letter is among the model's top_k."""
