@@ -27,7 +27,7 @@ final class CallOverlay {
     func show() {
         let panel = self.panel ?? makePanel()
         self.panel = panel
-        let size = NSSize(width: 820, height: 96)
+        let size = NSSize(width: 880, height: 112)
         if let saved = UserDefaults.standard.string(forKey: Self.originKey) {
             panel.setFrame(NSRect(origin: NSPointFromString(saved), size: size), display: true)
         } else if let screen = NSScreen.main {
@@ -70,40 +70,47 @@ struct CallOverlayView: View {
     let close: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            SignStateDot(state: engine.signState)
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 16) {
+            SignStateBadge(state: engine.signState, size: 52)
+            VStack(alignment: .leading, spacing: 6) {
                 signing.lineLimit(1)
                 voice.lineLimit(1)
             }
             Spacer(minLength: 8)
-            if engine.speechState == "waiting" || (engine.state == "listening" && !engine.glosses.isEmpty) {
+            if engine.state == "confirming" {
+                Button { engine.gesture("confirm") } label: { Label("Send", systemImage: "paperplane.fill") }
+                    .buttonStyle(PillButtonStyle(fill: Brand.detected))
+                OverlayButton(icon: "xmark", help: "Cancel (NO)") { engine.gesture("cancel") }
+            } else if engine.speechState == "waiting" || (engine.state == "listening" && !engine.glosses.isEmpty) {
                 Button { engine.gesture("now") } label: { Label("Say now", systemImage: "bolt.fill") }
+                    .buttonStyle(PillButtonStyle(fill: Brand.signing, text: .black))
                     .help("Speak right away, without waiting for a pause (the NOW sign)")
             }
-            if engine.state == "confirming" {
-                Button { engine.gesture("confirm") } label: { Label("Send", systemImage: "checkmark") }.tint(.green)
-                Button { engine.gesture("cancel") } label: { Image(systemName: "xmark") }
-            }
+            Divider().frame(height: 40).overlay(Color.white.opacity(0.12))
             Menu {
+                Button("Introduce me") { engine.introduce() }
+                Divider()
                 ForEach(engine.quickReplies, id: \.text) { reply in
                     Button(reply.urgent ? "\(reply.text)  (right away)" : reply.text) { engine.quickReply(reply.text) }
                 }
             } label: {
-                Image(systemName: "text.bubble")
+                OverlayIcon(icon: "text.bubble.fill")
             }
-            .menuStyle(.borderlessButton).fixedSize()
+            .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
             .help("Quick replies, said in your voice")
-            Button(action: openPreview) { Image(systemName: "macwindow") }
-                .buttonStyle(.borderless).help("Open SignBridge")
-            Button(action: close) { Image(systemName: "xmark.circle.fill") }
-                .buttonStyle(.borderless).foregroundStyle(.secondary).help("Hide (menu bar > Call Overlay)")
+            OverlayButton(icon: "macwindow", help: "Open SignBridge", action: openPreview)
+            OverlayButton(icon: "chevron.down", help: "Hide (menu bar > Call Overlay)", action: close)
         }
         .controlSize(.large)
-        .padding(.horizontal, 18).padding(.vertical, 12)
+        .padding(.leading, 20).padding(.trailing, 16).padding(.vertical, 14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 22))
-        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(SignStateDot.color(engine.signState).opacity(0.7), lineWidth: 2))
+        .background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .background(Color.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 26, style: .continuous)
+            .strokeBorder(LinearGradient(colors: [SignState.color(engine.signState).opacity(0.9),
+                                                  SignState.color(engine.signState).opacity(0.25)],
+                                         startPoint: .leading, endPoint: .trailing), lineWidth: 2))
+        .animation(.easeInOut(duration: 0.25), value: engine.signState)
         .environment(\.colorScheme, .dark)
         .tint(Brand.accent)
     }
@@ -111,64 +118,94 @@ struct CallOverlayView: View {
     /// Line 1: the letter being held, the word being spelled and its suggestion, or the signs so far.
     @ViewBuilder private var signing: some View {
         if let h = engine.holding {
-            HStack(spacing: 10) {
-                Text("Letter \(h.0)").font(.title3.weight(.bold))
-                ProgressView(value: h.1).frame(width: 120).tint(.white)
+            HStack(spacing: 12) {
+                Text(h.0).font(.system(size: 22, weight: .heavy, design: .rounded))
+                    .frame(width: 34, height: 34).background(Brand.raised, in: RoundedRectangle(cornerRadius: 8))
+                ProgressView(value: h.1).frame(width: 160).tint(Brand.signing)
+                Text("Hold still…").font(.title3).foregroundStyle(.secondary)
             }
         } else if let a = engine.autocomplete {
             HStack(spacing: 10) {
-                Text(a.letters.map(String.init).joined(separator: " ")).font(.title3.weight(.bold).monospaced())
+                Text(a.letters.map(String.init).joined(separator: " ")).font(.system(size: 24, weight: .heavy, design: .rounded))
                 if let top = a.top {
-                    Image(systemName: "arrow.right").foregroundStyle(.secondary)
-                    Text(top.term).font(.title3.weight(.semibold)).foregroundStyle(Brand.accent)
-                    Text("sign YES to use it").foregroundStyle(.secondary)
+                    Image(systemName: "arrow.right").font(.headline).foregroundStyle(.tertiary)
+                    Text(top.term).font(.system(size: 24, weight: .bold, design: .rounded))
+                        .padding(.horizontal, 10).padding(.vertical, 1)
+                        .background(Brand.gradient, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    Keycap(text: "YES", tint: Brand.detected)
+                    Text("to use it").foregroundStyle(.secondary)
                 }
             }
         } else if !engine.glosses.isEmpty {
-            Text(engine.glosses.joined(separator: "  ")).font(.title3.weight(.semibold))
+            HStack(spacing: 8) {
+                ForEach(Array(engine.glosses.suffix(6).enumerated()), id: \.offset) { _, g in Chip(text: g, size: 17) }
+            }
         } else if engine.state == "thinking" {
-            Text("Writing it in English…").font(.title3).foregroundStyle(.secondary)
+            Label("Writing it in English…", systemImage: "sparkles").font(.title2.weight(.semibold)).foregroundStyle(Brand.indigo)
         } else if engine.state == "confirming", let sentence = engine.sentence {
-            Text("\u{201C}\(sentence)\u{201D}  Sign YES to say it").font(.title3.weight(.semibold))
+            Text("\u{201C}\(sentence)\u{201D}").font(.title2.weight(.semibold))
         } else {
-            Text(engine.cameraOn ? "Sign when you're ready" : "SignBridge is paused").font(.title3).foregroundStyle(.secondary)
+            Text(engine.cameraOn ? "Sign when you're ready" : "SignBridge is paused")
+                .font(.title2.weight(.semibold)).foregroundStyle(.secondary)
         }
     }
 
     /// Line 2: what the voice is doing, or the last thing it said.
     @ViewBuilder private var voice: some View {
-        switch engine.speechState {
-        case "waiting":
-            Label("Waiting for a pause to say: \u{201C}\(engine.speechText)\u{201D}", systemImage: "hourglass").foregroundStyle(.yellow)
-        case "interjecting":
-            Label("Jumping in…", systemImage: "hand.raised.fill").foregroundStyle(.orange)
-        case "speaking":
-            Label("Speaking: \u{201C}\(engine.speechText)\u{201D}", systemImage: "speaker.wave.2.fill").foregroundStyle(Brand.accent)
-        default:
-            if let said = engine.meetLog.last(where: { $0.who == "you" })?.text {
-                Label("Said: \u{201C}\(said)\u{201D}", systemImage: "checkmark.circle").foregroundStyle(.secondary)
-            } else if engine.themTalking {
-                Label("They're talking", systemImage: "waveform").foregroundStyle(.secondary)
-            } else {
-                Text(" ")
+        Group {
+            switch engine.speechState {
+            case "waiting":
+                Label("Waiting for a pause: \u{201C}\(engine.speechText)\u{201D}", systemImage: "hourglass").foregroundStyle(Brand.signing)
+            case "interjecting":
+                Label("Jumping in…", systemImage: "hand.raised.fill").foregroundStyle(.orange)
+            case "speaking":
+                Label("Speaking: \u{201C}\(engine.speechText)\u{201D}", systemImage: "speaker.wave.2.fill").foregroundStyle(Brand.accent)
+            default:
+                if let said = engine.meetLog.last(where: { $0.who == "you" })?.text {
+                    Label("Said: \u{201C}\(said)\u{201D}", systemImage: "checkmark.circle.fill").foregroundStyle(.secondary)
+                } else if engine.themTalking {
+                    Label("They're talking", systemImage: "waveform").foregroundStyle(.secondary)
+                } else {
+                    Label("FINISH sends · NOW says it right away", systemImage: "hand.raised").foregroundStyle(.tertiary)
+                }
             }
         }
+        .font(.system(size: 15, weight: .medium))
     }
 }
 
-/// The signing box's state as a dot: gray hands down, yellow signing, green recognized.
-struct SignStateDot: View {
-    let state: String?
+/// A round icon, the overlay's button look.
+struct OverlayIcon: View {
+    let icon: String
     var body: some View {
-        Circle().fill(Self.color(state)).frame(width: 18, height: 18)
-            .overlay(Circle().strokeBorder(.white.opacity(0.3), lineWidth: 1))
-            .help(["signing": "Signing", "detected": "Sign recognized: drop your hands for the next"][state ?? ""] ?? "Hands down")
+        Image(systemName: icon).font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.9))
+            .frame(width: 40, height: 40)
+            .background(Color.white.opacity(0.1), in: Circle())
+            .overlay(Circle().strokeBorder(Color.white.opacity(0.12)))
     }
-    static func color(_ state: String?) -> Color {
-        switch state {
-        case "signing": .yellow
-        case "detected": .green
-        default: .gray
-        }
+}
+
+/// A filled capsule button drawn by hand: the overlay never takes focus, and macOS draws its own
+/// prominent buttons gray in a window that isn't key.
+struct PillButtonStyle: ButtonStyle {
+    var fill: Color
+    var text: Color = .white
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 16, weight: .bold))
+            .foregroundStyle(text)
+            .padding(.horizontal, 18).frame(height: 40)
+            .background(fill.opacity(configuration.isPressed ? 0.75 : 1), in: Capsule())
+            .shadow(color: fill.opacity(0.45), radius: 8, y: 2)
+            .contentShape(Capsule())
+    }
+}
+
+struct OverlayButton: View {
+    let icon: String, help: String
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) { OverlayIcon(icon: icon) }.buttonStyle(.plain).help(help)
     }
 }

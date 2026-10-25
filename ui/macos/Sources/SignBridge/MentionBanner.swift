@@ -57,21 +57,31 @@ struct MentionBannerView: View {
     @State private var flash = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            Image(systemName: mention.question ? "questionmark.bubble.fill" : "person.wave.2.fill")
-                .font(.system(size: 40, weight: .bold))
+        HStack(alignment: .center, spacing: 18) {
+            Image(systemName: mention.question ? "questionmark" : "person.wave.2.fill")
+                .font(.system(size: 30, weight: .heavy))
+                .foregroundStyle(Color.yellow)
+                .frame(width: 64, height: 64)
+                .background(Color.black, in: Circle())
+                .scaleEffect(flash ? 1.08 : 1)
             VStack(alignment: .leading, spacing: 6) {
-                Text(title).font(.system(size: 22, weight: .heavy))
-                Text("\u{201C}\(mention.text)\u{201D}").font(.system(size: 24, weight: .semibold))
-                    .lineLimit(3).minimumScaleFactor(0.7)
+                Text(title.uppercased()).font(.system(size: 14, weight: .heavy)).tracking(1.2).opacity(0.7)
+                Text("\u{201C}\(mention.text)\u{201D}").font(.system(size: 26, weight: .bold, design: .rounded))
+                    .lineLimit(2).minimumScaleFactor(0.7)
             }
             Spacer(minLength: 0)
         }
         .foregroundStyle(.black)
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color.yellow, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Color.orange, lineWidth: flash ? 8 : 2))
+        .padding(.horizontal, 22).padding(.vertical, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(colors: [Color(red: 1, green: 0.88, blue: 0.3), Color(red: 1, green: 0.74, blue: 0.16)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing),
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .strokeBorder(Color.white.opacity(flash ? 0.9 : 0.3), lineWidth: flash ? 6 : 1.5))
+        .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
+        .padding(10)
         .onTapGesture(perform: dismiss)
         .onAppear {
             withAnimation(.easeInOut(duration: 0.35).repeatCount(5, autoreverses: true)) { flash = true }
@@ -81,6 +91,6 @@ struct MentionBannerView: View {
 
     private var title: String {
         let who = name.isEmpty ? "You" : name
-        return mention.question ? "\(who), you were asked:" : "\(who), you were mentioned:"
+        return mention.question ? "\(who), you were asked" : "\(who), you were mentioned"
     }
 }

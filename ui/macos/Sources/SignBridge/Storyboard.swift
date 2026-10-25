@@ -3,11 +3,10 @@ import SwiftUI
 /// "How it works" on the welcome page: four steps that light up in turn, each with a small animation.
 struct Storyboard: View {
     @State private var active = 0
-    @State private var since = Date()
     private let timer = Timer.publish(every: 2.6, on: .main, in: .common).autoconnect()
     private let steps: [(String, String)] = [
-        ("Sign", "Hands up in the green box, then sign."),
-        ("Fingerspell", "Spell a name; it suggests the word."),
+        ("Sign", "Raise your hands into the box: one sign, then drop them."),
+        ("Fingerspell", "Spell a letter; it suggests the word."),
         ("Claude writes it", "Your signs become a sentence."),
         ("Said in the call", "FINISH sends it, in your voice."),
     ]
@@ -39,20 +38,21 @@ struct Storyboard: View {
         }
         .animation(.easeInOut(duration: 0.35), value: active)
         .onReceive(timer) { _ in active = (active + 1) % steps.count }
-        .onChange(of: active) { _, _ in since = Date() }
     }
 
     @ViewBuilder private func visual(_ i: Int, on: Bool) -> some View {
         switch i {
         case 0:
-            if let hello = GuideSign.all.first(where: { $0.name == "HELLO" }) {
-                SignDiagram(sign: hello, animate: on, start: since).padding(4)
-            } else {
-                Image(systemName: "hand.wave").font(.system(size: 40)).symbolEffect(.bounce, value: on)
+            ZStack {
+                RoundedRectangle(cornerRadius: 8).strokeBorder(on ? Brand.signing : Color.secondary.opacity(0.4), lineWidth: 2.5)
+                    .frame(width: 92, height: 72)
+                Image(systemName: on ? "hand.raised.fill" : "hand.raised").font(.system(size: 38))
+                    .foregroundStyle(on ? Brand.signing : .secondary)
+                    .symbolEffect(.bounce, value: on)
             }
         case 1:
             VStack(spacing: 8) {
-                Text("P  R").font(.system(size: 26, weight: .bold, design: .monospaced))
+                Text("P").font(.system(size: 28, weight: .heavy, design: .rounded))
                 Image(systemName: "arrow.down").foregroundStyle(.secondary).font(.caption)
                 Chip(text: "Pranav").scaleEffect(0.8)
                     .opacity(on ? 1 : 0.25)
@@ -60,9 +60,9 @@ struct Storyboard: View {
             }
         case 2:
             VStack(spacing: 8) {
-                Chip(text: "HELLO").scaleEffect(0.8)
+                Chip(text: "COLOR PROBLEM", size: 13)
                 Image(systemName: "arrow.down").foregroundStyle(.secondary).font(.caption)
-                Text("“Hello!”").font(.system(.title3).weight(.semibold))
+                Text("“There's a color problem.”").font(.system(.callout).weight(.semibold)).multilineTextAlignment(.center)
                     .opacity(on ? 1 : 0.25)
                     .animation(.easeIn(duration: 0.5).delay(on ? 0.6 : 0), value: on)
             }

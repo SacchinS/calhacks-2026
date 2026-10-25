@@ -8,35 +8,52 @@ struct AutocompleteBar: View {
 
     var body: some View {
         if let a = engine.autocomplete {
-            HStack(alignment: .center, spacing: large ? 16 : 10) {
-                Image(systemName: "hand.point.up.left").foregroundStyle(Brand.accent)
-                Text(a.letters.map(String.init).joined(separator: " "))
-                    .font(.system(size: large ? 30 : 20, weight: .bold, design: .monospaced))
+            let k: CGFloat = large ? 1.5 : 1
+            HStack(alignment: .center, spacing: 12 * k) {
+                HStack(spacing: 4 * k) {
+                    ForEach(Array(a.letters.enumerated()), id: \.offset) { _, c in
+                        Text(String(c)).font(.system(size: 22 * k, weight: .heavy, design: .rounded))
+                            .frame(minWidth: 30 * k, minHeight: 36 * k)
+                            .background(Brand.raised, in: RoundedRectangle(cornerRadius: 8 * k, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 8 * k, style: .continuous).strokeBorder(Brand.hairline))
+                    }
+                }
                 if a.dismissed {
                     Text("Spelling it out. NO again to start over.").foregroundStyle(.secondary)
                 } else if let top = a.top {
-                    Image(systemName: "arrow.right").foregroundStyle(.secondary)
+                    Image(systemName: "arrow.right").font(.system(size: 14 * k, weight: .bold)).foregroundStyle(.tertiary)
                     Button { engine.acceptSuggestion(0) } label: {
-                        Text(top.term).font(.system(size: large ? 34 : 22, weight: .semibold))
+                        Text(top.term).font(.system(size: 22 * k, weight: .bold, design: .rounded))
+                            .padding(.horizontal, 14 * k).padding(.vertical, 5 * k)
+                            .background(Brand.gradient, in: RoundedRectangle(cornerRadius: 10 * k, style: .continuous))
+                            .foregroundStyle(.white)
+                            .shadow(color: Brand.accent.opacity(0.4), radius: 8, y: 2)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.plain)
                     .help("Sign YES to use \(top.term)")
                     ForEach(Array(a.alternates.enumerated()), id: \.offset) { i, w in
                         Button { engine.acceptSuggestion(i + 1) } label: {
-                            Text(w.term).font(large ? .title3 : .callout)
+                            Text(w.term).font(.system(size: 15 * k, weight: .semibold))
+                                .padding(.horizontal, 10 * k).padding(.vertical, 5 * k)
+                                .background(Brand.raised, in: RoundedRectangle(cornerRadius: 8 * k, style: .continuous))
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
                     }
                 } else if a.letters.count >= 2 {
                     Text("New word. YES keeps it as spelled.").foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
                 if !a.dismissed, a.top != nil {
-                    Text("YES to use · NO to dismiss").font(.caption).foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        Keycap(text: "YES", tint: Brand.detected)
+                        Keycap(text: "NO", tint: .secondary)
+                    }
+                    .scaleEffect(k, anchor: .trailing)
                 }
             }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(Brand.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal, 10 * k).padding(.vertical, 8 * k)
+            .background(Brand.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Brand.accent.opacity(0.25)))
             .transition(.opacity)
         }
     }
@@ -49,9 +66,9 @@ struct SpellBox: View {
     @State private var text = ""
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "character.cursor.ibeam").foregroundStyle(Brand.accent)
-            TextField("Fingerspell by typing: letters suggest a word, Return uses it", text: $text)
-                .textFieldStyle(.roundedBorder)
+            Image(systemName: "keyboard").foregroundStyle(.tertiary)
+            TextField("Or type letters to fingerspell; Return takes the suggestion", text: $text)
+                .textFieldStyle(.plain).foregroundStyle(.secondary)
                 .onChange(of: text) { old, new in
                     if new.count > old.count, new.hasPrefix(old) { engine.letters(String(new.dropFirst(old.count))) }
                 }
@@ -64,6 +81,8 @@ struct SpellBox: View {
                     if engine.autocomplete?.dismissed ?? false { text = "" }
                 }
         }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onChange(of: engine.autocomplete == nil) { _, gone in if gone { text = "" } }
     }
 }
@@ -106,7 +125,7 @@ struct RememberedWords: View {
                 }
             }
         } header: {
-            Text("Remembered words")
+            Label("Remembered words", systemImage: "character.book.closed.fill")
         } footer: {
             let s = engine.autocompleteStats
             Text("Kept in a file on this Mac: the word, a few topic tags, and when it was used. Never sentences or captions. \(s.accepted) suggestions used, \(s.lettersSaved) letters saved.")
