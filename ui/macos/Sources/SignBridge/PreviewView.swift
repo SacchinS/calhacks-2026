@@ -118,6 +118,8 @@ struct PreviewView: View {
                         Spacer()
                         if engine.state == "confirming" {
                             Keycap(text: "YES", tint: Brand.detected)
+                            Text("or").foregroundStyle(.secondary)
+                            Keycap(text: "FINISH", tint: Brand.accent)
                             Text("sends").foregroundStyle(.secondary)
                             Keycap(text: "NO", tint: .secondary)
                             Text("cancels").foregroundStyle(.secondary)

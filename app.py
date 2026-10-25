@@ -98,6 +98,7 @@ class App:
         )
         self.buffer.spelling = self.autocomplete
         self.router.spelling = self.autocomplete  # a YES on a suggestion isn't an approval
+        self.router.buffer = self.buffer  # the FINISH ending a new sentence isn't either
 
     def _voice(self, config: Config) -> Any:
         """The TTS output, turn-aware in calls (waits for the other side to finish)."""
