@@ -314,6 +314,8 @@ class TicketAgent:
         self.autocomplete = autocomplete
         self.announcer = announcer
         self.notes = CallNotes(config)
+        # Who "the signer" is, for Claude and the audit: Settings > Calls sets it (ui/server.py).
+        self.signer = str(config.get("meet.signer_name", "") or "")
         self.update = TicketUpdate("none")
         self.dismissed: list[str] = []
         self.history: list[dict[str, Any]] = []
@@ -401,7 +403,7 @@ class TicketAgent:
                 self.dismissed,
                 words,
                 today=date.today().isoformat(),
-                signer=str(self.config.get("meet.signer_name", "")),
+                signer=self.signer,
                 jira=context,
             )
         except Exception as exc:
@@ -474,7 +476,7 @@ class TicketAgent:
         audit = {
             "call_id": self.call_id,
             "draft_version": version,
-            "approved_by": str(self.config.get("meet.signer_name", "")) or "signer",
+            "approved_by": self.signer or "signer",
             "approved_via": via,
             "approved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "model": self.drafter.model,

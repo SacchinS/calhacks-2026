@@ -720,6 +720,8 @@ class EngineServer:
     def _apply_settings(self) -> None:
         """Settings the app's Settings window changes that the engine uses."""
         self.app.call_host.name = str(self.ui_config.get("signer_name") or "").strip()
+        if getattr(self.app, "tickets", None) is not None:
+            self.app.tickets.signer = self.app.call_host.name  # the ticket's "you" and approver
         self.app.mentions.set_name(self.app.call_host.name)
         self.app.router.review_before_speaking = bool(self.ui_config.get("review_before_speaking"))
         # Settings' letter hold: now, and when the recognizer next starts.
