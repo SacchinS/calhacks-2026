@@ -27,7 +27,9 @@ word; the utterance buffer turns the accepted word into one fingerspelled sign.
 Which way the model expects the hand (as the camera sees it, or mirrored) isn't
 documented, so `letter_orientation: auto` tries both and follows the one that has been
 surer so far (switching every frame would break up a held letter); set it to `as_is` or
-`mirrored` once tools/try_letters.py shows which one your hand reads as.
+`mirrored` once tools/try_letters.py shows which one your hand reads as. `either` takes,
+each frame, whichever view gives an allowed letter: for a small letter_set where one letter
+reads right mirrored and another as seen (our P and F).
 """
 
 from __future__ import annotations
@@ -99,8 +101,16 @@ class LetterModel:
     def predict(self, hand: Sequence[Point]) -> tuple[str, float] | None:
         if len(hand) < 21:
             return None
-        tries = ORIENTATIONS if self.orientation == "auto" else (self.orientation,)
+        tries = ORIENTATIONS if self.orientation in ("auto", "either") else (self.orientation,)
         guesses = {o: self.guess(hand, o == "mirrored") for o in tries}
+        if self.orientation == "either":
+            # Each frame, whichever view gives an allowed letter as its top guess (with a
+            # small letter_set, a letter reads right one way and not at all the other).
+            read = {o: g for o, g in guesses.items() if g is not None}
+            if not read:
+                return None
+            self.last_orientation = max(read, key=lambda o: read[o][1])
+            return read[self.last_orientation]
         if len(guesses) == 1:
             (self.last_orientation,) = guesses
         else:
