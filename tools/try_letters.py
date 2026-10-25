@@ -85,16 +85,20 @@ def main() -> None:
                 surest = max(guesses, key=lambda o: guesses[o][1] if guesses[o] else 0)
                 if guesses[surest] and guesses[surest][1] >= reader.threshold:
                     wins[surest] += 1
-            if args.top and hand and frame.ts - printed >= 0.5:
-                printed = frame.ts
-                ranks = [
-                    f"{o}: "
-                    + " ".join(f"{c} {p:.0%}" for c, p in model.ranked(hand, o == "mirrored"))
-                    for o in ORIENTATIONS
-                ]
-                print(f"{reader.status:<40} | {'  |  '.join(ranks)}", flush=True)
             was_spelling = reader.spelling
             spelled += "".join(letter.letter for letter in reader.push(frame, space))
+            if args.top and frame.ts - printed >= 0.5:
+                printed = frame.ts
+                ranks = (
+                    [
+                        f"{o}: "
+                        + " ".join(f"{c} {p:.0%}" for c, p in model.ranked(hand, o == "mirrored"))
+                        for o in ORIENTATIONS
+                    ]
+                    if hand
+                    else ["(no letter read)"]
+                )
+                print(f"{reader.status:<45} | {'  |  '.join(ranks)}", flush=True)
             if was_spelling and not reader.spelling and not spelled.endswith(" "):
                 spelled += " "  # the word ended
             if not draw(cv2, frame, space, [line, reader.status, spelled[-24:] or "-"]):

@@ -182,6 +182,7 @@ class LetterReader:
         self._seen = 0.0  # when the spelling hand was last seen
         self._now = 0.0
         self.status = ""  # why the last frame did or didn't count (tools/try_letters.py)
+        self._why = ""  # why no spelling hand was found this frame
 
     def end(self) -> None:
         """Spelling is over (a control sign, or the hands went down)."""
@@ -221,7 +222,7 @@ class LetterReader:
             if now - self._seen > self.release:  # gone, not a tracking blip
                 self._run = None
                 self._last = None  # the hand dropped: the same letter may come again
-            self.status = "raise one hand into the box"
+            self.status = self._why or "raise one hand into the box"
             return []
         self._seen = now
         guess = self.model.predict(hand)
@@ -297,12 +298,28 @@ class LetterReader:
 
     def spelling_hand(self, frame: LandmarkFrame, space: SigningSpace) -> tuple[Point, ...]:
         """The hand that's spelling: one hand in the signing space (two hands up means a
-        two-handed sign), or the one `letter_hand` names."""
+        two-handed sign), or the one `letter_hand` names. A hand is in the space when its
+        wrist is (letters like P point the fingers down, which pulls its middle low)."""
+
+        def inside(hand: tuple[Point, ...]) -> bool:
+            return bool(hand) and space.contains(hand[:1])
+
         if self.hand in ("left", "right"):
             hand = frame.left_hand if self.hand == "left" else frame.right_hand
-            return hand if space.contains(hand) else ()
-        up = [h for h in (frame.right_hand, frame.left_hand) if space.contains(h)]
-        return up[0] if len(up) == 1 else ()
+            self._why = "" if inside(hand) else "raise your hand into the box"
+            return hand if inside(hand) else ()
+        up = [h for h in (frame.right_hand, frame.left_hand) if inside(h)]
+        seen = sum(1 for h in (frame.right_hand, frame.left_hand) if h)
+        if len(up) == 1:
+            self._why = ""
+            return up[0]
+        if len(up) == 2:
+            self._why = "two hands up: spell with one, the other down"
+        elif seen:
+            self._why = "hand below or outside the box"
+        else:
+            self._why = "no hand seen"
+        return ()
 
 
 def letter_reader(config: Config) -> LetterReader | None:
