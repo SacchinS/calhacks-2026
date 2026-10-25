@@ -42,6 +42,8 @@ enum TicketLook {
 struct TicketCard: View {
     @ObservedObject var engine: EngineClient
     var large = false
+    /// The fields that changed in the newest version, lit for a moment (from Eleyn's card).
+    @State private var lit: Set<String> = []
 
     var body: some View {
         if let t = engine.ticket {
@@ -64,16 +66,18 @@ struct TicketCard: View {
                     }
                     Text(t.summary).font(.system(size: large ? 26 : 19, weight: .bold, design: .rounded))
                         .fixedSize(horizontal: false, vertical: true)
+                        .lit(lit.contains("summary"), tint)
                     if !t.description.isEmpty {
                         Text(t.description).font(large ? .title3 : .callout).foregroundStyle(.secondary)
                             .lineLimit(large ? 4 : 3).fixedSize(horizontal: false, vertical: true)
+                            .lit(lit.contains("description"), tint)
                     }
                     FlowRow(spacing: 6) {
-                        if t.assignee == "signer" { fact("person.fill", "Owner: you") }
-                        if !t.asked.isEmpty { fact("text.bubble", "Asked by \(t.asked)") }
-                        if !t.due.isEmpty { fact("calendar", "Due \(Self.day(t.due))") }
-                        if let b = t.blocks { fact("arrow.triangle.branch", "Blocks \(b.key)") }
-                        ForEach(t.labels, id: \.self) { fact("tag", $0) }
+                        if t.assignee == "signer" { fact("person.fill", "Owner: you").lit(lit.contains("assign_to_signer"), tint) }
+                        if !t.asked.isEmpty { fact("text.bubble", "Asked by \(t.asked)").lit(lit.contains("asked"), tint) }
+                        if !t.due.isEmpty { fact("calendar", "Due \(Self.day(t.due))").lit(lit.contains("due"), tint) }
+                        if let b = t.blocks { fact("arrow.triangle.branch", "Blocks \(b.key)").lit(lit.contains("blocks"), tint) }
+                        ForEach(t.labels, id: \.self) { fact("tag", $0).lit(lit.contains("labels"), tint) }
                     }
                     if let d = t.duplicate {
                         Label("Maybe a duplicate of \(d.key): \(d.summary)", systemImage: "doc.on.doc")
@@ -85,6 +89,8 @@ struct TicketCard: View {
             .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(tint.opacity(0.45), lineWidth: 1.5))
             .animation(.easeInOut(duration: 0.25), value: t)
             .transition(.move(edge: .top).combined(with: .opacity))
+            .onAppear { light(t) }
+            .onChange(of: t.version) { _, _ in if let t = engine.ticket { light(t) } }
         }
     }
 
@@ -111,7 +117,8 @@ struct TicketCard: View {
                 Button("Done") { engine.dismissTicket() }.buttonStyle(.borderless).foregroundStyle(.secondary)
                     .help("Clear it; SignBridge starts drafting the next one")
             case "failed":
-                Text("Dismiss it and SignBridge drafts it again.").font(.caption).foregroundStyle(.tertiary)
+                Button { engine.approveTicket() } label: { Label("Try again", systemImage: "arrow.clockwise") }
+                    .help("Same version, so Jira won't get it twice")
                 Spacer()
                 Button("Dismiss") { engine.dismissTicket() }.buttonStyle(.borderless).foregroundStyle(.secondary)
             default:
@@ -119,6 +126,17 @@ struct TicketCard: View {
             }
         }
         .font(large ? .title3 : .callout)
+    }
+
+    /// Light what changed in this version, then let it fade.
+    private func light(_ t: EngineClient.Ticket) {
+        guard t.state == "tentative", t.version > 1 else { return }
+        let version = t.version
+        withAnimation(.easeOut(duration: 0.2)) { lit = Set(t.changed) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            guard engine.ticket?.version == version else { return }
+            withAnimation(.easeOut(duration: 0.6)) { lit = [] }
+        }
     }
 
     private func fact(_ icon: String, _ text: String) -> some View {
@@ -132,6 +150,14 @@ struct TicketCard: View {
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
         guard let d = f.date(from: iso) else { return iso }
         return d.formatted(.dateTime.month(.abbreviated).day())
+    }
+}
+
+extension View {
+    /// A field that just changed: a tinted glow behind it for a moment.
+    func lit(_ on: Bool, _ tint: Color) -> some View {
+        padding(.horizontal, on ? 4 : 0)
+            .background(tint.opacity(on ? 0.22 : 0), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }
 

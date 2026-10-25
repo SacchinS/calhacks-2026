@@ -253,6 +253,10 @@ final class EngineClient: ObservableObject {
     }
     /// Drop the draft, or clear a created one so drafting starts again.
     func dismissTicket() { send(["cmd": "ticket", "action": "dismiss"]) }
+    /// Draft the ticket again now, without waiting for the call to move on.
+    func redraftTicket() { send(["cmd": "ticket", "action": "draft"]) }
+    /// Forget this call's notes and dismissed drafts (kept in memory only), and hide the card.
+    func clearTicketNotes() { send(["cmd": "ticket", "action": "clear_notes"]) }
     func listVocab() { send(["cmd": "vocab_list"]) }
     func deleteWord(_ term: String) { send(["cmd": "vocab_delete", "term": term]) }
     func deleteUse(_ id: String) { send(["cmd": "vocab_delete", "id": id]) }

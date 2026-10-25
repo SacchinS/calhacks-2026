@@ -75,7 +75,8 @@ struct DemoView: View {
             .animation(.easeInOut(duration: 0.25), value: engine.signState)
     }
 
-    /// Backup keys for a live demo: W start, C send, X cancel, N say it now, 1-3 the demo script's phrases.
+    /// Backup keys for a live demo: W start, C send (or add a ready ticket), X cancel (or dismiss the
+    /// ticket), N say it now, 1-3 the demo script's phrases, 4 redraft the ticket now.
     private var shortcuts: some View {
         let phrases = DemoScript.phrases
         return ZStack {
@@ -86,6 +87,7 @@ struct DemoView: View {
             ForEach(Array(phrases.enumerated()), id: \.offset) { i, p in
                 Button("") { engine.fake(p) }.keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: [])
             }
+            Button("") { engine.redraftTicket() }.keyboardShortcut(KeyEquivalent(Character("\(phrases.count + 1)")), modifiers: [])
         }
         .opacity(0).allowsHitTesting(false)
     }

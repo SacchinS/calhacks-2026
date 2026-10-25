@@ -63,6 +63,17 @@ struct SettingsView: View {
                 }
                 .padding(.top, 8)
             }
+            Section {
+                HStack(alignment: .top) {
+                    Text("While Jira tickets are on, this call's captions and your sentences stay in memory (never on disk) and go to Claude to draft the ticket.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Clear Call Notes") { engine.clearTicketNotes() }
+                        .help("Forget this call's notes and dismissed drafts, and hide the ticket card")
+                }
+            } header: {
+                Label("Jira tickets", systemImage: "ticket.fill")
+            }
             RememberedWords(engine: engine)
             Section("Privacy") {
                 Label("Video never leaves this Mac. Hand tracking and sign recognition run here.", systemImage: "video.slash")
