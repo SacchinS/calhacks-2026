@@ -116,7 +116,7 @@ In rough demo order:
 1. **Keys** (lead): `ANTHROPIC_API_KEY` and `CARTESIA_API_KEY` are in `.env` on the build machine. `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY` are still needed, from a Moss project (code CALHACKS on the Portal's billing page). Then `uv run pytest --live` runs the real translator, Cartesia and Moss tests, including the 500-word startup timing.
 2. **Camera letters** (A): the letter model, publishing `Letter` events, until P-R-I spelled live suggests Priyanka.
 3. **Bigger vocabulary** (A): the ASL Citizen model next to the Kaggle one, limited to the demo's signs.
-4. **Record and tune** (A): `tools/record_script.py` takes of the demo phrases, then `tools/tune_recognition.py` for the thresholds. The signer who demos should record them.
+4. **Record and tune** (A): `uv run python tools/record_script.py` records 3 takes of each demo phrase to `models/takes/` (gitignored), with the glosses each should give; then `uv run python tools/tune_recognition.py --details` replays them through the models, tries every threshold combination, and prints the best `config.yaml` lines. Takes double as real replay fixtures. The signer who demos should record them.
 5. **Moss numbers** (B): ranking and latency with the real Moss session; tune the autocomplete weights on real letters.
 6. **The real call** (C): two laptops, BlackHole 2ch as Meet's mic, the Multi-Output Device with BlackHole 16ch as Meet's speakers (README "Audio for Meet"); captions within a couple of seconds; tune turn-taking.
 7. **Demo rehearsal** (everyone): `make demo` on the two-laptop, two-screen setup, and record the backup video.
