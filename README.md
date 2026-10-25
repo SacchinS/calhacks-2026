@@ -39,7 +39,7 @@ flowchart LR
 
 | Feature | Status |
 |---|---|
-| Sign recognition | The demo uses our signer's recorded custom signs (HELLO, NICE, MEET, YES, FINISH: five takes each). ASL Citizen and Kaggle models are built but didn't recognize our signer live |
+| Sign recognition | The demo uses our signer's recorded custom signs (HELLO, NICE, MEET, YOU, YES, FINISH: five takes each). ASL Citizen and Kaggle models are built but didn't recognize our signer live |
 | Gloss to English with Claude | Works (live tests pass, under 1 s) |
 | Google Meet: Cartesia voice out, captions in, "One moment, I'm signing." cue | Works on a loopback; a real two-laptop call is next |
 | Call intro: says who's calling ("Introduce me"; automatic only with `meet.intro_on_start`, for calls with strangers) | Built |
@@ -122,7 +122,7 @@ vocab_search: mock      # mock | moss
 3. In Meet's settings: Microphone = BlackHole 2ch, Speakers = that Multi-Output Device.
 4. `config.yaml`: `audio.virtual_mic_device: BlackHole 2ch`, `audio.meet_capture_device: BlackHole 16ch` (the defaults).
 
-**Custom signs.** Demo signs the Kaggle model doesn't know (`MEET-YOU`, `HOW`, `YOU`) are recorded from a few examples each: `uv run python tools/record_signs.py MEET-YOU --takes 5`, then `--check` to see whether the signs separate. Learn each sign from a Deaf signer or the videos linked in `docs/asl-demo-script-research.md` first.
+**Custom signs.** The demo's signs (HELLO, NICE, MEET, YOU, YES, FINISH) are recorded from a few examples each by the signer who demos: `uv run python tools/record_signs.py YOU --takes 5`, then `--check` to see whether the signs separate. Learn each sign from a Deaf signer or the videos linked in `docs/asl-demo-script-research.md` first.
 
 **Calls.** In the app's Settings > Calls, set your name for the call intro ("Hi, this is Sam. I'm Deaf and signing through SignBridge...", said when the app starts if `meet.intro_on_start` is on; Preview's call panel has "Introduce me" to say it any time) and turn on "Review before speaking" if your words should wait for a signed YES.
 

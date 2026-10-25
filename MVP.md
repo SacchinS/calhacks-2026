@@ -35,7 +35,7 @@
 **The demo** is one Google Meet call between two laptops, live, with a real webcam; Demo Mode is on the projector. A teammate on the other laptop plays Priyanka, a designer:
 
 1. **She talks; captions show it.** *"Hi, I'm Priyanka, I'm designing the new app. The mockups are all in Figma."* The captions appear, and the autocomplete remembers Priyanka and Figma.
-2. **Signing, fingerspelling, voice.** The signer signs `HELLO`, spells **P-R**, and the app suggests **Priyanka**; `YES` takes it. Then `NICE MEET-you` and `FINISH`: her laptop hears *"Hello Priyanka, nice to meet you."* in the Cartesia voice, at the next pause.
+2. **Signing, fingerspelling, voice.** The signer signs `HELLO`, spells **P-R**, and the app suggests **Priyanka**; `YES` takes it. Then `NICE MEET YOU` and `FINISH`: her laptop hears *"Hello Priyanka, nice to meet you."* in the Cartesia voice, at the next pause.
 3. **She asks the signer something.** *"Sacchin, where should we put the feedback?"* The name banner flashes over every window. The signer spells **F-I**, `YES` takes **Figma**, `FINISH`, and the voice says *"Figma."*
 4. **If there's time:** she talks fast, and the signer taps "Please slow down a little." (said right away).
 

@@ -3,7 +3,7 @@
     uv sync --extra camera
     uv run python tools/record_script.py                  # every phrase, 3 takes each
     uv run python tools/record_script.py --takes 5 --only 1 3      # phrases 1 and 3
-    uv run python tools/record_script.py --phrase "HELLO, NICE MEET-YOU" --takes 3
+    uv run python tools/record_script.py --phrase "HELLO, NICE MEET YOU" --takes 3
     uv run python tools/record_script.py --list
     uv run python tools/tune_recognition.py               # then: tune on what you recorded
 
@@ -41,7 +41,7 @@ MAX_SECONDS = 15.0  # longest take
 # autocomplete's suggestion; the tuner scores only the signs. Drafts until a Deaf signer
 # approves them.
 SCRIPT = [
-    "HELLO, NICE MEET-YOU",
+    "HELLO, NICE MEET YOU",
     "~pri YES",
     "HOW YOU [wh]",
     "FINE, THANK-YOU",

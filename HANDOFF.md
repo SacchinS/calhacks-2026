@@ -45,7 +45,7 @@ From `MVP.md` ("Checkpoints" has the full list):
 
 One Google Meet call between two laptops (details in `MVP.md`, "What the MVP must do"). A teammate on the other laptop plays a colleague:
 1. **They talk; captions show it.** "Hi, I'm Priyanka, I'm designing the new app. The mockups are all in Figma." The autocomplete remembers Priyanka and Figma.
-2. **Fingerspelling with autocomplete.** The signer signs HELLO, spells P-R, YES takes "Priyanka", then NICE MEET-you, FINISH: the other laptop hears it in the Cartesia voice at the next pause.
+2. **Fingerspelling with autocomplete.** The signer signs HELLO, spells P-R, YES takes "Priyanka", then NICE MEET YOU, FINISH: the other laptop hears it in the Cartesia voice at the next pause.
 3. **Someone asks the signer something.** "Sacchin, where should we put the feedback?" flashes the name banner; the signer spells F-I, YES takes "Figma", FINISH, and the voice says "Figma."
 4. **Meeting manners.** A one-tap "Please slow down a little." is said right away, and turn-taking waits for pauses.
 
@@ -63,7 +63,7 @@ The glosses are drafts (`docs/asl-demo-script-research.md`, Moment 3). A Deaf si
 | Kaggle sign model (`recognition/isolated.py`) | A | **Built.** Downloads to `models/islr/` on first use, runs with LiteRT (~9 ms per window). Not yet tested on a real webcam: thresholds need tuning. |
 | ASL Citizen sign model (`recognition/asl_citizen.py`, `tools/setup_asl_citizen.py`) | A | **Built, off for the demo:** it didn't recognize our signer live (NICE ranked 13th to 1,800th on six takes; `tools/try_signs.py` shows why), so `recognition.sign_models` is `[custom]`. What it is: 2,731 signs, limited to the demo's (`asl_citizen_signs`), with the training code's own preprocessing (checked against it in the tests) and a "nothing" check. On in `recognition.sign_models`; each machine runs the setup tool once (it needs torch only for that). |
 | Recording and tuning tools (`tools/record_script.py`, `tools/tune_recognition.py`) | A | **Built on `person-a`**, waiting on a PR and real takes. |
-| Custom signs (`recognition/custom_signs.py`, `tools/record_signs.py`) | A | **The demo's sign model.** Our signer's HELLO, NICE, MEET, YES and FINISH, 5–6 takes each, all separate (`--check`). New takes also save raw landmarks. |
+| Custom signs (`recognition/custom_signs.py`, `tools/record_signs.py`) | A | **The demo's sign model.** Our signer's HELLO, NICE, MEET, YOU, YES and FINISH, 5–6 takes each, all separate (`--check`). New takes also save raw landmarks. |
 | Segmenter and control signs (`recognition/segmenter.py`) | A | Works. YES / NO / FINISH need a hold (2x `min_frames`), so a mid-sentence FINISH doesn't send. |
 | Face markers (`recognition/face_markers.py`) | A | **Built, off by default** (`recognition.face_markers`). Heuristic; untested on a real face. |
 | Fingerspelling (`recognition/fingerspelling.py`, `tools/try_letters.py`) | A | **Built on `person-a`**, not tried live: a pretrained letter model on the hand landmarks (ONNX, CC BY-NC) publishes one `Letter` per held handshape; spelling starts at the second letter, and other signs are ignored while spelling. Settings under `recognition.letter_*`. |
