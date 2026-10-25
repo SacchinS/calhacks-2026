@@ -209,3 +209,28 @@ def test_one_unsure_frame_does_not_break_a_hold():
 
     r = LetterReader(Config(), Dipping())
     assert read(r, [("P", 0.4, 0.5), ("R", 0.4, 0.5)]) == "PR"
+
+
+def test_a_letter_set_picks_among_its_letters_but_not_from_nothing():
+    classes = [*"0123456789", *"ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
+    logits = {"seen": None}
+
+    def run(x):
+        return logits["seen"][None]
+
+    def scores(**by_letter):
+        out = np.zeros(36, dtype=np.float32)
+        for letter, value in by_letter.items():
+            out[10 + ord(letter) - 65] = value
+        return out
+
+    settings = {"letter_set": "PRIKUB", "letter_orientation": "as_is"}
+    model = LetterModel(Config(sections={"recognition": settings}), run, classes)
+    logits["seen"] = scores(V=8, U=6)  # V and U look alike: V isn't allowed, so U
+    assert model.predict(hand("A"))[0] == "U"
+    logits["seen"] = scores(A=8, S=7, E=6, U=1)  # clearly a fist: none of the six
+    assert model.predict(hand("A")) is None
+    everything = LetterModel(
+        Config(sections={"recognition": {"letter_orientation": "as_is"}}), run, classes
+    )
+    assert everything.predict(hand("A"))[0] == "A"
