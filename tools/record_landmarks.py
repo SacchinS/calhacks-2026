@@ -7,9 +7,8 @@
 Frames are written in the format recognition/replay.py reads. `--label` stamps every
 frame where the hands are in the signing space (use one file per sign for training data).
 
-TODO(Person A): to replace fixtures/landmarks_sample.jsonl with the real demo script,
-add a way to mark sign boundaries while recording (e.g. press a key per sign) so each
-frame gets the right label.
+For the demo script, use tools/record_script.py instead: it records phrase by phrase with
+the glosses each take should give, which tools/tune_recognition.py tunes against.
 """
 
 from __future__ import annotations

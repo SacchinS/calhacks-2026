@@ -96,16 +96,15 @@ enum RouteInfo {
     static func label(target: String?) -> String { "Say it in \(target ?? "the call")" }
 }
 
-/// The Meet demo's draft glosses (docs/asl-demo-script-research.md), in demo order, in the
-/// mock-sign syntax (`#word` = a fingerspelled word). Demo Mode's backup keys 1-4 and Preview's
-/// test phrases. Live, the names are spelled letter by letter and autocomplete finishes them.
-/// A Deaf signer must approve them before the demo.
+/// The Meet demo's draft glosses (MVP.md, docs/asl-demo-script-research.md), in demo order, in
+/// the mock-sign syntax (`#word` = a fingerspelled word). Demo Mode's backup keys 1-3 and
+/// Preview's test phrases. Live, the words are spelled P-R and F-I and autocomplete finishes
+/// them. A Deaf signer must approve them before the demo.
 enum DemoScript {
     static let phrases: [[String]] = [
-        ["HELLO,", "#PRIYANKA,", "NICE", "MEET-YOU"],   // 1 greeting, with the name autocomplete learned
-        ["HOW", "YOU", "[wh]"],                         // 2
-        ["FINE,", "THANK-YOU"],                         // 3
-        ["#KUBERNETES", "[q]"],                         // 4 jargon heard in the call, spelled back
+        ["HELLO,", "#PRIYANKA,", "NICE", "MEET-YOU"],   // 1 greeting, with the name heard in the call
+        ["#FIGMA"],                                     // 2 "where should we put the feedback?"
+        ["THANK-YOU"],                                  // 3
     ]
     static func label(_ phrase: [String]) -> String { phrase.joined(separator: " ") }
 }
@@ -113,9 +112,11 @@ enum DemoScript {
 /// How each control gesture is shown.
 enum GestureInfo {
     static func name(_ g: String) -> String {
-        ["wake": "Start", "confirm": "Send", "cancel": "Cancel"][g] ?? g.capitalized
+        if g.count == 1 { return "Letter \(g)" }  // a fingerspelled letter being held
+        return ["wake": "Start", "confirm": "Send", "cancel": "Cancel"][g] ?? g.capitalized
     }
     static func icon(_ g: String) -> String {
-        ["wake": "hand.raised", "confirm": "hand.thumbsup", "cancel": "hand.thumbsdown"][g] ?? "hand.raised"
+        if g.count == 1 { return "hand.point.up.left" }
+        return ["wake": "hand.raised", "confirm": "hand.thumbsup", "cancel": "hand.thumbsdown"][g] ?? "hand.raised"
     }
 }

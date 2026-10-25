@@ -10,7 +10,6 @@
 ## Before anyone starts (lead)
 
 - [x] **Repo push access.** The repo (`SacchinS/calhacks-2026`) is public, so anyone can clone it, but only collaborators can push. Invites are sent (GitHub > Settings > Collaborators); each teammate accepts theirs (step 1 below).
-- [ ] **SignBridge access for Person A.** Person A's stretch goal ports `signbridge/gestures.py` from the earlier project, and `SacchinS/signbridge` is private. Add Person A as a collaborator there, or copy that one file over.
 - [ ] **API keys.** Send keys privately (a DM, never the repo or a public channel). Person B needs `ANTHROPIC_API_KEY` and the Moss keys (`MOSS_PROJECT_ID`, `MOSS_PROJECT_KEY`). Person C needs `CARTESIA_API_KEY`. Person A needs none.
 - [x] **Who is A, B, and C** (from the team's work-split doc):
   - Person A (Recognition): Sacchin
@@ -45,9 +44,9 @@ From `MVP.md` ("Checkpoints" has the full list):
 ## The demo, in short
 
 One Google Meet call between two laptops (details in `MVP.md`, "What the MVP must do"). A teammate on the other laptop plays a colleague:
-1. **They talk; captions show it.** "Hi, I'm Priyanka, I'm leading the Kubernetes migration this sprint." The autocomplete remembers Priyanka and Kubernetes.
-2. **Fingerspelling with autocomplete.** The signer signs HELLO, spells P-R-I, YES takes "Priyanka", then NICE MEET-you, FINISH: the other laptop hears it in the Cartesia voice at the next pause.
-3. **Someone asks the signer something.** Their name in the captions flashes a banner; they answer by signing (K-U-B → Kubernetes).
+1. **They talk; captions show it.** "Hi, I'm Priyanka, I'm designing the new app. The mockups are all in Figma." The autocomplete remembers Priyanka and Figma.
+2. **Fingerspelling with autocomplete.** The signer signs HELLO, spells P-R, YES takes "Priyanka", then NICE MEET-you, FINISH: the other laptop hears it in the Cartesia voice at the next pause.
+3. **Someone asks the signer something.** "Sacchin, where should we put the feedback?" flashes the name banner; the signer spells F-I, YES takes "Figma", FINISH, and the voice says "Figma."
 4. **Meeting manners.** A one-tap "Please slow down a little." is said right away, and turn-taking waits for pauses.
 
 Why only calls: Professor Lance Forshay (Deaf ASL faculty at UW), who answered our survey, said video calls are the one place he'd use this. His answers and what we changed are in `docs/user-research.md`.
@@ -62,12 +61,12 @@ The glosses are drafts (`docs/asl-demo-script-research.md`, Moment 3). A Deaf si
 | Mac app (`ui/macos`) and its engine bridge (`ui/server.py`) | C | Works on mocks: Preview with the call panel always showing (a You/Them conversation, quick replies, "Introduce me"), Demo Mode, the autocomplete bar, setup wizard (Save This Position fits the signing space), camera-on indicator, Settings > Calls, Privacy and Remembered words. |
 | Webcam and landmarks (`recognition/camera.py`, `gating.py`) | A | Camera and MediaPipe landmarks run (`uv sync --extra camera`). Not tested live since the model went in. |
 | Kaggle sign model (`recognition/isolated.py`) | A | **Built.** Downloads to `models/islr/` on first use, runs with LiteRT (~9 ms per window). Not yet tested on a real webcam: thresholds need tuning. |
-| ASL Citizen sign model (2,731 signs) | A | **Next.** Weights checked: MediaPipe Holistic points like ours, ~20 ms per sign on an M1. To be limited to the demo's signs. |
+| ASL Citizen sign model (`recognition/asl_citizen.py`, `tools/setup_asl_citizen.py`) | A | **Built on `person-a`**, not tried live: 2,731 signs, limited to the demo's (`asl_citizen_signs`), with the training code's own preprocessing (checked against it in the tests) and a "nothing" check. On in `recognition.sign_models`; each machine runs the setup tool once (it needs torch only for that). |
 | Recording and tuning tools (`tools/record_script.py`, `tools/tune_recognition.py`) | A | **Built on `person-a`**, waiting on a PR and real takes. |
 | Custom signs (`recognition/custom_signs.py`, `tools/record_signs.py`) | A | **Built.** Few-shot matching from recorded examples. Nothing recorded yet; only needed for demo signs neither model knows. |
 | Segmenter and control signs (`recognition/segmenter.py`) | A | Works. YES / NO / FINISH need a hold (2x `min_frames`), so a mid-sentence FINISH doesn't send. |
 | Face markers (`recognition/face_markers.py`) | A | **Built, off by default** (`recognition.face_markers`). Heuristic; untested on a real face. |
-| Fingerspelling (`recognition/fingerspelling.py`) | A | **Next.** Stub: the camera produces no letters yet. Plan: a pretrained A–Z letter model on the hand landmarks (ONNX), one `Letter` per held handshape. |
+| Fingerspelling (`recognition/fingerspelling.py`, `tools/try_letters.py`) | A | **Built on `person-a`**, not tried live: a pretrained letter model on the hand landmarks (ONNX, CC BY-NC) publishes one `Letter` per held handshape; spelling starts at the second letter, and other signs are ignored while spelling. Settings under `recognition.letter_*`. |
 | Fingerspelling autocomplete (`language/autocomplete.py`, `vocab.py`, `vocab_search.py`, `vocab_terms.py`, `tagger.py`) | B | **Built and tested on typed letters** (`~pri` in the mock box, or the app's "Fingerspell by typing" box). It ranks words by letters, the conversation (Moss session or keyword mock), frequency and recency; learns words from your spelling and from captions; keeps its memory in a local SQLite file; and lets you list and delete words in Settings. Moss itself isn't run yet (no keys): `uv run pytest --live tests/test_moss_search.py` once they're in `.env`. |
 | Replay (`recognizer: replay`) | A | Works, but `fixtures/landmarks_sample.jsonl` is fake data. |
 | Claude translator (`language/claude.py`, prompt) | B | **Works**: live tests pass, 0.6 to 1.0 s each (Haiku 5.5, no thinking). The prompt is now written for speech in a meeting. |
@@ -84,12 +83,12 @@ The glosses are drafts (`docs/asl-demo-script-research.md`, Moment 3). A Deaf si
   - **Events and config:** `shared/events.py` lost `Mode`, `ModeChanged`, `OutputReply`, and the `MODE` control sign; `ConfirmRequest` lost `target`. The `claude_code`, `siri` and `mode` config lines and the `claude_code_cli` / `type_to_siri` sections are gone, and so is pyobjc.
   - **Behavior:** every translation goes to the voice (after YES with review on). Captions start with the app. The call intro is said at startup when `meet.intro_on_start` is on. The autocomplete keeps one meeting id per run.
   - **Protocol:** the `output_mode` command and the `reply` event are gone; `status` lost `output_mode` and `claude_code_working`; `sent` lost `mode`; `test_route` is voice only.
-  - **App:** no mode picker; Preview always shows the call panel; setup lost the Accessibility and Siri steps; the demo phrases are the Meet greeting with fingerspelled Priyanka and Kubernetes.
+  - **App:** no mode picker; Preview always shows the call panel; setup lost the Accessibility, Siri and Claude steps (the API key is ours, in `.env`) and the control-gesture step (the gestures were never detected), and the engine lost its gestures mode; the demo phrases are the Meet greeting with fingerspelled Priyanka and Figma.
 - **Fingerspelling autocomplete with Moss** (Oct 24). `shared/events.py` gained `Letter`, `Suggestion`, and `AutocompleteUpdate`. A new component line, `vocab_search: mock | moss`, is on `moss` in `config.demo.yaml` and needs `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY`.
-  - **Flow:** the utterance buffer hands letters to the autocompleter in order with the signs. While a word is being spelled, YES accepts it and NO dismisses it, and the confirm and cancel gestures do the same. A sign or SEND keeps the letters as spelled.
+  - **Flow:** the utterance buffer hands letters to the autocompleter in order with the signs. While a word is being spelled, YES accepts it and NO dismisses it, and the app's Send and Cancel buttons (C / X in Demo Mode) do the same. A sign or SEND keeps the letters as spelled.
   - **Storage:** the memory is `~/Library/Application Support/calhacks-2026/vocab.sqlite` (`vocab-mock.sqlite` for the mock search). The Moss session is built from it at startup, never pushed.
   - **New protocol:** status fields `autocomplete` and `autocomplete_stats`; commands `letters`, `autocomplete`, `vocab_list` and `vocab_delete`; event `vocab`.
-  - **Mock and tools:** `~abc` in the mock box spells letters, the mock captions mention Priyanka and Kubernetes, and `make seed-vocab` loads demo words.
+  - **Mock and tools:** `~abc` in the mock box spells letters, the mock captions mention Priyanka and Figma (the demo call), and `make seed-vocab` loads demo words.
   - **Known edge:** with review before speaking, YES while spelling and while a sentence waits for review acts on both.
 
 - **Mention alerts** (Oct 24). `captions/mentions.py` watches the captions for the signer's name (Settings > Calls, plus `meet.mention_names`) and publishes a new `Mention` event in `shared/events.py`: once per turn as soon as the name is heard, then again with the full sentence and whether it's a question. The app shows a flashing yellow banner above every window, fullscreen Meet included, without taking focus (`MentionBanner.swift`). `meet.alert_on_questions` alerts on every question, for 1:1 calls. New protocol event `mention`. The mock captions are now a short sprint check-in that says "Sam, can you take the filters ticket by Friday?".
@@ -114,9 +113,9 @@ The glosses are drafts (`docs/asl-demo-script-research.md`, Moment 3). A Deaf si
 In rough demo order:
 
 1. **Keys** (lead): `ANTHROPIC_API_KEY` and `CARTESIA_API_KEY` are in `.env` on the build machine. `MOSS_PROJECT_ID` and `MOSS_PROJECT_KEY` are still needed, from a Moss project (code CALHACKS on the Portal's billing page). Then `uv run pytest --live` runs the real translator, Cartesia and Moss tests, including the 500-word startup timing.
-2. **Camera letters** (A): the letter model, publishing `Letter` events, until P-R-I spelled live suggests Priyanka.
-3. **Bigger vocabulary** (A): the ASL Citizen model next to the Kaggle one, limited to the demo's signs.
-4. **Record and tune** (A): `tools/record_script.py` takes of the demo phrases, then `tools/tune_recognition.py` for the thresholds. The signer who demos should record them.
+2. **Camera letters** (A): `uv run python tools/try_letters.py`, spell P-R and F-I, set `recognition.letter_orientation` to what it prints, and tune `letter_threshold` / `letter_hold_seconds`; then check P-R and F-I in the app bring up Priyanka and Figma.
+3. **ASL Citizen live** (A): run `tools/setup_asl_citizen.py` on the demo laptop, then sign HELLO, NICE, MEET, YES and FINISH with `recognizer: camera` and check they come through.
+4. **Record and tune** (A): `uv run python tools/record_script.py` records 3 takes of each demo phrase to `models/takes/` (gitignored), with the glosses each should give; then `uv run python tools/tune_recognition.py --details` replays them through the models, tries every threshold combination, and prints the best `config.yaml` lines. Takes double as real replay fixtures. The signer who demos should record them.
 5. **Moss numbers** (B): ranking and latency with the real Moss session; tune the autocomplete weights on real letters.
 6. **The real call** (C): two laptops, BlackHole 2ch as Meet's mic, the Multi-Output Device with BlackHole 16ch as Meet's speakers (README "Audio for Meet"); captions within a couple of seconds; tune turn-taking.
 7. **Demo rehearsal** (everyone): `make demo` on the two-laptop, two-screen setup, and record the backup video.
@@ -136,7 +135,7 @@ Paste your prompt into Claude Code, opened in the repo folder on your branch. Ea
 ```text
 I'm Person A: Recognition on our Cal Hacks 2026 team. Read README.md, MVP.md, and HANDOFF.md in full first. The project is Google Meet only now; HANDOFF.md "What's built" says what's tested, and "What still needs a person" lists the remaining work. I own recognition/, tools/record_*.py, tools/tune_recognition.py, fixtures/landmarks_sample.jsonl, and the `recognizer` line.
 
-My job now: fingerspelled letters from the camera and a bigger sign vocabulary. Add a letter recognizer on the hand landmarks (a pretrained A-Z model; check its license) that publishes one `Letter` event per held handshape, so spelling P-R-I live brings up the autocomplete's Priyanka. Then add the ASL Citizen ST-GCN model (weights in models/asl_citizen/) next to the Kaggle model, limited to the demo's signs, with a cutoff so other movement isn't forced into a demo sign. Then help me record takes with tools/record_script.py and tune the thresholds with tools/tune_recognition.py. Video and images must never be saved or sent; record only teammates who agree.
+My job now: fingerspelled letters from the camera and a bigger sign vocabulary. Add a letter recognizer on the hand landmarks (a pretrained A-Z model; check its license) that publishes one `Letter` event per held handshape, so spelling P-R live brings up the autocomplete's Priyanka. Then add the ASL Citizen ST-GCN model (weights in models/asl_citizen/) next to the Kaggle model, limited to the demo's signs, with a cutoff so other movement isn't forced into a demo sign. Then help me record takes with tools/record_script.py and tune the thresholds with tools/tune_recognition.py. Video and images must never be saved or sent; record only teammates who agree.
 
 How to work: I'm on branch person-a. Commit in small steps and open a PR to main when a piece works. Flip only my own config.yaml lines while testing and don't commit them (main stays on mock). `make test` and `make lint` must pass before every PR. Never print to stdout in engine code (it's the app protocol), never log what the user signs or says at INFO, and never commit .env. Don't change shared/, app.py, Makefile, or tests/contracts/ without asking me first. If something needs a live keystroke, the webcam, or a call, tell me the command and let me run it.
 

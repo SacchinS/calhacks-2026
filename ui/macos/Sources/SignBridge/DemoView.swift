@@ -71,7 +71,7 @@ struct DemoView: View {
         }
     }
 
-    /// Backup keys for a live demo: W start, C send, X cancel, 1-4 the demo script's phrases, in order.
+    /// Backup keys for a live demo: W start, C send, X cancel, 1-3 the demo script's phrases, in order.
     private var shortcuts: some View {
         let phrases = DemoScript.phrases
         return ZStack {

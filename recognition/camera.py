@@ -1,8 +1,9 @@
 """Webcam capture + MediaPipe Holistic landmarks, published as LandmarkFrames.
 
 Needs the camera extra: `uv sync --extra camera`. The Holistic model file is downloaded
-to `models/` on first run, and so is the sign model. Signs come from recorded custom signs,
-the Kaggle isolated-sign model, and fingerspelling (recognition.base.sign_classifiers).
+to `models/` on first run, and so are the sign and letter models. Signs come from recorded
+custom signs and the Kaggle isolated-sign model (recognition.base.sign_classifiers);
+fingerspelled letters from recognition.fingerspelling.
 Camera images stay in memory: they're drawn in the app's preview and never saved or sent.
 """
 
@@ -120,3 +121,8 @@ class CameraRecognizer(FrameRecognizer):
 
     def classifiers(self) -> list[FrameClassifier]:
         return sign_classifiers(self.config)
+
+    def letter_reader(self):
+        from recognition.fingerspelling import letter_reader
+
+        return letter_reader(self.config)

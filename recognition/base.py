@@ -1,7 +1,8 @@
 """Recognizer interface, plus the shared frame pipeline used by replay and camera.
 
 A Recognizer publishes SignEvents to the bus. Landmark-based recognizers (replay, camera)
-run every frame through: gating -> classifiers -> segmenter -> SignEvent.
+run every frame through: gating -> classifiers -> segmenter -> SignEvent, and through the
+letter reader (recognition/fingerspelling.py) -> Letter events for fingerspelling.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from shared.events import (
     CONTROL_SIGNS,
     FaceMarker,
     LandmarkFrame,
+    Notice,
     SignEvent,
     SignKind,
 )
@@ -79,21 +81,46 @@ class FrameClassifier(ABC):
         """Prediction for the sign in progress at this frame, or None if nothing is signed."""
 
 
+SIGN_MODELS = ("custom", "asl_citizen", "kaggle")
+
+
 def sign_classifiers(config: Config) -> list[FrameClassifier]:
-    """The real models, in the order tried: custom signs (only when clearly matched), the
-    Kaggle isolated-sign model, then fingerspelling."""
+    """The real sign models in `recognition.sign_models` order (the first answer wins):
+    `custom` (recorded signs, only when clearly matched), `asl_citizen` (2,731 signs, limited
+    to the demo's), `kaggle` (250 signs). ASL Citizen needs tools/setup_asl_citizen.py
+    first; without it the Kaggle model stands in. Fingerspelled letters are read separately
+    (FrameRecognizer.letter_reader)."""
     from recognition.custom_signs import CustomSignModel
-    from recognition.fingerspelling import FingerspellingModel
     from recognition.isolated import IsolatedSignModel
 
-    return [CustomSignModel(config), IsolatedSignModel(config), FingerspellingModel(config)]
+    names = list(config.get("recognition.sign_models", ["custom", "kaggle"]) or [])
+    out: list[FrameClassifier] = []
+    for name in names:
+        if name == "custom":
+            out.append(CustomSignModel(config))
+        elif name == "kaggle":
+            out.append(IsolatedSignModel(config))
+        elif name == "asl_citizen":
+            from recognition.asl_citizen import ASLCitizenModel
+
+            try:
+                out.append(ASLCitizenModel(config))
+            except RuntimeError as exc:
+                log.warning("%s; using the Kaggle model instead", exc)
+                if "kaggle" not in names:
+                    out.append(IsolatedSignModel(config))
+        else:
+            raise ValueError(f"recognition.sign_models: {name!r} is not one of {SIGN_MODELS}")
+    return out
 
 
 class FrameRecognizer(Recognizer):
     """Base for recognizers that produce LandmarkFrames (replay, camera).
 
     Subclasses implement frames(); this class gates each frame, publishes it, runs the
-    classifiers, and turns per-frame predictions into SignEvents with the segmenter.
+    classifiers, and turns per-frame predictions into SignEvents with the segmenter. With a
+    letter reader, it also publishes fingerspelled Letters, and while a word is being spelled
+    only control signs (YES / NO / FINISH) get through.
     """
 
     def __init__(self, bus: Bus, config: Config) -> None:
@@ -106,6 +133,7 @@ class FrameRecognizer(Recognizer):
         self.segmenter = Segmenter.from_config(config)
         self.faces = FaceMarkerDetector(config)
         self.markers = MarkerTally()
+        self.letters = None  # the letter reader, once running (the app shows its hold)
         self._task: asyncio.Task[None] | None = None
 
     @abstractmethod
@@ -115,6 +143,18 @@ class FrameRecognizer(Recognizer):
     @abstractmethod
     def classifiers(self) -> list[FrameClassifier]:
         """Classifiers to try in order; the first non-None prediction wins."""
+
+    def letter_reader(self):
+        """The fingerspelled-letter reader (recognition.fingerspelling.LetterReader), or None."""
+        return None
+
+    def _letters(self):
+        try:
+            return self.letter_reader()
+        except Exception as exc:  # no model download, no ONNX Runtime: signs still work
+            log.exception("letter reader failed to load")
+            self.bus.publish(Notice("warning", f"Fingerspelled letters are off ({exc})"))
+            return None
 
     async def start(self) -> None:
         if self._task is None:
@@ -128,7 +168,10 @@ class FrameRecognizer(Recognizer):
             self._task = None
 
     async def _run(self) -> None:
+        from recognition.segmenter import is_control
+
         classifiers = self.classifiers()
+        letters = self.letters = self._letters()
         async for raw in self.frames():
             frame = self.gate.apply(raw)
             self.bus.publish(frame)
@@ -140,7 +183,14 @@ class FrameRecognizer(Recognizer):
                 self.markers.add(self.faces.update(frame))
             else:
                 self.faces.update(frame)  # resting frames teach the neutral face
+            if letters is not None:
+                for letter in letters.push(frame, self.gate):
+                    self.bus.publish(letter)
+                if letters.spelling and prediction is not None and not is_control(prediction.gloss):
+                    prediction = None  # spelling: a handshape isn't a sign
             event = self.segmenter.push(prediction)
+            if event is not None and letters is not None and event.kind == "control":
+                letters.end()  # YES / NO / FINISH: the word is done
             if event is not None:
                 markers = self.markers.take()
                 if event.kind != "control" and markers:
