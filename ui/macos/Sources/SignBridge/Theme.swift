@@ -90,47 +90,24 @@ struct SidebarBackground: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
-/// How each output route is shown.
+/// Where the English goes: spoken in the call.
 enum RouteInfo {
-    static func icon(_ route: String?) -> String {
-        ["siri": "mic.circle.fill", "text": "keyboard", "voice": "speaker.wave.2.fill"][route ?? ""] ?? "arrow.right"
-    }
-    static func label(_ route: String?, target: String?) -> String {
-        switch route {
-        case "siri": "Ask Siri"
-        case "text": "Type into \(target ?? "the active app")"
-        case "voice": target.map { "Say it in \($0)" } ?? "Send to the virtual mic"
-        default: ""
-        }
-    }
+    static let icon = "speaker.wave.2.fill"
+    static func label(target: String?) -> String { "Say it in \(target ?? "the call")" }
 }
 
-/// How each output mode is shown (calhacks-2026 addition).
-/// The demo script's draft glosses (docs/asl-demo-script-research.md), in demo order, in the
-/// mock-sign syntax (`/\` = raised brows over the topic). Demo Mode's backup keys 1-6 and Preview's
-/// test phrases. A Deaf signer must approve them before the demo.
+/// The Meet demo's draft glosses (docs/asl-demo-script-research.md), in demo order, in the
+/// mock-sign syntax (`#word` = a fingerspelled word). Demo Mode's backup keys 1-4 and Preview's
+/// test phrases. Live, the names are spelled letter by letter and autocomplete finishes them.
+/// A Deaf signer must approve them before the demo.
 enum DemoScript {
     static let phrases: [[String]] = [
-        ["FOOD", "STORE", "/\\", "WW", "MAKE"],                       // 1 Claude Code kick-off
-        ["TOMORROW", "MORNING,", "YOU-REMIND-ME", "BUY", "MILK"],     // 2 Siri reminder
-        ["HELLO,", "NICE", "MEET-YOU"],                               // 3 Meet greeting
-        ["HOW", "YOU", "[wh]"],                                       // 4 Meet
-        ["THANK-YOU"],                                                // 5 Meet
-        ["TITLE", "/\\", "RED"],                                      // 6 Claude Code re-prompt
+        ["HELLO,", "#PRIYANKA,", "NICE", "MEET-YOU"],   // 1 greeting, with the name autocomplete learned
+        ["HOW", "YOU", "[wh]"],                         // 2
+        ["FINE,", "THANK-YOU"],                         // 3
+        ["#KUBERNETES", "[q]"],                         // 4 jargon heard in the call, spelled back
     ]
     static func label(_ phrase: [String]) -> String { phrase.joined(separator: " ") }
-}
-
-enum OutputMode {
-    static let all = ["claude_code", "siri", "voice", "meet"]
-    static func label(_ mode: String) -> String {
-        ["claude_code": "Claude Code", "siri": "Siri", "voice": "Voice", "meet": "Meet"][mode] ?? mode
-    }
-    static func icon(_ mode: String) -> String {
-        ["claude_code": "chevron.left.forwardslash.chevron.right", "siri": "mic.circle.fill",
-         "voice": "speaker.wave.2.fill",
-         "meet": "video.fill"][mode] ?? "arrow.right"
-    }
 }
 
 /// How each control gesture is shown.

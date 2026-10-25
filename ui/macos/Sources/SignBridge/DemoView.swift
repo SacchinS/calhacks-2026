@@ -15,12 +15,11 @@ struct DemoView: View {
                     TitleText("SignBridge", font: .system(size: 30, weight: .bold))
                     StatePill(state: engine.state).scaleEffect(1.25).padding(.leading, 10)
                     Spacer()
-                    if engine.claudeCodeWorking { ClaudeCodeWorking().font(.title3) }
                     CameraIndicator(on: engine.cameraOn).font(.title3)
                     if let target = engine.target, engine.state != "idle" {
                         Label(target, systemImage: "macwindow").font(.title3).foregroundStyle(.secondary)
                     }
-                    Label(OutputMode.label(engine.outputMode), systemImage: OutputMode.icon(engine.outputMode))
+                    Label("Meet", systemImage: "video.fill")
                         .font(.title3.weight(.semibold)).foregroundStyle(Brand.accent)
                         .padding(.horizontal, 14).padding(.vertical, 6)
                         .overlay(Capsule().strokeBorder(Brand.accent, lineWidth: 1.5))
@@ -44,11 +43,9 @@ struct DemoView: View {
                 }
                 stage.frame(minHeight: 190)
                 AutocompleteBar(engine: engine, large: true)
-                if engine.outputMode == "meet" {
-                    FloorStatus(engine: engine, font: .title2.weight(.semibold))
-                    QuickReplies(engine: engine, size: .large)
-                }
-                if engine.outputMode == "meet", let caption = engine.captions.last {
+                FloorStatus(engine: engine, font: .title2.weight(.semibold))
+                QuickReplies(engine: engine, size: .large)
+                if let caption = engine.captions.last {
                     HStack(alignment: .firstTextBaseline, spacing: 14) {
                         Image(systemName: "captions.bubble.fill").foregroundStyle(Brand.accent)
                         Text(caption).fixedSize(horizontal: false, vertical: true)
@@ -74,7 +71,7 @@ struct DemoView: View {
         }
     }
 
-    /// Backup keys for a live demo: W start, C send, X cancel, 1-6 the demo script's phrases, in order.
+    /// Backup keys for a live demo: W start, C send, X cancel, 1-4 the demo script's phrases, in order.
     private var shortcuts: some View {
         let phrases = DemoScript.phrases
         return ZStack {
@@ -118,7 +115,7 @@ struct DemoView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 HStack {
-                    Label(RouteInfo.label(engine.route, target: engine.target), systemImage: RouteInfo.icon(engine.route))
+                    Label(RouteInfo.label(target: engine.target), systemImage: RouteInfo.icon)
                         .font(.title2.weight(.semibold)).foregroundStyle(Brand.accent)
                     Spacer()
                     if engine.state == "confirming" {
@@ -166,8 +163,8 @@ struct DemoView: View {
                             }
                             Text(item.sentence).font(.title3.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
                             HStack(spacing: 6) {
-                                Image(systemName: RouteInfo.icon(item.route))
-                                Text(item.sent ? RouteInfo.label(item.route, target: nil) : "Cancelled")
+                                Image(systemName: RouteInfo.icon)
+                                Text(item.sent ? "Said in the call" : "Cancelled")
                                 Spacer()
                                 Image(systemName: item.sent ? "checkmark.circle.fill" : "xmark.circle.fill")
                                     .foregroundStyle(item.sent ? .green : .secondary)

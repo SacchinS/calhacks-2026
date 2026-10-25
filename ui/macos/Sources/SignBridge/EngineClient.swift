@@ -33,10 +33,8 @@ final class EngineClient: ObservableObject {
     @Published var lastCalibration: String?
     @Published var lastRouteTest: (route: String, ok: Bool, detail: String)?
     @Published var history: [HistoryItem] = []  // newest first
-    // calhacks-2026 additions: where English goes, Meet captions, Claude Code's reply, mock signs
-    @Published var outputMode = "claude_code"
+    // calhacks-2026 additions: Meet captions, turn-taking, autocomplete, mock signs
     @Published var components: [String: String] = [:]
-    @Published var claudeCodeWorking = false
     @Published var cameraOn = false
     /// Turn-aware speaking in Meet: our voice's state ("idle", "waiting", "interjecting",
     /// "speaking"), the sentence it's about to say, and whether the other side is talking.
@@ -73,8 +71,6 @@ final class EngineClient: ObservableObject {
     @Published var vocab: [VocabWord] = []
     @Published var mockRecognizer = false
     @Published var captions: [String] = []
-    @Published var replies: [String] = []
-    @Published var sent: [(mode: String, text: String)] = []
     private var pending: (glosses: [String], sentence: String, route: String)?
     /// Arguments for the engine, e.g. --mock (everything after the app's own binary path).
     let engineArguments = Array(CommandLine.arguments.dropFirst())
@@ -223,7 +219,6 @@ final class EngineClient: ObservableObject {
     func saveConfig(_ values: [String: Any]) { send(["cmd": "config", "values": values]) }
     func introduce() { send(["cmd": "introduce"]) }
     func quickReply(_ text: String) { send(["cmd": "quick_reply", "text": text]) }
-    func setOutputMode(_ mode: String) { send(["cmd": "output_mode", "mode": mode]) }
     func letters(_ text: String) { send(["cmd": "letters", "text": text]) }
     func acceptSuggestion(_ index: Int = 0) { send(["cmd": "autocomplete", "action": "accept", "index": index]) }
     func dismissSuggestions() { send(["cmd": "autocomplete", "action": "dismiss"]) }
@@ -259,7 +254,7 @@ final class EngineClient: ObservableObject {
             config = e["config"] as? [String: Any] ?? config
         case "status":
             let newState = e["state"] as? String ?? "idle"
-            // Voice and Meet send without confirming, so remember the phrase while sending too.
+            // Without review the phrase goes straight to sending, so remember it then too.
             if newState == "confirming" || (newState == "sending" && pending == nil),
                let intent = e["intent"] as? [String: Any], let text = intent["sentence"] as? String {
                 pending = (e["glosses"] as? [String] ?? [], text, intent["route"] as? String ?? "")
@@ -291,9 +286,7 @@ final class EngineClient: ObservableObject {
             let practice = e["practice"] as? [String: Any]
             practiceDone = practice?["done"] as? [String] ?? []
             practiceTodo = practice?["todo"] as? [String] ?? []
-            outputMode = e["output_mode"] as? String ?? outputMode
             components = e["components"] as? [String: String] ?? components
-            claudeCodeWorking = e["claude_code_working"] as? Bool ?? false
             cameraOn = e["camera_on"] as? Bool ?? false
             let speech = e["speech"] as? [String: Any]
             speechState = speech?["state"] as? String ?? "idle"
@@ -327,13 +320,8 @@ final class EngineClient: ObservableObject {
             captions = Array((captions + [text]).suffix(30))
             meetLog = Array((meetLog + [("them", text)]).suffix(60))
             captionPartial = !(e["final"] as? Bool ?? true)
-        case "reply":
-            replies = Array((replies + [e["text"] as? String ?? ""]).suffix(60))
         case "sent":
-            sent = Array((sent + [(e["mode"] as? String ?? "", e["text"] as? String ?? "")]).suffix(60))
-            if e["mode"] as? String == "meet" {
-                meetLog = Array((meetLog + [("you", e["text"] as? String ?? "")]).suffix(60))
-            }
+            meetLog = Array((meetLog + [("you", e["text"] as? String ?? "")]).suffix(60))
         case "mention":
             mention = MentionAlert(text: e["text"] as? String ?? "", question: e["question"] as? Bool ?? false,
                                    final: e["final"] as? Bool ?? true, turn: e["turn"] as? Int ?? 0)
