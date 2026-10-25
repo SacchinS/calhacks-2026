@@ -69,6 +69,7 @@ def main() -> None:
         m.orientation = orientation
     reader = LetterReader(config, model)
     wins: Counter[str] = Counter()
+    by_letter: dict[str, Counter[str]] = {}  # letter -> which view read it surely
     spelled = ""
     printed = 0.0
     camera = Camera(config)
@@ -85,6 +86,7 @@ def main() -> None:
                 surest = max(guesses, key=lambda o: guesses[o][1] if guesses[o] else 0)
                 if guesses[surest] and guesses[surest][1] >= reader.threshold:
                     wins[surest] += 1
+                    by_letter.setdefault(guesses[surest][0], Counter())[surest] += 1
             was_spelling = reader.spelling
             spelled += "".join(letter.letter for letter in reader.push(frame, space))
             if args.top and frame.ts - printed >= 0.5:
@@ -107,8 +109,10 @@ def main() -> None:
         camera.close()
         cv2.destroyAllWindows()
     if wins:
-        best, _ = wins.most_common(1)[0]
-        print(f"Surer reads: {dict(wins)}. Set recognition.letter_orientation: {best}")
+        views = {letter: c.most_common(1)[0][0] for letter, c in by_letter.items()}
+        best = "either" if len(set(views.values())) > 1 else wins.most_common(1)[0][0]
+        read = ", ".join(f"{letter} {view}" for letter, view in sorted(views.items()))
+        print(f"Each letter read surest: {read}. Set recognition.letter_orientation: {best}")
     print(f"Counted: {spelled or '(nothing)'}")
 
 
