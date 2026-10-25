@@ -182,7 +182,7 @@ document or query text.
 **How it learns.**
 - Every word the signer spells and keeps.
 - Likely names, acronyms and jargon in the other side's captions: capitalized words that aren't
-  ordinary English, all-caps tokens, and unusual long words. So "Priyanka" or "Figma",
+  ordinary English, all-caps tokens, and unusual long words. So "Pranav" or "Figma",
   heard in a meeting, can be suggested before the signer has ever spelled them.
 
 **How ranking works.** On each letter:
@@ -209,7 +209,7 @@ latency is logged.
 - `make seed-vocab` loads Julian, Jupyter, June and a few more.
 - In `make mock`, type `tennis partner ~ju` in the mock-sign box: `~ju` spells J, U one letter
   at a time.
-- The mock captions are the demo call: Priyanka mentions Figma, so `~pr` suggests Priyanka and
+- The mock captions are the demo meeting: Pranav and Figma come up, so `~pr` suggests Pranav and
   `~fi` suggests Figma.
 - With the camera, fingerspell to it: hold each letter until it counts (5 s in the slow
   settings for people new to ASL, with a progress bar in the app; 0.25 s at fluent speed). `uv run python tools/try_letters.py` shows what the letter model

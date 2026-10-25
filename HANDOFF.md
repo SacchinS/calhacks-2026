@@ -26,7 +26,7 @@
    cd calhacks-2026
    make install && make test && make mock
    ```
-   `make mock` opens the Mac app (hand icon in the menu bar). Click through setup with "Skip for now", open Preview, and type `hello ~pri` in the box at the bottom: the autocomplete suggests Priyanka (from the mock captions). Then `/yes nice meet-you /send`, and the call panel shows what the mock voice said.
+   `make mock` opens the Mac app (hand icon in the menu bar). Click through setup with "Skip for now", open Preview, and type `~pr` in the box at the bottom: the autocomplete suggests Pranav (from the mock captions). Then `/yes nice meet-you /send`, and the call panel shows what the mock voice said.
 4. Read, in this order: this file (all of it); `MVP.md` ("What the MVP must do", "How we work", "Checkpoints", then your own Person section); `SCAFFOLD.md` ("Core interfaces" and "The mock recognizer"); `README.md`; `docs/user-research.md` (why the app is only about calls, and the privacy rules); and for A and B, `docs/asl-demo-script-research.md` (Moment 3, the Meet greeting: the draft glosses and the source video for every sign). Your starter prompt has Claude Code read the first four too.
 5. Find your role in "Who is A, B, and C" above, then make your branch from the new `main`: `git checkout -b person-a` (or `person-b`, `person-c`).
 6. If you use API keys: get yours from the lead in a DM, then `cp .env.example .env` and fill it in. `.env` is gitignored. Never commit it; Cartesia's rules disqualify that.
@@ -43,11 +43,12 @@ From `MVP.md` ("Checkpoints" has the full list):
 
 ## The demo, in short
 
-One Google Meet call between two laptops (details in `MVP.md`, "What the MVP must do"). A teammate on the other laptop plays a colleague:
-1. **They talk; captions show it.** "Hi, I'm Priyanka, I'm designing the new app. The mockups are all in Figma." The autocomplete remembers Priyanka and Figma.
-2. **Fingerspelling with autocomplete.** The signer signs HELLO, spells P-R, YES takes "Priyanka", then NICE MEET YOU, FINISH: the other laptop hears it in the Cartesia voice at the next pause.
-3. **Someone asks the signer something.** "Sacchin, where should we put the feedback?" flashes the name banner; the signer spells F-I, YES takes "Figma", FINISH, and the voice says "Figma."
-4. **Meeting manners.** A one-tap "Please slow down a little." is said right away, and turn-taking waits for pauses.
+A release check-in on Google Meet between two laptops (details in `MVP.md`, "What the MVP must do"):
+1. **Speech and captions.** "The dashboard's ready. Pranav redesigned the charts in Figma last night, so I think we ship tomorrow." The autocomplete remembers Pranav and Figma.
+2. **Getting the floor.** The signer taps "Sorry, can I jump in?", or turn-taking interjects for them.
+3. **Signing with fingerspelling.** WAIT, F-I (Figma), COLOR PROBLEM, FINISH: "Wait, there's a color problem in the Figma design."
+4. **Being asked.** "Sacchin, can you sort it out with Pranav?" flashes the name banner; the signer answers ME MEET, P-R (Pranav), TOMORROW: "I'll meet with Pranav tomorrow."
+5. **The outcome:** the release is held.
 
 Why only calls: Professor Lance Forshay (Deaf ASL faculty at UW), who answered our survey, said video calls are the one place he'd use this. His answers and what we changed are in `docs/user-research.md`.
 
@@ -88,7 +89,7 @@ The glosses are drafts (`docs/asl-demo-script-research.md`, Moment 3). A Deaf si
   - **Flow:** the utterance buffer hands letters to the autocompleter in order with the signs. While a word is being spelled, YES accepts it and NO dismisses it, and the app's Send and Cancel buttons (C / X in Demo Mode) do the same. A sign or SEND keeps the letters as spelled.
   - **Storage:** the memory is `~/Library/Application Support/calhacks-2026/vocab.sqlite` (`vocab-mock.sqlite` for the mock search). The Moss session is built from it at startup, never pushed.
   - **New protocol:** status fields `autocomplete` and `autocomplete_stats`; commands `letters`, `autocomplete`, `vocab_list` and `vocab_delete`; event `vocab`.
-  - **Mock and tools:** `~abc` in the mock box spells letters, the mock captions mention Priyanka and Figma (the demo call), and `make seed-vocab` loads demo words.
+  - **Mock and tools:** `~abc` in the mock box spells letters, the mock captions mention Pranav and Figma (the demo meeting), and `make seed-vocab` loads demo words.
   - **Known edge:** with review before speaking, YES while spelling and while a sentence waits for review acts on both.
 
 - **Mention alerts** (Oct 24). `captions/mentions.py` watches the captions for the signer's name (Settings > Calls, plus `meet.mention_names`) and publishes a new `Mention` event in `shared/events.py`: once per turn as soon as the name is heard, then again with the full sentence and whether it's a question. The app shows a flashing yellow banner above every window, fullscreen Meet included, without taking focus (`MentionBanner.swift`). `meet.alert_on_questions` alerts on every question, for 1:1 calls. New protocol event `mention`. The mock captions are now a short sprint check-in that says "Sam, can you take the filters ticket by Friday?".
@@ -135,7 +136,7 @@ Paste your prompt into Claude Code, opened in the repo folder on your branch. Ea
 ```text
 I'm Person A: Recognition on our Cal Hacks 2026 team. Read README.md, MVP.md, and HANDOFF.md in full first. The project is Google Meet only now; HANDOFF.md "What's built" says what's tested, and "What still needs a person" lists the remaining work. I own recognition/, tools/record_*.py, tools/tune_recognition.py, fixtures/landmarks_sample.jsonl, and the `recognizer` line.
 
-My job now: fingerspelled letters from the camera and a bigger sign vocabulary. Add a letter recognizer on the hand landmarks (a pretrained A-Z model; check its license) that publishes one `Letter` event per held handshape, so spelling P-R live brings up the autocomplete's Priyanka. Then add the ASL Citizen ST-GCN model (weights in models/asl_citizen/) next to the Kaggle model, limited to the demo's signs, with a cutoff so other movement isn't forced into a demo sign. Then help me record takes with tools/record_script.py and tune the thresholds with tools/tune_recognition.py. Video and images must never be saved or sent; record only teammates who agree.
+My job now: fingerspelled letters from the camera and a bigger sign vocabulary. Add a letter recognizer on the hand landmarks (a pretrained A-Z model; check its license) that publishes one `Letter` event per held handshape, so spelling P-R live brings up the autocomplete's Pranav. Then add the ASL Citizen ST-GCN model (weights in models/asl_citizen/) next to the Kaggle model, limited to the demo's signs, with a cutoff so other movement isn't forced into a demo sign. Then help me record takes with tools/record_script.py and tune the thresholds with tools/tune_recognition.py. Video and images must never be saved or sent; record only teammates who agree.
 
 How to work: I'm on branch person-a. Commit in small steps and open a PR to main when a piece works. Flip only my own config.yaml lines while testing and don't commit them (main stays on mock). `make test` and `make lint` must pass before every PR. Never print to stdout in engine code (it's the app protocol), never log what the user signs or says at INFO, and never commit .env. Don't change shared/, app.py, Makefile, or tests/contracts/ without asking me first. If something needs a live keystroke, the webcam, or a call, tell me the command and let me run it.
 
