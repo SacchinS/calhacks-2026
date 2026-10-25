@@ -2,12 +2,9 @@ import asyncio
 
 import pytest
 
-from language.mock import MockTranslator
-from language.utterance import UtteranceBuffer
 from outputs.console import ConsoleOutput
 from outputs.router import Router
 from shared.bus import Bus
-from shared.config import Config
 from shared.events import (
     ConfirmRequest,
     ConfirmResult,
@@ -226,29 +223,3 @@ async def test_an_urgent_translation_is_said_right_away_and_now_hurries_the_voic
     assert voice.now == ["Wait."] and voice.sent == ["Later."]
     await router.handle(control("NOW"))
     assert voice.hurried == 1
-
-
-@pytest.mark.parametrize("sign", ["SEND", "NOW"])
-async def test_finish_or_now_alone_approves_the_sentence_waiting_for_review(sign):
-    bus = Bus()
-    tts = RecordingOutput("tts")
-    router = Router(bus, tts=tts, review_before_speaking=True)
-    router.buffer = UtteranceBuffer(bus, MockTranslator(Config()))  # nothing being signed
-    await router.handle(translation())
-    await router.handle(control(sign))  # the signer signs FINISH (or NOW) again: "send it"
-    assert tts.sent == ["Hello, nice to meet you."] and router.pending is None
-
-
-async def test_the_finish_ending_a_new_sentence_doesnt_approve_the_waiting_one():
-    bus = Bus()
-    tts = RecordingOutput("tts")
-    router = Router(bus, tts=tts, review_before_speaking=True)
-    buffer = router.buffer = UtteranceBuffer(bus, MockTranslator(Config()))
-    await router.handle(translation("First."))
-    finish = control("SEND")
-    buffer.signs.append(SignEvent("COLOR", 0.9, "isolated"))  # router sees it first
-    await router.handle(finish)
-    buffer.signs.clear()
-    buffer.ended.append(finish)  # ...or the buffer used it first
-    await router.handle(finish)
-    assert tts.sent == [] and router.pending is not None and router.pending.english == "First."

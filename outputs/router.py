@@ -2,11 +2,9 @@
 into the virtual mic).
 
 With `review_before_speaking`, it asks for YES / NO first (a ConfirmRequest), so a
-misrecognized sign is never spoken in the signer's name. FINISH (SEND) or NOW signed on its
-own also approves it, NOW saying it right away: "send it" is what a signer means there.
-Quick replies skip the review: pressing one is the approval. An urgent translation (the
-signer ended with NOW) is said right away; NOW on its own tells the voice to say a sentence
-that's waiting for the pause.
+misrecognized sign is never spoken in the signer's name. Quick replies skip the review:
+pressing one is the approval. An urgent translation (the signer ended with NOW) is said
+right away; NOW on its own tells the voice to say a sentence that's waiting for the pause.
 
 If the voice is unavailable or fails, the text goes to the console and the UI gets a
 warning. The router never raises.
@@ -45,9 +43,6 @@ class Router:
         # The Autocompleter (set in app.py), so a YES spent on a fingerspelling suggestion
         # doesn't also approve a sentence waiting for review.
         self.spelling: Any = None
-        # The UtteranceBuffer (set in app.py), so the FINISH that ends a new sentence doesn't
-        # also approve the one waiting for review.
-        self.buffer: Any = None
         self._task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
@@ -77,12 +72,6 @@ class Router:
         if isinstance(event, Translation):
             await self.on_translation(event)
         elif event.kind == "control":
-            if event.gloss in ("SEND", "NOW") and self.pending is not None:
-                if not self.ends_a_sentence(event):  # FINISH or NOW alone: "send it"
-                    if event.gloss == "NOW":
-                        self._pending_urgent = True
-                    await self.confirm(True)
-                return
             if event.gloss == "NOW":
                 hurry = getattr(self.tts, "hurry", None)
                 if hurry is not None:
@@ -104,17 +93,6 @@ class Router:
         if self.spelling.active:
             return True
         return any(event is used for used in self.spelling.consumed)
-
-    def ends_a_sentence(self, event: SignEvent) -> bool:
-        """Does this SEND / NOW end a sentence being signed (rather than approve the one
-        waiting)? As with spent_on_spelling, the buffer may see the event before us or after:
-        before, there are signs (or letters) still to send; after, it recorded the event."""
-        buffer = self.buffer
-        if buffer is None:
-            return False
-        if buffer.signs or (self.spelling is not None and self.spelling.active):
-            return True
-        return any(event is used for used in buffer.ended)
 
     async def on_translation(self, translation: Translation) -> None:
         if self.review_before_speaking:
