@@ -33,6 +33,7 @@ enum Brand {
 /// a speech bubble on the brand tile.
 struct Logo: View {
     var size: CGFloat = 64
+    var glow = true
     var body: some View {
         if Bundle.main.url(forResource: "AppIcon", withExtension: "icns") != nil {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: size, height: size)
@@ -49,7 +50,7 @@ struct Logo: View {
                         .padding(.trailing, size * 0.1).padding(.top, size * 0.1)
                 }
                 .foregroundStyle(.white)
-                .shadow(color: Brand.accent.opacity(0.35), radius: size * 0.08, y: size * 0.03)
+                .shadow(color: Brand.accent.opacity(glow ? 0.35 : 0), radius: size * 0.08, y: size * 0.03)
                 .frame(width: size * 0.86, height: size * 0.86)
                 .frame(width: size, height: size)
         }
