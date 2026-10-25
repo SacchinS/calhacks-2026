@@ -110,6 +110,7 @@ class FrameRecognizer(Recognizer):
         self.segmenter = Segmenter.from_config(config)
         self.faces = FaceMarkerDetector(config)
         self.markers = MarkerTally()
+        self.letters = None  # the letter reader, once running (the app shows its hold)
         self._task: asyncio.Task[None] | None = None
 
     @abstractmethod
@@ -147,7 +148,7 @@ class FrameRecognizer(Recognizer):
         from recognition.segmenter import is_control
 
         classifiers = self.classifiers()
-        letters = self._letters()
+        letters = self.letters = self._letters()
         async for raw in self.frames():
             frame = self.gate.apply(raw)
             self.bus.publish(frame)

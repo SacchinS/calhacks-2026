@@ -208,8 +208,8 @@ latency is logged.
 - In `make mock`, type `tennis partner ~ju` in the mock-sign box: `~ju` spells J, U one letter
   at a time.
 - The mock captions mention Priyanka and Kubernetes, then `~pri` suggests Priyanka.
-- With the camera, fingerspell to it: hold each letter still for a moment, and the first two
-  letters start the word. `uv run python tools/try_letters.py` shows what the letter model
+- With the camera, fingerspell to it: hold each letter until it counts (5 s in the slow
+  settings for people new to ASL, with a progress bar in the app; 0.25 s at fluent speed). `uv run python tools/try_letters.py` shows what the letter model
   sees. The "Fingerspell by typing" box still works as a backup.
 - `tools/seed_vocab.py --synthetic 500 --time` measures the startup load.
 

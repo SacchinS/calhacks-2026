@@ -291,3 +291,15 @@ async def test_mentions_reach_the_app_using_the_name_from_settings(engine):
     await until(lambda: messages(engine, "mention"))
     mention = messages(engine, "mention")[-1]
     assert mention["question"] and mention["final"] and "dashboard" in mention["text"]
+
+
+async def test_a_held_letter_shows_as_the_hold_bar(engine):
+    class Holding:
+        holding = ("P", 0.4321)
+
+    engine.app.recognizer.letters = Holding()
+    engine.on_event(LandmarkFrame())
+    assert last_status(engine)["holding"] == ["P", 0.43]
+    Holding.holding = None
+    engine.on_event(LandmarkFrame())
+    assert last_status(engine)["holding"] is None

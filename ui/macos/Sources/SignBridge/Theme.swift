@@ -113,9 +113,11 @@ enum DemoScript {
 /// How each control gesture is shown.
 enum GestureInfo {
     static func name(_ g: String) -> String {
-        ["wake": "Start", "confirm": "Send", "cancel": "Cancel"][g] ?? g.capitalized
+        if g.count == 1 { return "Letter \(g)" }  // a fingerspelled letter being held
+        return ["wake": "Start", "confirm": "Send", "cancel": "Cancel"][g] ?? g.capitalized
     }
     static func icon(_ g: String) -> String {
-        ["wake": "hand.raised", "confirm": "hand.thumbsup", "cancel": "hand.thumbsdown"][g] ?? "hand.raised"
+        if g.count == 1 { return "hand.point.up.left" }
+        return ["wake": "hand.raised", "confirm": "hand.thumbsup", "cancel": "hand.thumbsdown"][g] ?? "hand.raised"
     }
 }

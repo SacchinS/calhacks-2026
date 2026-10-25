@@ -26,7 +26,8 @@ Events (stdout):
   {"type": "ready", "config": {...}, "quick_replies": [{"text": ..., "urgent": bool}]}
   {"type": "status", "state": "idle|listening|thinking|confirming|sending", "mode": ...,
    "glosses": [...], "intent": {"sentence": ..., "route": "voice"} | null,
-   "target": "Google Meet", "log": [...], "holding": null, "fps": ..., "error": null,
+   "target": "Google Meet", "log": [...], "fps": ..., "error": null,
+   "holding": ["P", 0.4] | null (a fingerspelled letter being held, and how far to counting),
    "components": {...}, "mock": bool, "camera_on": bool,
    "speech": {"state": "idle|waiting|interjecting|speaking", "text": ...},
    "them_talking": bool,
@@ -172,6 +173,7 @@ class EngineServer:
         self.frame: LandmarkFrame | None = None
         self.frame_times: deque[float] = deque(maxlen=60)
         self.frame_seq = 0
+        self._holding: list[Any] | None = None
         self._last_status: dict[str, Any] | None = None
         self._tasks: list[asyncio.Task[None]] = []
 
@@ -223,7 +225,7 @@ class EngineServer:
             "intent": intent,
             "target": TARGET,
             "log": list(self.log),
-            "holding": None,
+            "holding": self.letter_holding(),
             "fps": float(len(recent)),
             "error": None,
             # The webcam is open (only the camera recognizer opens it; the app always shows this).
@@ -244,6 +246,12 @@ class EngineServer:
                 "done": [g for g in PRACTICE if g not in self.practice],
             }
         return status
+
+    def letter_holding(self) -> list[Any] | None:
+        """The letter being held for fingerspelling and its progress (0..1), for the app's bar."""
+        reader = getattr(self.app.recognizer, "letters", None)
+        holding = reader.holding if reader is not None else None
+        return [holding[0], round(holding[1], 2)] if holding else None
 
     def _autocomplete(self) -> dict[str, Any] | None:
         update = self.spelling
@@ -330,6 +338,10 @@ class EngineServer:
         if isinstance(event, LandmarkFrame):
             self.frame = event
             self.frame_times.append(time.monotonic())
+            holding = self.letter_holding()
+            if holding != self._holding:  # the hold bar moves with the frames
+                self._holding = holding
+                self.emit_status()
             if self.preview:
                 jpeg = render_preview(event, self.space, self.mirror)
                 if jpeg:

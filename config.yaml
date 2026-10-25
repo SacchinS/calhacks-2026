@@ -33,18 +33,23 @@ recognition:
   isolated_floor: 0.3
   isolated_gap_seconds: 0.4      # hands out of the signing space this long: a fresh window
   # Fingerspelled letters (recognition/fingerspelling.py; model downloaded here on first use,
-  # CC BY-NC 4.0). A letter counts once its handshape is held still this long; spelling
-  # starts at the second letter within letter_gap_seconds. Check with tools/try_letters.py.
+  # CC BY-NC 4.0). Check with tools/try_letters.py. Set slow for testing with people who
+  # aren't fluent: hold each letter 5 s; the same letter twice needs a different letter or
+  # the hand down in between. Fluent values are in the comments.
   letters: true
   letter_model_dir: models/letters
   letter_set: PRIKUB              # only these letters (the demo's P-R-I, K-U-B); empty = A-Z
   letter_top_k: 3                 # ...and only if it's among the model's 3 likeliest of A-Z
   letter_threshold: 0.6           # the model's probability among the letters
-  letter_hold_seconds: 0.25
+  letter_hold_seconds: 5.0        # fluent: 0.25
   letter_min_frames: 3
-  letter_still: 0.25              # wrist movement allowed while holding, in palm lengths
-  letter_gap_seconds: 1.5
-  letter_end_seconds: 1.5         # no letter this long: spelling is over
+  letter_still: 0.6               # wrist drift allowed while holding, in palm lengths (0.25)
+  letter_switch_seconds: 0.3      # another letter must last this long to take over
+  letter_release_seconds: 0.5     # hand gone this long = dropped (shorter = a tracking blip)
+  letter_slide_doubles: false     # true: a small slide repeats a letter (fluent: true)
+  letter_start_count: 1           # letters before spelling starts (fluent: 2)
+  letter_gap_seconds: 10          # ...within this long of each other (1.5)
+  letter_end_seconds: 10          # no letter this long: spelling is over (1.5)
   letter_hand: auto               # auto (the one hand up) | right | left
   letter_orientation: auto        # auto (tries both) | as_is | mirrored
   # Custom signs recorded with tools/record_signs.py (tried before the Kaggle model).
