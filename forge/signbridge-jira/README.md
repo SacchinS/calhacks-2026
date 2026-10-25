@@ -223,6 +223,19 @@ output; do not print or share payloads/audit records.
 
 ## Current references and differences from the task
 
+Local validation: the built-in Node test suite passes on Node 22 and 24; ESLint
+and `forge lint` pass. `npm audit fix` applied compatible updates, reducing the
+template's 14 advisories to eight high-severity transitive advisories rooted in
+ProseMirror paste handling. npm's proposed remaining fix downgrades Forge packages
+across major versions, so it was not applied. This panel uses no rich-text editor
+or paste handler, but the upstream dependency advisory remains unresolved.
+
+Development variables `JIRA_PROJECT_KEY=SB` and `RELEASE_LABEL=release` are set.
+Demo site, signer account ID and user-entered encrypted secret are still needed
+for installation and live checks. No test issues have been created. PR #2's
+preserved description plus a Forge app section is prepared locally in ignored
+`.forge/pr-2-body.md`; GitHub CLI authentication is required to apply it.
+
 Read before implementation, October 25, 2026:
 
 - [Web trigger manifest](https://developer.atlassian.com/platform/forge/manifest-reference/modules/web-trigger/)
