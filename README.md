@@ -52,7 +52,7 @@ flowchart LR
 | Teach it your own signs (`tools/record_signs.py`) | Built |
 | Facial grammar tags (brows, head shake, nod) | Built, off by default |
 | Fingerspelling autocomplete with Moss: suggests the word from the first letters, the conversation, and your history | Built and tested with typed letters; needs Moss keys for the Moss search |
-| Fingerspelling recognition from the camera | Not yet: a letter model on the hand landmarks is next. Type letters in the app meanwhile |
+| Fingerspelling recognition from the camera | Built (a letter model on the hand landmarks, A–Z without J and Z); not yet tried on a live webcam. Typed letters still work |
 | Live accuracy and latency on screen | Stretch |
 
 ## Repo structure
@@ -138,6 +138,7 @@ The packaged app reads its keys from `~/Library/Application Support/calhacks-202
 
 - [Kaggle ISLR 2023 1st-place model](https://huggingface.co/sign/kaggle-asl-signs-1st-place) (MIT license): isolated sign recognition, 250 signs. Downloaded to `models/islr/` the first time the camera runs; run with LiteRT.
 - [MediaPipe Holistic Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/holistic_landmarker): hand, pose, and face landmarks.
+- [ASL Landmark MLP](https://huggingface.co/nocontextdoruk/asl-landmark-mlp) by Doruk Doğular (CC BY-NC 4.0: non-commercial use only), trained on the [ASL-HG dataset](https://doi.org/10.17632/j4y5w2c8w9.1) (Pranto et al., 2026): fingerspelled letters from the 21 hand landmarks. Downloaded to `models/letters/` the first time the camera runs; run with ONNX Runtime (~0.05 ms per frame). Its reported 100% accuracy is on held-out photos of the same 10 people it was trained on, so expect less on a new signer.
 - Custom signs: our own recordings (landmarks only), matched by nearest neighbour.
 
 ## Autocomplete with Moss
@@ -207,8 +208,9 @@ latency is logged.
 - In `make mock`, type `tennis partner ~ju` in the mock-sign box: `~ju` spells J, U one letter
   at a time.
 - The mock captions mention Priyanka and Kubernetes, then `~pri` suggests Priyanka.
-- With the camera, type letters in the "Fingerspell by typing" box until fingerspelling
-  recognition exists.
+- With the camera, fingerspell to it: hold each letter still for a moment, and the first two
+  letters start the word. `uv run python tools/try_letters.py` shows what the letter model
+  sees. The "Fingerspell by typing" box still works as a backup.
 - `tools/seed_vocab.py --synthetic 500 --time` measures the startup load.
 
 ## How we use Claude
@@ -234,7 +236,7 @@ latency is logged.
 
 ## Limitations
 
-- Recognition covers a limited vocabulary (250 Kaggle signs plus the custom signs we record), not all of ASL. Fingerspelling isn't recognized from the camera yet (letters can be typed, and autocomplete works on them). ASL grammar and regional variation are only partly handled.
+- Recognition covers a limited vocabulary (250 Kaggle signs plus the custom signs we record), not all of ASL. Fingerspelled letters are read one held handshape at a time, slower than fluent fingerspelling, and J and Z (drawn in the air) aren't read; autocomplete makes up for most of it. ASL grammar and regional variation are only partly handled.
 - ASL grammar lives partly on the face and body. We can read brow raises and furrows, head shakes, and nods (off by default until a Deaf signer has checked it), but not mouth morphemes (size and intensity, like CHA or OOO) or body shifts (comparison, role shift), so some meaning is lost. A Deaf signer should check the output.
 - Live webcam accuracy can be much lower than benchmark scores. We'll report what we actually measure.
 - It's not a replacement for a qualified interpreter. It's a direct option for everyday meetings and short calls.

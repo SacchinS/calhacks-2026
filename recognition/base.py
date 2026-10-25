@@ -1,7 +1,8 @@
 """Recognizer interface, plus the shared frame pipeline used by replay and camera.
 
 A Recognizer publishes SignEvents to the bus. Landmark-based recognizers (replay, camera)
-run every frame through: gating -> classifiers -> segmenter -> SignEvent.
+run every frame through: gating -> classifiers -> segmenter -> SignEvent, and through the
+letter reader (recognition/fingerspelling.py) -> Letter events for fingerspelling.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from shared.events import (
     CONTROL_SIGNS,
     FaceMarker,
     LandmarkFrame,
+    Notice,
     SignEvent,
     SignKind,
 )
@@ -80,20 +82,22 @@ class FrameClassifier(ABC):
 
 
 def sign_classifiers(config: Config) -> list[FrameClassifier]:
-    """The real models, in the order tried: custom signs (only when clearly matched), the
-    Kaggle isolated-sign model, then fingerspelling."""
+    """The real sign models, in the order tried: custom signs (only when clearly matched),
+    then the Kaggle isolated-sign model. Fingerspelled letters are read separately
+    (FrameRecognizer.letter_reader)."""
     from recognition.custom_signs import CustomSignModel
-    from recognition.fingerspelling import FingerspellingModel
     from recognition.isolated import IsolatedSignModel
 
-    return [CustomSignModel(config), IsolatedSignModel(config), FingerspellingModel(config)]
+    return [CustomSignModel(config), IsolatedSignModel(config)]
 
 
 class FrameRecognizer(Recognizer):
     """Base for recognizers that produce LandmarkFrames (replay, camera).
 
     Subclasses implement frames(); this class gates each frame, publishes it, runs the
-    classifiers, and turns per-frame predictions into SignEvents with the segmenter.
+    classifiers, and turns per-frame predictions into SignEvents with the segmenter. With a
+    letter reader, it also publishes fingerspelled Letters, and while a word is being spelled
+    only control signs (YES / NO / FINISH) get through.
     """
 
     def __init__(self, bus: Bus, config: Config) -> None:
@@ -116,6 +120,18 @@ class FrameRecognizer(Recognizer):
     def classifiers(self) -> list[FrameClassifier]:
         """Classifiers to try in order; the first non-None prediction wins."""
 
+    def letter_reader(self):
+        """The fingerspelled-letter reader (recognition.fingerspelling.LetterReader), or None."""
+        return None
+
+    def _letters(self):
+        try:
+            return self.letter_reader()
+        except Exception as exc:  # no model download, no ONNX Runtime: signs still work
+            log.exception("letter reader failed to load")
+            self.bus.publish(Notice("warning", f"Fingerspelled letters are off ({exc})"))
+            return None
+
     async def start(self) -> None:
         if self._task is None:
             self._task = asyncio.create_task(self._run(), name=f"{self.name}-recognizer")
@@ -128,7 +144,10 @@ class FrameRecognizer(Recognizer):
             self._task = None
 
     async def _run(self) -> None:
+        from recognition.segmenter import is_control
+
         classifiers = self.classifiers()
+        letters = self._letters()
         async for raw in self.frames():
             frame = self.gate.apply(raw)
             self.bus.publish(frame)
@@ -140,7 +159,14 @@ class FrameRecognizer(Recognizer):
                 self.markers.add(self.faces.update(frame))
             else:
                 self.faces.update(frame)  # resting frames teach the neutral face
+            if letters is not None:
+                for letter in letters.push(frame, self.gate):
+                    self.bus.publish(letter)
+                if letters.spelling and prediction is not None and not is_control(prediction.gloss):
+                    prediction = None  # spelling: a handshape isn't a sign
             event = self.segmenter.push(prediction)
+            if event is not None and letters is not None and event.kind == "control":
+                letters.end()  # YES / NO / FINISH: the word is done
             if event is not None:
                 markers = self.markers.take()
                 if event.kind != "control" and markers:

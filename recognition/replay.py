@@ -92,3 +92,10 @@ class ReplayRecognizer(FrameRecognizer):
         if self.config.get("recognition.replay_classifier", "labels") == "model":
             return sign_classifiers(self.config)
         return [FixtureLabelClassifier()]
+
+    def letter_reader(self):
+        if self.config.get("recognition.replay_classifier", "labels") != "model":
+            return None  # labeled fixtures carry whole fingerspelled words
+        from recognition.fingerspelling import letter_reader
+
+        return letter_reader(self.config)
