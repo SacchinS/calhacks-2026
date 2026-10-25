@@ -49,7 +49,7 @@ async def test_ready_carries_the_apps_settings(engine):
     engine.send_ready()
     (ready,) = messages(engine, "ready")
     assert ready["config"]["onboarded"] is False
-    assert {"still", "phrase_rest", "min_conf", "voice_device"} <= set(ready["config"])
+    assert {"letter_hold", "voice_device"} <= set(ready["config"])
 
 
 async def test_review_flow_goes_through_signbridge_states(engine):
@@ -351,3 +351,20 @@ async def test_reset_starts_over(engine, tmp_path):
 
     await engine.handle_command({"cmd": "reset", "forget_words": True})
     assert engine.app.vocab.all() == [] and messages(engine, "vocab")[-1]["words"] == []
+
+
+def test_the_letter_hold_setting_reaches_the_letter_reader():
+    from types import SimpleNamespace
+
+    server = EngineServer.__new__(EngineServer)
+    letters = SimpleNamespace(hold=2.5)
+    recognizer = SimpleNamespace(letter_hold=None, letters=letters)
+    server.app = SimpleNamespace(
+        call_host=SimpleNamespace(name=""),
+        mentions=SimpleNamespace(set_name=lambda name: None),
+        router=SimpleNamespace(review_before_speaking=False, tts=SimpleNamespace()),
+        recognizer=recognizer,
+    )
+    server.ui_config = {"letter_hold": 1.8}
+    server._apply_settings()
+    assert letters.hold == 1.8 and recognizer.letter_hold == 1.8  # now, and on the next start

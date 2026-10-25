@@ -611,9 +611,7 @@ class EngineServer:
     def _load_ui_config(self) -> dict[str, Any]:
         cfg: dict[str, Any] = {
             "onboarded": False,
-            "still": 0.5,
-            "phrase_rest": 1.5,
-            "min_conf": float(self.config.get("recognition.confidence_threshold", 0.6)),
+            "letter_hold": float(self.config.get("recognition.letter_hold_seconds", 2.5)),
             "voice_device": self.config.get("audio.virtual_mic_device", "BlackHole 2ch"),
             "signer_name": self.config.get("meet.signer_name", "") or "",
             "review_before_speaking": bool(self.config.get("meet.review_before_speaking", False)),
@@ -695,6 +693,14 @@ class EngineServer:
         self.app.call_host.name = str(self.ui_config.get("signer_name") or "").strip()
         self.app.mentions.set_name(self.app.call_host.name)
         self.app.router.review_before_speaking = bool(self.ui_config.get("review_before_speaking"))
+        # Settings' letter hold: now, and when the recognizer next starts.
+        with contextlib.suppress(TypeError, ValueError):
+            hold = float(self.ui_config["letter_hold"])
+            recognizer = self.app.recognizer
+            if hasattr(recognizer, "letter_hold"):
+                recognizer.letter_hold = hold
+            if getattr(recognizer, "letters", None) is not None:
+                recognizer.letters.hold = hold
         voice = getattr(self.app.router.tts, "inner", self.app.router.tts)  # under turn-taking
         if self.ui_config.get("voice_id") and hasattr(voice, "voice_id"):
             voice.voice_id = str(self.ui_config["voice_id"])  # the voice picked in setup
