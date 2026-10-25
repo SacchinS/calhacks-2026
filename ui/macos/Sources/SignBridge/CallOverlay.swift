@@ -143,7 +143,11 @@ struct CallOverlayView: View {
         } else if engine.state == "thinking" {
             Label("Writing it in English…", systemImage: "sparkles").font(.title2.weight(.semibold)).foregroundStyle(Brand.indigo)
         } else if engine.state == "confirming", let sentence = engine.sentence {
-            Text("\u{201C}\(sentence)\u{201D}").font(.title2.weight(.semibold))
+            HStack(spacing: 10) {
+                Text("\u{201C}\(sentence)\u{201D}").font(.title2.weight(.semibold))
+                Keycap(text: "YES", tint: Brand.detected)
+                Text("sends").foregroundStyle(.secondary)
+            }
         } else {
             Text(engine.cameraOn ? "Sign when you're ready" : "SignBridge is paused")
                 .font(.title2.weight(.semibold)).foregroundStyle(.secondary)
