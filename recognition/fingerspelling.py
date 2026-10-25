@@ -12,12 +12,17 @@ word; the utterance buffer turns the accepted word into one fingerspelled sign.
   model's `letter_top_k` likeliest letters, so a handshape that's clearly another letter,
   or no letter, isn't forced into one).
 - `LetterReader`: turns per-frame guesses into letters. A letter counts once its
-  handshape is held still for `letter_hold_seconds`. The same letter again needs the hand
-  to move or drop first (a double letter is signed with a small slide). Spelling starts
-  only when two letters come within `letter_gap_seconds` of each other, so a sign's
-  starting handshape isn't read as a letter; while spelling, signs other than YES / NO /
-  FINISH are ignored (the recognizer asks `spelling`). Spelling ends after
-  `letter_end_seconds` without a letter, or at a control sign.
+  handshape is held still for `letter_hold_seconds`; a different letter has to last
+  `letter_switch_seconds` to take over, so a flicker doesn't restart the hold, and a
+  tracking blip under `letter_release_seconds` doesn't count as dropping the hand. The
+  same letter again needs a different letter or the hand down in between, or with
+  `letter_slide_doubles` a small slide (how fluent signers sign a double letter). With
+  `letter_start_count: 2`, spelling starts only when two letters come within
+  `letter_gap_seconds`, so a sign's starting handshape isn't read as a letter (1 = every
+  letter counts at once, fine with a long hold). While spelling, signs other than YES /
+  NO / FINISH are ignored (the recognizer asks `spelling`). Spelling ends after
+  `letter_end_seconds` without a letter, or at a control sign. `holding` is the letter
+  being held and how far along, for the app's progress bar.
 
 Which way the model expects the hand (as the camera sees it, or mirrored) isn't
 documented, so `letter_orientation: auto` tries both and follows the one that has been
@@ -140,6 +145,9 @@ class _Run:
     wrist: tuple[float, float]
     confidences: list[float] = field(default_factory=list)
     counted: bool = False
+    challenger: str = ""  # another letter showing up: since when, and how sure
+    challenger_since: float = 0.0
+    challenger_confidences: list[float] = field(default_factory=list)
 
 
 class LetterReader:
@@ -152,11 +160,17 @@ class LetterReader:
         self.gap = float(config.get("recognition.letter_gap_seconds", 1.5))
         self.end_after = float(config.get("recognition.letter_end_seconds", 1.5))
         self.hand = str(config.get("recognition.letter_hand", "auto"))
+        self.switch = float(config.get("recognition.letter_switch_seconds", 0.3))
+        self.release = float(config.get("recognition.letter_release_seconds", 0.5))
+        self.slide_doubles = bool(config.get("recognition.letter_slide_doubles", True))
+        self.start_count = int(config.get("recognition.letter_start_count", 2))
         self.spelling = False  # letters are being published: other signs are ignored
         self._run: _Run | None = None
-        self._last: str | None = None  # the last letter counted, until the hand moves
+        self._last: str | None = None  # the last letter counted: it can't count again yet
         self._pending: Letter | None = None  # a first letter, waiting for a second one
         self._last_time = 0.0
+        self._seen = 0.0  # when the spelling hand was last seen
+        self._now = 0.0
         self.status = ""  # why the last frame did or didn't count (tools/try_letters.py)
 
     def end(self) -> None:
@@ -166,18 +180,28 @@ class LetterReader:
         self._run = None
         self._last = None
 
+    @property
+    def holding(self) -> tuple[str, float] | None:
+        """The letter being held and how far to counting it (0..1), or None."""
+        run = self._run
+        if run is None or run.counted or run.letter == self._last or not run.confidences:
+            return None
+        return run.letter, min(1.0, (self._now - run.start) / self.hold) if self.hold else 1.0
+
     def push(self, frame: LandmarkFrame, space: SigningSpace) -> list[Letter]:
-        now = frame.ts
+        now = self._now = frame.ts
         if self.spelling and now - self._last_time > self.end_after:
-            self.end()
+            self.spelling = False  # the word is over, but a letter being held still counts
         if self._pending is not None and now - self._pending.ts > self.gap:
             self._pending = None
         hand = self.spelling_hand(frame, space)
         if not hand:
-            self._run = None
-            self._last = None  # the hand dropped or left: the same letter may come again
+            if now - self._seen > self.release:  # gone, not a tracking blip
+                self._run = None
+                self._last = None  # the hand dropped: the same letter may come again
             self.status = "raise one hand into the box"
             return []
+        self._seen = now
         guess = self.model.predict(hand)
         if guess is None or guess[1] < self.threshold:
             self.status = f"unsure ({guess[1]:.0%})" if guess else "not one of the letters"
@@ -189,19 +213,33 @@ class LetterReader:
         if run is not None:
             moved = np.hypot(wrist[0] - run.wrist[0], wrist[1] - run.wrist[1]) / size
             if moved > self.still:
-                self._last = None  # moved: a double letter, or a sign
+                if self.slide_doubles:
+                    self._last = None  # moved: a double letter, or a sign
                 run = None
             elif run.letter != letter:
-                run = None
+                if run.challenger != letter:
+                    run.challenger, run.challenger_since = letter, now
+                    run.challenger_confidences = []
+                run.challenger_confidences.append(confidence)
+                if now - run.challenger_since < self.switch:
+                    self.status = f"holding {run.letter}"
+                    return []  # a flicker: keep holding
+                # It lasted: the new letter, held since it first showed.
+                seen = run.challenger_confidences[:-1]
+                run = _Run(letter, run.challenger_since, wrist, seen)
+                self._run = run
+            else:
+                run.challenger = ""
         if run is None:
             run = self._run = _Run(letter, now, wrist)
         run.confidences.append(confidence)
         held = now - run.start >= self.hold and len(run.confidences) >= self.min_frames
-        if not held:
-            self.status = f"holding {letter}"
-            return []
         if run.counted or letter == self._last:
-            self.status = f"{letter} counted; next letter (slide for a double)"
+            again = "slide or drop your hand" if self.slide_doubles else "drop your hand"
+            self.status = f"{letter} counted; next letter ({again} for a double)"
+            return []
+        if not held:
+            self.status = f"holding {letter} {now - run.start:.1f}/{self.hold:g} s"
             return []
         run.counted = True
         self._last = letter
@@ -211,7 +249,8 @@ class LetterReader:
     def _count(self, letter: Letter) -> list[Letter]:
         self._last_time = letter.ts
         self.status = f"{letter.letter} counted"
-        if self.spelling:
+        if self.spelling or self.start_count <= 1:
+            self.spelling = True
             return [letter]
         if self._pending is not None:
             first, self._pending = self._pending, None

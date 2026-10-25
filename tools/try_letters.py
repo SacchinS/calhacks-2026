@@ -6,7 +6,8 @@ app would count, so you can check the model and settle `recognition.letter_orien
     uv run python tools/try_letters.py --orientation mirrored
 
 Keep one hand inside the green box (the signing space you saved in setup). Hold each
-letter still for a moment, then move to the next; slide a little for a double letter.
+letter for `letter_hold_seconds` (5 s in the slow testing settings), then change to the
+next; for the same letter twice, drop your hand in between.
 
 - Line 1: the model's guess this frame, as the camera sees the hand and mirrored. Only the
   letters in `recognition.letter_set` are read (PRIKUB for the demo; empty = A-Z).

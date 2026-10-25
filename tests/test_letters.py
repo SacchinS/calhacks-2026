@@ -234,3 +234,40 @@ def test_a_letter_set_picks_among_its_letters_but_not_from_nothing():
         Config(sections={"recognition": {"letter_orientation": "as_is"}}), run, classes
     )
     assert everything.predict(hand("A"))[0] == "A"
+
+
+SLOW = {
+    "letter_hold_seconds": 5.0,
+    "letter_still": 0.6,
+    "letter_slide_doubles": False,
+    "letter_start_count": 1,
+    "letter_gap_seconds": 10,
+    "letter_end_seconds": 10,
+}
+
+
+def blip(r, seconds=0.1):
+    """MediaPipe loses the hand for a moment."""
+    start = getattr(r, "clock", 0.0)
+    for i in range(int(seconds * FPS)):
+        r.push(LandmarkFrame(ts=start + i / FPS), SPACE)
+    r.clock = start + seconds
+
+
+def test_slow_letters_count_after_five_seconds_each_at_once():
+    r = reader(**SLOW)
+    assert read(r, [("P", 4.5, 0.5)]) == ""
+    assert r.holding[0] == "P" and 0.85 < r.holding[1] < 0.95  # the app's progress bar
+    assert read(r, [("P", 0.6, 0.5)]) == "P"  # no waiting for a second letter
+    assert r.holding is None
+
+
+def test_slow_letters_dont_double_from_wobbles_blips_or_flickers():
+    r = reader(**SLOW)
+    script = [("P", 2, 0.5), ("K", 0.1, 0.5), ("P", 2, 0.53), ("P", 2, 0.47)]  # flicker, wobble
+    assert read(r, script) == "P"
+    blip(r)
+    assert read(r, [("P", 6, 0.5)]) == ""  # still the same P
+    assert read(r, [("R", 5.2, 0.5)]) == "R"
+    blip(r, 1.0)  # the hand really went down
+    assert read(r, [("R", 5.2, 0.5)]) == "R"  # a double R
