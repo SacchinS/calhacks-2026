@@ -167,6 +167,9 @@ class LetterReader:
         self.gap = float(config.get("recognition.letter_gap_seconds", 1.5))
         self.end_after = float(config.get("recognition.letter_end_seconds", 1.5))
         self.hand = str(config.get("recognition.letter_hand", "auto"))
+        # Fingerspelling is done in front of the shoulder; a hand up by the face is signing
+        # (HELLO starts at the forehead with a flat hand that reads as a letter).
+        self.below_mouth = bool(config.get("recognition.letter_below_mouth", True))
         self.switch = float(config.get("recognition.letter_switch_seconds", 0.3))
         self.release = float(config.get("recognition.letter_release_seconds", 0.5))
         self.slide_doubles = bool(config.get("recognition.letter_slide_doubles", True))
@@ -202,6 +205,10 @@ class LetterReader:
         if self._pending is not None and now - self._pending.ts > self.gap:
             self._pending = None
         hand = self.spelling_hand(frame, space)
+        if hand and self.below_mouth and self.by_the_face(hand, frame.pose):
+            self._run = None
+            self.status = "hand by the face: signing, not spelling"
+            return []
         if not hand:
             if now - self._seen > self.release:  # gone, not a tracking blip
                 self._run = None
@@ -267,6 +274,13 @@ class LetterReader:
         self._pending = letter
         self.status = f"{letter.letter} held: shows once a second letter comes"
         return []
+
+    @staticmethod
+    def by_the_face(hand: Sequence[Point], pose: Sequence[Point]) -> bool:
+        """The wrist is above the mouth (pose points 9 and 10; y grows downward)."""
+        if len(pose) < 11:
+            return False
+        return hand[0][1] < (pose[9][1] + pose[10][1]) / 2
 
     def spelling_hand(self, frame: LandmarkFrame, space: SigningSpace) -> tuple[Point, ...]:
         """The hand that's spelling: one hand in the signing space (two hands up means a
