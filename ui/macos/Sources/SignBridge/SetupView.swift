@@ -3,13 +3,12 @@ import AVFoundation
 import SwiftUI
 
 enum SetupStep: Int, CaseIterable, Identifiable {
-    case welcome, camera, claude, voice, framing, gestures, signs, done
+    case welcome, camera, voice, framing, gestures, signs, done
     var id: Int { rawValue }
     var title: String {
         switch self {
         case .welcome: "Welcome"
         case .camera: "Camera"
-        case .claude: "Claude"
         case .voice: "Voice"
         case .framing: "Position"
         case .gestures: "Gestures"
@@ -21,7 +20,6 @@ enum SetupStep: Int, CaseIterable, Identifiable {
         switch self {
         case .welcome: "hand.wave"
         case .camera: "camera"
-        case .claude: "sparkles"
         case .voice: "speaker.wave.2"
         case .framing: "person.crop.rectangle"
         case .gestures: "hand.thumbsup"
@@ -126,7 +124,6 @@ struct SetupView: View {
         switch step {
         case .welcome: WelcomePage()
         case .camera: CameraPage(done: { done(.camera, $0) })
-        case .claude: ClaudePage(engine: engine, done: { done(.claude, $0) })
         case .voice: VoicePage(engine: engine, done: { done(.voice, $0) })
         case .framing: FramingPage(engine: engine, done: { done(.framing, $0) })
         case .gestures: GesturesPage(engine: engine, done: { done(.gestures, $0) })
@@ -205,24 +202,6 @@ struct CameraPage: View {
         let now = AVCaptureDevice.authorizationStatus(for: .video)
         if now != status { status = now }
         done(status == .authorized)
-    }
-}
-
-struct ClaudePage: View {
-    @ObservedObject var engine: EngineClient
-    let done: (Bool) -> Void
-    var body: some View {
-        PageHeader(title: "Claude",
-                   subtitle: "Claude turns the signs you make into a natural sentence for the call.")
-        Text("SignBridge uses the Anthropic API key in its .env file (ANTHROPIC_API_KEY). If the check fails, add the key and restart the app.")
-            .fixedSize(horizontal: false, vertical: true)
-        Button("Check Connection") { engine.check("claude") }.controlSize(.large).padding(.vertical, 8)
-        if let r = engine.checks["claude"] {
-            StatusLine(ok: r.ok, text: r.detail)
-        } else if engine.running {
-            Text("Press the button to test (takes a few seconds).").foregroundStyle(.secondary)
-        }
-        Color.clear.frame(height: 1).onChange(of: engine.checks["claude"]?.ok) { _, ok in done(ok ?? false) }
     }
 }
 
