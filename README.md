@@ -1,5 +1,31 @@
 # calhacks-2026
 
+## Atlassian (Forge)
+
+The [SignBridge Jira app](forge/signbridge-jira/README.md) supports the **Atlassian
+Agentic Workforce Challenge, Track 1: Agents that do the work**: a meeting app sends a Claude-drafted action after
+explicit human approval; Forge creates a Jira Task, links a release dependency,
+and adds a short comment and approval audit. The native **SignBridge meeting**
+issue panel displays the approver, time, Claude model, reasons and draft history.
+
+The bridge uses HMAC-SHA256 signed requests, a 300-second replay window and atomic
+KVS request-ID claims for idempotency. Jira access runs as the Forge app: no Jira
+token is needed on the Mac, and captions are never sent to Jira. The Mac needs
+`FORGE_SHARED_SECRET` and `FORGE_TRIGGER_URL`. The Python caller/drafting UI is
+separate follow-up work; this addition leaves Python unchanged. The app follows
+the bridge contract in `docs/person-b-spec.md`.
+
+From `forge/signbridge-jira/`, run `npm ci`, `npm test`, `npm run lint`, `forge lint`,
+then `forge deploy --environment development --non-interactive` and
+`forge install --environment development --product jira --site <demo-site>.atlassian.net --non-interactive`.
+Set the encrypted `SIGNBRIDGE_SECRET` and Jira configuration variables, redeploy,
+and obtain the installation URL with `forge webtrigger create --environment development`.
+See the app README for private secret entry, exact variables, test-only live checks,
+deployment details and partial-failure handling. Production deployment requires
+team approval. The template's Forge runtime remains `nodejs24.x`; helpers run on
+Node 22. The [architecture review](forge/signbridge-jira/ARCHITECTURE.md) maps the
+existing MediaPipe, Moss, Claude, Cartesia and SwiftUI implementation.
+
 > Working title. Product name TBD.
 
 A Mac app that lets Deaf ASL signers take part in Google Meet calls by signing. Sign to your webcam, and your signing is spoken in the call as natural English through a virtual microphone; what the others say comes back as live captions. Names and jargon, which signers fingerspell letter by letter, are suggested after the first few letters by an autocomplete that learns the words used in your calls.

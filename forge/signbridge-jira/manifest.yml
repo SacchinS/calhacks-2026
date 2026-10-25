@@ -1,0 +1,34 @@
+modules:
+  webtrigger:
+    - key: signbridge
+      function: bridge
+      urlFormat: v2
+      response:
+        type: dynamic
+  jira:issuePanel:
+    - key: signbridge-meeting
+      resource: main
+      resolver:
+        function: resolver
+      render: native
+      title: SignBridge meeting
+      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+  function:
+    - key: bridge
+      handler: bridge.bridge
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: main
+    path: src/frontend/index.jsx
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+    - storage:app
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/55b01241-c86b-4022-8219-f8687c35ec68

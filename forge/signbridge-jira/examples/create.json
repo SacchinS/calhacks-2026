@@ -1,0 +1,42 @@
+{
+  "action": "create",
+  "request_id": "test-1",
+  "ticket": {
+    "summary": "SignBridge test: verify dashboard filters",
+    "description": "Verify the dashboard filters. Confirm the release dependency.",
+    "due": "",
+    "labels": [
+      "signbridge-test"
+    ],
+    "blocks": "SB-3",
+    "assign_to_signer": false
+  },
+  "audit": {
+    "call_id": "test-call",
+    "approved_by": "Test signer",
+    "approved_via": "signed YES",
+    "approved_at": "2026-10-25T12:00:00Z",
+    "model": "claude-haiku-5-5",
+    "draft_version": 2,
+    "reasons": [
+      "Unblocks the dashboard release."
+    ],
+    "versions": [
+      {
+        "version": 1,
+        "changed": [
+          "summary",
+          "description"
+        ],
+        "at": "2026-10-25T11:59:00Z"
+      },
+      {
+        "version": 2,
+        "changed": [
+          "blocks"
+        ],
+        "at": "2026-10-25T11:59:30Z"
+      }
+    ]
+  }
+}
