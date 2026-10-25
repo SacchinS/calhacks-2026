@@ -75,9 +75,14 @@ class UtteranceBuffer:
             return
         if self.spelling is not None and self.spelling.active:
             if event.gloss == "YES" and event.kind == "control":
+                # Spent on the suggestion, so the router must not also approve a sentence
+                # waiting for review. Recorded before accepting, because accepting ends
+                # spelling and the router may only look afterwards.
+                self.spelling.consumed.append(event)
                 self.accept_suggestion()
                 return
             if event.gloss == "NO" and event.kind == "control":
+                self.spelling.consumed.append(event)
                 self.spelling.dismiss()
                 return
             if event.gloss == "CLEAR":
