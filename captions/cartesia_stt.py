@@ -59,6 +59,11 @@ class CartesiaCaptionSource(CaptionSource):
         self.voice_device = config.get("audio.virtual_mic_device", "BlackHole 2ch")
         self._client = client
         self._task: asyncio.Task[None] | None = None
+        # Remembered names and jargon, so Ink spells them the way the signer does (app.py
+        # fills this from the word memory before start). Ink takes them when the connection
+        # opens and they can't change mid-stream, so words learned during a call reach it on
+        # the next start.
+        self.keyterms: list[str] = []
         # Optional Ink turn-detection tuning (cartesia.turn_* in config.yaml).
         keys = (
             "turn_start_threshold",
@@ -109,8 +114,15 @@ class CartesiaCaptionSource(CaptionSource):
         try:
             audio: asyncio.Queue[bytes] = asyncio.Queue(maxsize=50)
             with self._microphone(device, audio):
+                terms = {"keyterm": list(self.keyterms)} if self.keyterms else {}
+                if terms:
+                    log.debug("Cartesia captions: %d keyterms", len(self.keyterms))
                 ws = self.client.stt.auto_finalize.websocket(
-                    encoding="pcm_s16le", model=self.model, sample_rate=SAMPLE_RATE, **self.turns
+                    encoding="pcm_s16le",
+                    model=self.model,
+                    sample_rate=SAMPLE_RATE,
+                    **terms,
+                    **self.turns,
                 )
                 async with ws as connection:
                     sender = asyncio.create_task(self._send_audio(connection, audio))

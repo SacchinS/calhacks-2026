@@ -54,7 +54,7 @@ struct Storyboard: View {
             VStack(spacing: 8) {
                 Text("P  R").font(.system(size: 26, weight: .bold, design: .monospaced))
                 Image(systemName: "arrow.down").foregroundStyle(.secondary).font(.caption)
-                Chip(text: "Priyanka").scaleEffect(0.8)
+                Chip(text: "Pranav").scaleEffect(0.8)
                     .opacity(on ? 1 : 0.25)
                     .animation(.easeIn(duration: 0.5).delay(on ? 0.6 : 0), value: on)
             }

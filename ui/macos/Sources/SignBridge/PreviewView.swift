@@ -309,7 +309,7 @@ struct StatePill: View {
     }
 }
 
-/// Typed signs for the mock recognizer: `hello nice meet-you`, `#sarah` (fingerspelled), `~pri` (letters
+/// Typed signs for the mock recognizer: `hello nice meet-you`, `#sarah` (fingerspelled), `~p` (letters
 /// one at a time, for autocomplete), face markers
 /// after the signs they cover (`/\`, `[q]`, `[wh]`, `[neg]`, `[nod]`), and `/send /now /yes /no /clear`.
 struct MockSignBox: View {

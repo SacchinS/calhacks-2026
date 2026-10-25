@@ -254,26 +254,26 @@ async def test_no_twice_drops_the_letters(config):
 
 async def test_words_heard_in_captions_are_learned_with_tags(config):
     ac = await make(config, seeded=False)
-    ac.bus.publish(Caption("Priyanka moved the dashboard to Kubernetes last week.", is_final=True))
-    await until(lambda: ac.store.for_term("PRIYANKA") != [])
-    await until(lambda: ac.store.for_term("PRIYANKA")[0].tags != ())
-    (occ,) = ac.store.for_term("PRIYANKA")
+    ac.bus.publish(Caption("Pranav moved the dashboard to Kubernetes last week.", is_final=True))
+    await until(lambda: ac.store.for_term("PRANAV") != [])
+    await until(lambda: ac.store.for_term("PRANAV")[0].tags != ())
+    (occ,) = ac.store.for_term("PRANAV")
     assert (occ.source, occ.kind) == ("transcript", "name")
     assert "dashboard" in occ.tags  # from the conversation, not the sentence itself
     assert ac.store.for_term("KUBERNETES") != []
     assert ac.store.for_term("DASHBOARD") == []  # ordinary English isn't remembered
-    assert (await spell(ac, "PRI"))[0] == "Priyanka"
+    assert (await spell(ac, "PR"))[0] == "Pranav"
     await ac.stop()
 
 
 async def test_the_same_word_heard_again_soon_is_counted_once(config):
     ac = await make(config, seeded=False)
     for _ in range(3):
-        ac.bus.publish(Caption("Ask Priyanka.", is_final=True))
-    ac.bus.publish(Caption("Priyanka", is_final=False))  # partial captions are ignored
-    await until(lambda: ac.store.for_term("PRIYANKA") != [])
+        ac.bus.publish(Caption("Ask Pranav.", is_final=True))
+    ac.bus.publish(Caption("Pranav", is_final=False))  # partial captions are ignored
+    await until(lambda: ac.store.for_term("PRANAV") != [])
     await asyncio.sleep(0.1)
-    assert len(ac.store.for_term("PRIYANKA")) == 1
+    assert len(ac.store.for_term("PRANAV")) == 1
     await ac.stop()
 
 
@@ -308,9 +308,9 @@ async def test_the_tagger_can_fix_kind_and_spelling(config):
 
 async def test_nothing_but_the_word_and_tags_is_stored(config):
     ac = await make(config, seeded=False)
-    sentence = "Priyanka said the secret launch date is March third."
+    sentence = "Pranav said the secret launch date is March third."
     ac.bus.publish(Caption(sentence, is_final=True))
-    await until(lambda: ac.store.for_term("PRIYANKA") != [])
+    await until(lambda: ac.store.for_term("PRANAV") != [])
     await asyncio.sleep(0.05)
     dump = "\n".join(ac.store.db.iterdump())
     assert sentence not in dump and "secret launch date" not in dump
@@ -319,11 +319,11 @@ async def test_nothing_but_the_word_and_tags_is_stored(config):
 
 async def test_memory_survives_a_restart(config, vocab_db):
     store = VocabStore(vocab_db)
-    store.add([Occurrence("Priyanka", "name", "transcript")])
+    store.add([Occurrence("Pranav", "name", "transcript")])
     store.close()
     ac = Autocompleter(Bus(), config, VocabStore(vocab_db), KeywordSearch(config), MockTagger())
     await ac.start()
-    assert (await spell(ac, "PR"))[0] == "Priyanka"
+    assert (await spell(ac, "PR"))[0] == "Pranav"
     await ac.stop()
 
 
@@ -354,6 +354,46 @@ async def test_a_sign_after_letters_keeps_them_as_spelled(config):
         await buffer.handle(event)
     assert [s.gloss for s in buffer.signs] == ["BOB", "HELP"]
     await ac.stop()
+
+
+def test_closing_the_store_while_a_background_write_runs_is_safe(tmp_path):
+    """The engine records a word, then tags it, in worker threads that outlive the task that
+    started them, so close() can land mid-write. It must wait, not close under the write."""
+    import threading
+
+    store = VocabStore(tmp_path / "vocab.sqlite")
+    stop = threading.Event()
+    failures: list[BaseException] = []
+
+    def write() -> None:
+        try:
+            while not stop.is_set():
+                occ = Occurrence("Pranav", "name", "fingerspelled")
+                store.add([occ])
+                store.set_tags(occ.id, ("design", "mockups"), "name")
+                store.all()
+        except BaseException as exc:  # noqa: BLE001
+            failures.append(exc)
+
+    writer = threading.Thread(target=write)
+    writer.start()
+    time.sleep(0.05)
+    store.close()
+    stop.set()
+    writer.join(5)
+    assert not failures, failures
+
+    # After close every call is a no-op, so shutdown never raises or crashes.
+    occ = Occurrence("Figma", "term", "fingerspelled")
+    store.add([occ])
+    store.set_tags(occ.id, ("design",))
+    store.delete([occ.id])
+    assert store.all() == []
+    assert store.for_term("FIGMA") == []
+    assert store.get(occ.id) is None
+    assert store.delete_term("FIGMA") == []
+    assert store.letters_saved() == (0, 0)
+    store.close()
 
 
 def _translator(config):

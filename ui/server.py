@@ -15,7 +15,7 @@ it onto our bus. Commands (stdin, one JSON object per line):
   {"cmd": "mock_input", "text": "title /\\ red /send"}      (ours) the mock-sign box
   {"cmd": "introduce"}                                  (ours) say the Meet call intro again
   {"cmd": "quick_reply", "text": "Can you repeat that?"}  (ours) one of meet.quick_replies
-  {"cmd": "letters", "text": "pri"}                     (ours) fingerspelled letters, typed
+  {"cmd": "letters", "text": "pr"}                      (ours) fingerspelled letters, typed
   {"cmd": "autocomplete", "action": "accept|dismiss", "index": 0}   (ours) while spelling,
         the suggestion to accept (0 = top). Send / Cancel (buttons, keys) do the same.
   {"cmd": "vocab_list"}                                 (ours) the remembered words
