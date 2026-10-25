@@ -1,10 +1,8 @@
 # Person B (Eleyn): the remaining work, with the live Jira ticket demo
 
-Prompts 1 and 2 are done; they're in PR #2. Four prompts are left:
-- **Prompt 3** (ThinkPad) builds the **Forge app** for the Atlassian Agentic Workforce Challenge. It creates the approved issue in Jira, links it to the work it affects, saves an audit record, and shows that record in a Jira issue panel.
-- **Prompt 4** (ThinkPad) builds the **live ticket agent** in the Mac app. During the meeting, Claude drafts a tentative Jira ticket from what's being said and updates it as the conversation goes on. The signer approves it with a signed YES while everyone is still in the call, and the approved ticket goes to the Forge app.
-- **Prompt 5** (demo laptop) checks everything on the Mac, takes the final numbers and rehearses the script.
-- **Prompt 6** follows the Deaf review.
+ (ThinkPad) builds the **Forge app** for the Atlassian Agentic Workforce Challenge. It creates the approved issue in Jira, links it to the work it affects, saves an audit record, and shows that record in a Jira issue panel.
+(ThinkPad) builds the **live ticket agent** in the Mac app. During the meeting, Claude drafts a tentative Jira ticket from what's being said and updates it as the conversation goes on. The signer approves it with a signed YES while everyone is still in the call, and the approved ticket goes to the Forge app.
+ (demo laptop) checks everything on the Mac, takes the final numbers and rehearses the script.
 
 Prompts 3 and 4 only meet at "The bridge contract" below, so they can be built in either order. Person C (Julian) builds the live ticket card; Person A (Sacchin) adds five signs.
 
