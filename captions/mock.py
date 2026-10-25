@@ -1,4 +1,5 @@
-"""Mock captions: emits the lines of fixtures/captions_sample.txt on a timer, looping.
+"""Mock captions: emits the lines of fixtures/captions_sample.txt on a timer, once through
+(the demo call), or over and over with `captions_mock.loop`.
 
 Each line is a "turn": TurnEvent start, `talk_seconds` of talking, the caption, then
 TurnEvent end, so turn-aware speaking can be tried on mocks (it waits for the pause).
@@ -24,6 +25,7 @@ class MockCaptionSource(CaptionSource):
         super().__init__(bus, config)
         self.interval = float(config.get("captions_mock.interval_seconds", 3.0))
         self.talk_seconds = float(config.get("captions_mock.talk_seconds", 0.0))
+        self.loop = bool(config.get("captions_mock.loop", False))
         self._task: asyncio.Task[None] | None = None
 
     def lines(self) -> list[str]:
@@ -44,7 +46,7 @@ class MockCaptionSource(CaptionSource):
             self._task = None
 
     async def _run(self, lines: list[str]) -> None:
-        for line in itertools.cycle(lines):
+        for line in itertools.cycle(lines) if self.loop else lines:
             log.debug("mock caption: %s", line)
             self.bus.publish(TurnEvent("start"))
             try:
