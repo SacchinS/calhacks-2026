@@ -230,11 +230,20 @@ ProseMirror paste handling. npm's proposed remaining fix downgrades Forge packag
 across major versions, so it was not applied. This panel uses no rich-text editor
 or paste handler, but the upstream dependency advisory remains unresolved.
 
-Development variables `JIRA_PROJECT_KEY=SB` and `RELEASE_LABEL=release` are set.
-Demo site, signer account ID and user-entered encrypted secret are still needed
-for installation and live checks. No test issues have been created. PR #2's
-preserved description plus a Forge app section is prepared locally in ignored
-`.forge/pr-2-body.md`; GitHub CLI authentication is required to apply it.
+Deployed development version **2.1.0** and installed on
+`one-atlas-egmo.atlassian.net`. All five configuration variables are set; the
+secret was entered through Forge's hidden prompt and stored encrypted. PR #2's
+existing description was preserved and its Forge app section was added. The
+`gh pr edit` command hit a GraphQL scope error, so GitHub REST applied the update.
+
+Live checks: unsigned context returns 401; signed context returns 200 with
+**SB-1** in the release list. Creating labeled test request `test-1` returned
+**SB-2**; repeating it returned **SB-2** again. The audit was saved and the creation
+comment succeeded. **The SB-3 link did not succeed**: the supplied site returns
+SB-1 as its release, rather than the SB-3 specified in the demo contract. Resolve
+that target mismatch before claiming the release-link demo passes. The issue
+panel still needs a visual check in Jira (open Apps > SignBridge meeting on SB-2).
+Test issue for cleanup: **SB-2**. No production deployment was performed.
 
 Read before implementation, October 25, 2026:
 
