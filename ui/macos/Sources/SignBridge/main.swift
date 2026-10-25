@@ -256,6 +256,10 @@ final class WindowCloseObserver: NSObject, NSWindowDelegate {
 
 MainActor.assumeIsolated {
     let app = NSApplication.shared
+    if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLine.arguments.count {
+        Snapshots.run(into: URL(fileURLWithPath: CommandLine.arguments[i + 1]))  // development: draw the screens
+        exit(0)
+    }
     let delegate = AppDelegate()
     app.delegate = delegate
     app.run()

@@ -4,9 +4,7 @@ struct SettingsView: View {
     @ObservedObject var engine: EngineClient
     let runSetup: () -> Void
     var resetApp: () -> Void = {}
-    @State private var still = 0.5
-    @State private var phraseRest = 1.5
-    @State private var minConf = 0.6
+    @State private var letterHold = 2.5
     @State private var saved = false
     @State private var signerName = ""
     @State private var review = false
@@ -27,21 +25,18 @@ struct SettingsView: View {
                 }
             }
             Section {
-                setting("Pause between signs", "Hold still this long to end one sign.",
-                        value: $still, range: 0.3...1.2, text: String(format: "%.1f s", still))
-                setting("Rest to finish", "Hands down this long sends the phrase to Claude.",
-                        value: $phraseRest, range: 0.8...3, text: String(format: "%.1f s", phraseRest))
-                setting("Minimum confidence", "Signs the model is less sure of are ignored.",
-                        value: $minConf, range: 0.3...0.95, text: "\(Int((minConf * 100).rounded()))%")
+                setting("Letter hold", "Hold a fingerspelled letter still this long for it to count.",
+                        value: $letterHold, range: 1.6...4, text: String(format: "%.1f s", letterHold))
+                Text("One sign each time you raise your hands: drop them between signs. Sign FINISH to send what you've signed, or NOW to say it right away.")
+                    .font(.caption).foregroundStyle(.secondary)
             } header: {
-                Text("Recognition")
+                Label("Signing", systemImage: "hand.raised.fill")
             } footer: {
                 HStack {
                     if saved { Label("Saved", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
                     Spacer()
                     Button("Save") {
-                        engine.saveConfig(["still": (still * 10).rounded() / 10, "phrase_rest": (phraseRest * 10).rounded() / 10,
-                                           "min_conf": (minConf * 20).rounded() / 20])
+                        engine.saveConfig(["letter_hold": (letterHold * 10).rounded() / 10])
                         withAnimation { saved = true }
                     }
                     .buttonStyle(.borderedProminent)
@@ -52,10 +47,10 @@ struct SettingsView: View {
             Section {
                 TextField("Your name", text: $signerName, prompt: Text("e.g. Sam"))
                 Toggle("Review before speaking", isOn: $review)
-                Text("\"Introduce me\" in a call says: \"Hi, this is \(signerName.isEmpty ? "<name>" : signerName). I'm Deaf and signing through SignBridge, so there may be a short pause before I answer.\" Useful on calls with people who don't know you. With review on, SignBridge waits for you to sign YES (NO drops it) before saying anything.")
+                Text("\"Introduce me\" (the call overlay's replies menu) says: \"Hi, this is \(signerName.isEmpty ? "<name>" : signerName). I'm Deaf and signing through SignBridge, so there may be a short pause before I answer.\" Useful on calls with people who don't know you. With review on, SignBridge waits for you to sign YES (NO drops it) before saying anything.")
                     .font(.caption).foregroundStyle(.secondary)
             } header: {
-                Text("Calls")
+                Label("Calls", systemImage: "video.fill")
             } footer: {
                 HStack {
                     if callSaved { Label("Saved", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
@@ -83,13 +78,11 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .tint(Brand.accent)
-        .onChange(of: [still, phraseRest, minConf]) { _, _ in saved = false }
+        .onChange(of: letterHold) { _, _ in saved = false }
         .onChange(of: signerName) { _, _ in callSaved = false }
         .onChange(of: review) { _, _ in callSaved = false }
         .onAppear {
-            still = engine.config["still"] as? Double ?? 0.5
-            phraseRest = engine.config["phrase_rest"] as? Double ?? 1.5
-            minConf = engine.config["min_conf"] as? Double ?? 0.6
+            letterHold = engine.config["letter_hold"] as? Double ?? 2.5
             signerName = engine.config["signer_name"] as? String ?? ""
             review = engine.config["review_before_speaking"] as? Bool ?? false
         }

@@ -37,6 +37,7 @@ func openSettingsPane(_ anchor: String) {
 struct SetupView: View {
     @ObservedObject var engine: EngineClient
     let finish: () -> Void
+    var startAt: SetupStep = .welcome
     @State private var step: SetupStep = .welcome
     @State private var completed: Set<SetupStep> = []
 
@@ -103,7 +104,7 @@ struct SetupView: View {
         }
         .tint(Brand.accent)
         .ignoresSafeArea(.container, edges: .top)
-        .onAppear { go(.welcome) }
+        .onAppear { go(startAt) }
     }
 
     private func go(_ s: SetupStep) {
@@ -159,7 +160,7 @@ struct WelcomePage: View {
         HStack(spacing: 18) {
             Logo(size: 88)
             VStack(alignment: .leading, spacing: 4) {
-                TitleText("SignBridge", font: .system(size: 40, weight: .bold))
+                TitleText("SignBridge", font: .system(size: 40, weight: .heavy, design: .rounded))
                 Text("Sign in your Google Meet calls. SignBridge speaks for you and captions the call.")
                     .font(.title3).foregroundStyle(.secondary)
             }
@@ -211,6 +212,8 @@ struct VoicePage: View {
             StatusLine(ok: r.ok, text: r.detail)
             if r.ok {
                 Text("In Meet's settings, choose **BlackHole 2ch** as the microphone.").padding(.top, 6)
+                Text("For captions, choose a **Multi-Output Device** with your speakers and **BlackHole 16ch** as Meet's speaker (make one in Audio MIDI Setup).")
+                    .foregroundStyle(.secondary)
                 Button("Play a test phrase into it") { engine.testRoute("voice", text: "SignBridge voice test.") }
                 RouteResult(engine: engine, route: "voice",
                             okText: "Played. You won't hear it here; someone in your call would.")
@@ -301,7 +304,7 @@ struct FramingPage: View {
             Button("Save This Position") { engine.calibrate() }.controlSize(.large).disabled(!engine.framingOK)
             if let msg = engine.lastCalibration { Text(msg).foregroundStyle(.secondary) }
         }
-        Text("Rest your hands below the orange line (or out of view) to finish a phrase.")
+        Text("Sign inside the box: it turns yellow while you sign and green when a sign is recognized. Drop your hands between signs.")
             .foregroundStyle(.secondary).padding(.top, 4)
         Color.clear.frame(height: 1).onChange(of: engine.lastCalibration) { _, msg in done(msg?.hasPrefix("Saved") ?? false) }
     }
@@ -318,13 +321,18 @@ struct SpeakerPage: View {
             ForEach(engine.voices) { voice in
                 let picked = engine.voiceID == voice.id
                 HStack(spacing: 12) {
-                    Image(systemName: picked ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(picked ? Brand.accent : .secondary).font(.title2)
+                    Text(String(voice.name.prefix(1))).font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white).frame(width: 42, height: 42)
+                        .background(picked ? AnyShapeStyle(Brand.gradient) : AnyShapeStyle(Color.gray.opacity(0.5)), in: Circle())
                     VStack(alignment: .leading, spacing: 2) {
                         Text(voice.name).font(.headline)
                         Text(voice.about).foregroundStyle(.secondary)
                     }
                     Spacer()
+                    if picked {
+                        Label("Your voice", systemImage: "checkmark.circle.fill").font(.callout.weight(.semibold))
+                            .foregroundStyle(Brand.accent)
+                    }
                     if engine.previewing == voice.id {
                         ProgressView().controlSize(.small)
                     } else {
@@ -333,8 +341,10 @@ struct SpeakerPage: View {
                     }
                 }
                 .padding(12)
-                .background(picked ? Brand.accent.opacity(0.12) : Color.primary.opacity(0.04),
-                            in: RoundedRectangle(cornerRadius: 10))
+                .background(picked ? Brand.accent.opacity(0.10) : Color.primary.opacity(0.04),
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(picked ? Brand.accent.opacity(0.6) : .clear, lineWidth: 1.5))
                 .contentShape(Rectangle())
                 .onTapGesture { engine.chooseVoice(voice.id) }
             }
@@ -351,14 +361,30 @@ struct SpeakerPage: View {
 
 struct DonePage: View {
     let skipped: [SetupStep]
+    static let steps = [
+        ("Join your Meet call", "Microphone: BlackHole 2ch. Speaker: your Multi-Output Device, for captions.", "video.fill"),
+        ("Sign inside the box", "One sign each time you raise your hands. Spell names letter by letter; YES takes the suggestion.", "hand.raised.fill"),
+        ("Sign FINISH", "Claude writes it in English and your voice says it in the call. NOW says it right away.", "speaker.wave.2.fill"),
+        ("Turn on Call Overlay", "From the menu bar: follow along on top of Meet without switching windows.", "rectangle.bottomhalf.inset.filled"),
+    ]
     var body: some View {
         PageHeader(title: "You're set", subtitle: "SignBridge lives in the menu bar (the hand icon).")
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Join your Meet call with BlackHole 2ch as the microphone.", systemImage: "1.circle")
-            Label("Sign with your hands in the green box. Spell names letter by letter; YES takes the suggestion.", systemImage: "2.circle")
-            Label("Sign FINISH: your words are spoken in the call.", systemImage: "3.circle")
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(Array(Self.steps.enumerated()), id: \.offset) { i, step in
+                HStack(spacing: 14) {
+                    Text("\(i + 1)").font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                        .frame(width: 34, height: 34).background(Brand.gradient, in: Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(step.0).font(.headline)
+                        Text(step.1).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: step.2).font(.title2).foregroundStyle(Brand.accent)
+                }
+                .padding(14)
+                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
         }
-        .font(.title3)
         if !skipped.isEmpty {
             Text("Not finished: \(skipped.map(\.title).joined(separator: ", ")). You can run setup again from the menu bar.")
                 .foregroundStyle(.orange).padding(.top, 16)
