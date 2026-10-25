@@ -63,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(demoOn)
         menu.addItem(.separator())
         menu.addItem(item("Run Setup…", #selector(showSetup), ""))
+        menu.addItem(item("Reset SignBridge…", #selector(resetApp), ""))
         menu.addItem(item("Settings…", #selector(showSettings), ","))
         menu.addItem(.separator())
         menu.addItem(item("Quit SignBridge", #selector(quit), "q"))
@@ -185,7 +186,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func showSettings() {
         open("settings", title: "SignBridge Settings", size: NSSize(width: 480, height: 470),
-             view: SettingsView(engine: engine, runSetup: { [weak self] in self?.showSetup() }))
+             view: SettingsView(engine: engine, runSetup: { [weak self] in self?.showSetup() },
+                                resetApp: { [weak self] in self?.resetApp() }))
+    }
+
+    /// Start over: the settings back to their defaults, then setup again. Asks first.
+    @objc func resetApp() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Reset SignBridge?"
+        alert.informativeText = "Your name, voice, signing position and settings go back to their defaults, and setup starts again. Your recorded signs and API keys stay."
+        alert.addButton(withTitle: "Reset")
+        alert.addButton(withTitle: "Cancel")
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = "Also forget remembered words"
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        engine.reset(forgetWords: alert.suppressionButton?.state == .on)
+        windows["settings"]?.close()
+        showSetup()
     }
 
     @objc func quit() { NSApp.terminate(nil) }

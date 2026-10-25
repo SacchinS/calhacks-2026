@@ -16,6 +16,8 @@ it onto our bus. Commands (stdin, one JSON object per line):
   {"cmd": "introduce"}                                  (ours) say the Meet call intro again
   {"cmd": "quick_reply", "text": "Can you repeat that?"}  (ours) one of meet.quick_replies
   {"cmd": "voice_preview", "voice_id": "..."}          (ours) say a sample on the Mac's speakers
+  {"cmd": "reset", "forget_words": false}               (ours) the app's settings back to their
+        defaults (setup runs again); with forget_words, the remembered words go too
   {"cmd": "letters", "text": "pr"}                      (ours) fingerspelled letters, typed
   {"cmd": "autocomplete", "action": "accept|dismiss", "index": 0}   (ours) while spelling,
         the suggestion to accept (0 = top). Send / Cancel (buttons, keys) do the same.
@@ -461,6 +463,8 @@ class EngineServer:
             self.app.call_host.introduce()
         elif cmd == "quick_reply":
             self.quick_reply(str(msg.get("text", "")))
+        elif cmd == "reset":
+            await self.reset(forget_words=bool(msg.get("forget_words")))
         elif cmd == "voice_preview":
             self._background(self.preview_voice(str(msg.get("voice_id", ""))))
         elif cmd == "letters":
@@ -625,6 +629,23 @@ class EngineServer:
             return
         self.log.append(f"quick reply: {text}")
         self._background(self.app.router.quick_reply(reply["text"], urgent=reply["urgent"]))
+
+    async def reset(self, forget_words: bool = False) -> None:
+        """Start over: the app's settings (name, voice, signing space, review, onboarded)
+        back to their defaults, so setup runs again. Recorded signs and .env keys stay."""
+        with contextlib.suppress(FileNotFoundError):
+            self.ui_config_path.unlink()
+        self.ui_config = self._load_ui_config()
+        self.space = SigningSpace.from_config(self.config)
+        if getattr(self.app.recognizer, "gate", None) is not None:
+            self.app.recognizer.gate = self.space
+        self._apply_settings()
+        if forget_words:
+            for word in await self.app.autocomplete.words():
+                await self.app.autocomplete.delete_word(word["term"])
+            self.emit({"type": "vocab", "words": await self.app.autocomplete.words()})
+        self.log.append("reset: setup runs again")
+        self.emit({"type": "config", "config": self.ui_config})
 
     async def preview_voice(self, voice_id: str) -> None:
         """Setup's "Your voice": say a sample in that Cartesia voice on the Mac's own speakers
