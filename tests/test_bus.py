@@ -1,13 +1,13 @@
 import asyncio
 
 from shared.bus import Bus
-from shared.events import Caption, ModeChanged, SignEvent
+from shared.events import Caption, Notice, SignEvent
 
 
 async def test_subscriber_gets_only_its_types():
     bus = Bus()
     signs = bus.subscribe(SignEvent)
-    bus.publish(ModeChanged("voice"))
+    bus.publish(Notice("info", "hi"))
     bus.publish(SignEvent("HELLO", 0.9, "isolated"))
     event = await asyncio.wait_for(signs.get(), 1)
     assert event.gloss == "HELLO"
@@ -18,9 +18,9 @@ async def test_subscribe_all_and_multiple_subscribers():
     bus = Bus()
     everything = bus.subscribe()
     captions_a = bus.subscribe(Caption)
-    captions_b = bus.subscribe(Caption, ModeChanged)
+    captions_b = bus.subscribe(Caption, Notice)
     bus.publish(Caption("hi"))
-    bus.publish(ModeChanged("meet"))
+    bus.publish(Notice("info", "hi"))
     assert everything.queue.qsize() == 2
     assert captions_a.queue.qsize() == 1
     assert captions_b.queue.qsize() == 2

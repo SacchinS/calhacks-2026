@@ -8,11 +8,10 @@ it onto our bus. Commands (stdin, one JSON object per line):
   {"cmd": "gesture", "name": "wake|confirm|cancel"}     on-screen buttons and backup keys:
         confirm = YES (or SEND while signing), cancel = NO (or CLEAR while signing)
   {"cmd": "fake", "glosses": ["RAIN", "TOMORROW"]}      test phrases: the signs, then SEND
-  {"cmd": "check", "name": "claude|voice"}              setup checks
-  {"cmd": "test_route", "route": "siri|voice", "text": "What time is it?"}
+  {"cmd": "check", "name": "claude|voice"}              setup checks (translator, BlackHole)
+  {"cmd": "test_route", "route": "voice", "text": "SignBridge voice test."}
   {"cmd": "calibrate"}
   {"cmd": "config", "values": {...}}                    saves the app's settings
-  {"cmd": "output_mode", "mode": "claude_code|siri|voice|meet"}   (ours) where English goes
   {"cmd": "mock_input", "text": "title /\\ red /send"}      (ours) the mock-sign box
   {"cmd": "introduce"}                                  (ours) say the Meet call intro again
   {"cmd": "quick_reply", "text": "Can you repeat that?"}  (ours) one of meet.quick_replies
@@ -26,10 +25,9 @@ it onto our bus. Commands (stdin, one JSON object per line):
 Events (stdout):
   {"type": "ready", "config": {...}, "quick_replies": [{"text": ..., "urgent": bool}]}
   {"type": "status", "state": "idle|listening|thinking|confirming|sending", "mode": ...,
-   "glosses": [...], "intent": {"sentence": ..., "route": "text|siri|voice"} | null,
-   "target": ..., "log": [...], "holding": null, "fps": ..., "error": null,
-   "output_mode": ..., "components": {...}, "mock": bool,
-   "claude_code_working": bool, "camera_on": bool,
+   "glosses": [...], "intent": {"sentence": ..., "route": "voice"} | null,
+   "target": "Google Meet", "log": [...], "holding": null, "fps": ..., "error": null,
+   "components": {...}, "mock": bool, "camera_on": bool,
    "speech": {"state": "idle|waiting|interjecting|speaking", "text": ...},
    "them_talking": bool,
    "autocomplete": {"letters": "JU", "top": {"term", "kind"} | null, "alternates": [...],
@@ -40,8 +38,7 @@ Events (stdout):
   {"type": "frame", "seq": n, "jpeg": "<base64>"}   while the preview is on (mirrored, drawn)
   {"type": "check" | "route_tested" | "calibrated" | "config" | "error", ...}
   {"type": "caption", "text": ..., "final": bool}   (ours) a partial caption is replaced
-  {"type": "reply", "text": ..., "done": bool}       (ours) Claude Code's streamed reply
-  {"type": "sent", "mode": ..., "output": ..., "text": ...}   (ours) what each output was given
+  {"type": "sent", "output": "tts|console", "text": ...}   (ours) what was said in the call
   {"type": "mention", "text": ..., "question": bool, "final": bool, "turn": n}   (ours)
         someone said the signer's name; the same turn comes again with the full sentence
   {"type": "vocab", "words": [{"term", "term_norm", "kind", "count", "last_used", "tags",
@@ -68,7 +65,6 @@ from typing import TYPE_CHECKING, Any, TextIO
 from recognition.gating import SigningSpace, space_from_pose
 from recognition.mock import parse_line
 from shared.events import (
-    MODES,
     AutocompleteUpdate,
     Caption,
     ConfirmRequest,
@@ -77,9 +73,7 @@ from shared.events import (
     Letter,
     Mention,
     MockInput,
-    ModeChanged,
     Notice,
-    OutputReply,
     OutputSent,
     SignEvent,
     SpeechStatus,
@@ -97,9 +91,7 @@ log = logging.getLogger(__name__)
 APP_MODES = ("off", "run", "framing", "gestures")
 PRACTICE = ["wake", "confirm", "cancel"]
 UI_CONFIG = Path("~/Library/Application Support/calhacks-2026/ui.json").expanduser()
-# Where each output mode sends English, in the app's route vocabulary.
-ROUTES = {"claude_code": "text", "siri": "siri", "voice": "voice", "meet": "voice"}
-TARGETS = {"claude_code": "Claude Code", "siri": "Siri", "meet": "Google Meet"}
+TARGET = "Google Meet"  # where the signer's English is spoken
 
 
 def protocol_stdout() -> TextIO:
@@ -164,17 +156,13 @@ class EngineServer:
 
         self.mode = "off"  # the app's mode: off | run | framing | gestures
         self.preview = False
-        self.output_mode = self.config.mode
-        self.voice_mode = self.output_mode if self.output_mode in ("voice", "meet") else "voice"
         self.woke = False
         self.gloss: list[str] = []  # live, until SEND
         self.utterance: list[str] = []  # the phrase being translated / confirmed / sent
         self.english: str | None = None
         self.pending_id: str | None = None
-        self.pending_target = "claude_code"
         self.thinking = False
         self.sending = False
-        self.claude_code_jobs: list[str] = []  # approved requests Claude Code is still working on
         self.speech = "idle"  # our voice in a call: idle | waiting | interjecting | speaking
         self.speech_text = ""
         self.them_talking = False  # the other side has the floor (Ink turn detection)
@@ -226,20 +214,18 @@ class EngineServer:
         glosses = self.gloss if state in ("idle", "listening") else self.utterance
         intent = None
         if state in ("confirming", "sending") and self.english:
-            intent = {"sentence": self.english, "route": ROUTES[self.output_mode]}
+            intent = {"sentence": self.english, "route": "voice"}
         recent = [t for t in self.frame_times if time.monotonic() - t < 1]
         status = {
             "state": state,
             "mode": self.mode,
             "glosses": [g.removeprefix("fs-") for g in glosses],
             "intent": intent,
-            "target": TARGETS.get(self.output_mode),
+            "target": TARGET,
             "log": list(self.log),
             "holding": None,
             "fps": float(len(recent)),
             "error": None,
-            "output_mode": self.output_mode,
-            "claude_code_working": bool(self.claude_code_jobs),
             # The webcam is open (only the camera recognizer opens it; the app always shows this).
             "camera_on": self.app.chosen.get("recognizer") == "camera" and self.mode != "off",
             # Turn-aware speaking in Meet: what our voice is doing, and whether they're talking.
@@ -306,9 +292,7 @@ class EngineServer:
             Translation,
             ConfirmRequest,
             ConfirmResult,
-            ModeChanged,
             OutputSent,
-            OutputReply,
             Caption,
             Notice,
             SpeechStatus,
@@ -372,44 +356,22 @@ class EngineServer:
         elif isinstance(event, Translation):
             self.english = event.english
             self.thinking = False
-            if self.output_mode != "claude_code":
-                self.sending = True  # voice / meet: straight to the voice
+            self.sending = True  # straight to the voice (a review turns it into confirming)
         elif isinstance(event, ConfirmRequest):
             self.pending_id = event.request_id
-            self.pending_target = event.target
             self.english = event.english
             self.sending = False
         elif isinstance(event, ConfirmResult):
             if event.request_id == self.pending_id:
                 self.pending_id = None
-                if event.approved and self.pending_target != "claude_code":
-                    self.sending = True  # reviewed in Meet / Voice: now it's spoken
-                elif event.approved and self.english:
-                    # Claude Code builds in the background: don't hold the app on "Sending".
-                    self.claude_code_jobs.append(self.english)
-                    self.log.append("Claude Code is working")
+                if event.approved:
+                    self.sending = True  # reviewed: now it's spoken
                 else:
                     self.log.append("cancelled")
-        elif isinstance(event, ModeChanged):
-            self.output_mode = event.mode
-            if event.mode in ("voice", "meet"):
-                self.voice_mode = event.mode
         elif isinstance(event, OutputSent):
-            mode = self.output_mode
-            if event.output in ("claude_code", "console") and event.text in self.claude_code_jobs:
-                self.claude_code_jobs.remove(event.text)
-                mode = "claude_code"
-            else:
-                self.sending = False
-                if event.output == "tts":
-                    mode = self.voice_mode  # spoken in Meet or Voice, even if the mode moved on
-                elif event.output == "siri":
-                    mode = "siri"
+            self.sending = False
             self.log.append("sent" if event.output != "console" else "printed to the console")
-            sent = {"mode": mode, "output": event.output, "text": event.text}
-            self.emit({"type": "sent", **sent})
-        elif isinstance(event, OutputReply):
-            self.emit({"type": "reply", "text": event.text, "done": event.done})
+            self.emit({"type": "sent", "output": event.output, "text": event.text})
         elif isinstance(event, Caption):
             self.emit({"type": "caption", "text": event.text, "final": event.is_final})
         elif isinstance(event, Notice):
@@ -446,9 +408,7 @@ class EngineServer:
         elif cmd == "check":
             self._background(self.run_check(str(msg.get("name"))))
         elif cmd == "test_route":
-            self._background(
-                self.test_route(str(msg.get("route")), msg.get("text", "What time is it?"))
-            )
+            self._background(self.test_route(msg.get("text", "SignBridge voice test.")))
         elif cmd == "calibrate":
             self.calibrate()
         elif cmd == "config":
@@ -456,8 +416,6 @@ class EngineServer:
             self._save_ui_config()
             self._apply_settings()
             self.emit({"type": "config", "config": self.ui_config})
-        elif cmd == "output_mode":
-            self.set_output_mode(str(msg.get("mode")))
         elif cmd == "introduce":
             self.app.call_host.introduce()
         elif cmd == "quick_reply":
@@ -546,11 +504,6 @@ class EngineServer:
                 self.bus.publish(event)
         self.control("SEND")
 
-    def set_output_mode(self, mode: str) -> None:
-        """Pick a mode directly. (Pressing MODE N times raced: N came from a stale mode.)"""
-        if mode in MODES:
-            self.app.router.set_mode(mode)
-
     async def run_check(self, name: str) -> None:
         if name == "claude":
             ok, detail = await self._check_translator()
@@ -576,22 +529,19 @@ class EngineServer:
             return False, f"Claude call failed: {exc}"
         return True, f"Claude answered in {time.monotonic() - start:.1f}s: {translation.english}"
 
-    async def test_route(self, route: str, text: str) -> None:
-        component = "siri" if route == "siri" else "tts"
-        output = self.app.router.siri if route == "siri" else self.app.router.tts
+    async def test_route(self, text: str) -> None:
+        """Setup's voice test: say `text` into the virtual mic."""
+        output = self.app.router.tts
         try:
             if not output.available():
-                chosen = self.app.chosen.get(component)
-                detail = f"The {component} output ({chosen}) isn't available."
-                if component == "siri":
-                    detail += " Give SignBridge Accessibility permission, then try again."
+                detail = f"The voice ({self.app.chosen.get('tts')}) isn't available."
                 ok = False
             else:
                 await output.send(text)
                 ok, detail = True, ""
         except Exception as exc:
             ok, detail = False, str(exc)
-        self.emit({"type": "route_tested", "route": route, "ok": ok, "detail": detail})
+        self.emit({"type": "route_tested", "route": "voice", "ok": ok, "detail": detail})
 
     def _background(self, coro) -> None:
         task = asyncio.create_task(coro)

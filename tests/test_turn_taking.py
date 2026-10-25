@@ -7,7 +7,7 @@ import pytest
 from outputs.turn_taking import INTERJECTION, TurnTakingOutput
 from shared.bus import Bus
 from shared.config import Config
-from shared.events import ModeChanged, SpeechStatus, TurnEvent
+from shared.events import SpeechStatus, TurnEvent
 from tests.test_router_confirm import RecordingOutput
 
 
@@ -110,21 +110,11 @@ async def test_sentences_are_spoken_one_at_a_time_in_order(call):
     assert voice.sent == ["First.", "Second."]
 
 
-async def test_leaving_meet_frees_the_floor(call):
-    bus, out, voice = call
-    await turn(bus, "start")
-    bus.publish(ModeChanged("voice"))
-    await asyncio.sleep(0.01)
-    assert out.is_floor_free()
-    await out.send("Dictate this.")
-    assert voice.sent == ["Dictate this."]
-
-
 async def test_urgent_quick_replies_skip_the_wait_normal_ones_wait(call):
     from outputs.router import Router
 
     bus, out, voice = call
-    router = Router(bus, claude_code=RecordingOutput("claude_code"), tts=out)
+    router = Router(bus, tts=out)
     await turn(bus, "start")  # they're mid-sentence
     await router.quick_reply("Please slow down a little.", urgent=True)
     assert voice.sent == ["Please slow down a little."]  # said right away

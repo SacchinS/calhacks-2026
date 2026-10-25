@@ -78,4 +78,3 @@ async def test_live_translation(gloss, pattern):
     english = (await ClaudeTranslator(load_config()).translate(gloss.split())).english
     assert re.search(pattern, english, re.I), english
     assert "[" not in english and "/\\" not in english and "fs-" not in english
-    assert "hey siri" not in english.lower()

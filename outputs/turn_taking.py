@@ -11,8 +11,8 @@ Wraps the voice output. Cartesia Ink's turn detection on the other side's audio
   for the floor, and say the sentence again once.
 
 Timing only: the signer already approved the exact words, and this never changes them.
-Approved sentences are spoken one at a time, in order. Outside Meet mode (no captions, so
-no turn events) the floor is always free and this passes straight through.
+Approved sentences are spoken one at a time, in order. Without turn events (mock captions
+with no turns) the floor is always free and this passes straight through.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ import time
 from outputs.base import Output
 from shared.bus import Bus
 from shared.config import Config
-from shared.events import ModeChanged, SpeechState, SpeechStatus, TurnEvent
+from shared.events import SpeechState, SpeechStatus, TurnEvent
 
 log = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class TurnTakingOutput(Output):
 
     async def start(self) -> None:
         if self._task is None:
-            sub = self.bus.subscribe(TurnEvent, ModeChanged)
+            sub = self.bus.subscribe(TurnEvent)
             self._task = asyncio.create_task(self._follow(sub), name="turn-taking")
 
     async def stop(self) -> None:
@@ -81,9 +81,7 @@ class TurnTakingOutput(Output):
     async def _follow(self, sub) -> None:
         try:
             async for event in sub:
-                if isinstance(event, ModeChanged):
-                    self._set_floor(free=True)  # captions stop outside Meet: nobody to wait for
-                elif event.kind in ("start", "resume"):
+                if event.kind in ("start", "resume"):
                     self._last_turn = time.monotonic()
                     self._set_floor(free=False)
                 elif event.kind == "end":

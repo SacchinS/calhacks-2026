@@ -11,10 +11,9 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Literal, get_args
+from typing import Any, Literal
 
 Point = tuple[float, float, float]  # normalized x, y (0..1, y down) and relative depth z
-Mode = Literal["claude_code", "siri", "voice", "meet"]
 SignKind = Literal["isolated", "fingerspell", "control"]
 # Facial grammar seen during a sign (face and pose landmarks). Raised brows mark a yes/no
 # question or a topic, furrowed brows a wh-question, a head shake negation, a nod affirmation.
@@ -26,10 +25,8 @@ TurnKind = Literal["start", "eager_end", "resume", "end"]
 # Our voice in a call: waiting for a pause, interjecting ("Sorry, can I jump in?"), speaking.
 SpeechState = Literal["idle", "waiting", "interjecting", "speaking"]
 
-MODES: tuple[Mode, ...] = get_args(Mode)
-
 # Control signs are ordinary SignEvents with kind="control". They are never translated.
-CONTROL_SIGNS = frozenset({"YES", "NO", "SEND", "CLEAR", "MODE"})
+CONTROL_SIGNS = frozenset({"YES", "NO", "SEND", "CLEAR"})
 # Signs that act as a control sign. FINISH is in the Kaggle vocabulary and means SEND.
 CONTROL_ALIASES = {"FINISH": "SEND"}
 
@@ -120,12 +117,12 @@ class Translation:
 
 @dataclass(frozen=True)
 class ConfirmRequest:
-    """Ask the signer to sign YES or NO before `english` is sent to `target`."""
+    """Ask the signer to sign YES or NO before `english` is spoken in the call
+    (`meet.review_before_speaking`)."""
 
     request_id: str
     english: str
     gloss: list[str]
-    target: str = "claude_code"
     ts: float = field(default_factory=_now)
 
 
@@ -137,14 +134,8 @@ class ConfirmResult:
 
 
 @dataclass(frozen=True)
-class ModeChanged:
-    mode: Mode
-    ts: float = field(default_factory=_now)
-
-
-@dataclass(frozen=True)
 class Caption:
-    """Incoming speech (Meet mode), shown to the signer as a caption."""
+    """Incoming speech from the call, shown to the signer as a caption."""
 
     text: str
     is_final: bool = True
@@ -153,7 +144,7 @@ class Caption:
 
 @dataclass(frozen=True)
 class TurnEvent:
-    """Turn-taking on the other side of the call (Meet mode), from the captions' STT."""
+    """Turn-taking on the other side of the call, from the captions' STT."""
 
     kind: TurnKind
     ts: float = field(default_factory=_now)
@@ -224,16 +215,6 @@ class OutputSent:
 
     output: str
     text: str
-    ts: float = field(default_factory=_now)
-
-
-@dataclass(frozen=True)
-class OutputReply:
-    """A streamed chunk of an output's reply, e.g. Claude Code's answer. `done` ends it."""
-
-    output: str
-    text: str
-    done: bool = False
     ts: float = field(default_factory=_now)
 
 

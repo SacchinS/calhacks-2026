@@ -16,8 +16,6 @@ from typing import Any
 import yaml
 from dotenv import load_dotenv
 
-from shared.events import MODES
-
 ROOT = Path(__file__).resolve().parent.parent  # the repo, or Resources/engine in the .app
 SUPPORT = Path("~/Library/Application Support/calhacks-2026").expanduser()
 IN_APP_BUNDLE = ".app/Contents/Resources" in str(ROOT)
@@ -26,8 +24,6 @@ IN_APP_BUNDLE = ".app/Contents/Resources" in str(ROOT)
 CHOICES: dict[str, tuple[str, ...]] = {
     "recognizer": ("mock", "replay", "camera"),
     "translator": ("mock", "claude"),
-    "claude_code": ("mock", "real"),
-    "siri": ("mock", "real"),
     "tts": ("mock", "say", "cartesia"),
     "captions": ("mock", "cartesia"),
     "vocab_search": ("mock", "moss"),
@@ -38,12 +34,9 @@ CHOICES: dict[str, tuple[str, ...]] = {
 class Config:
     recognizer: str = "mock"
     translator: str = "mock"
-    claude_code: str = "mock"
-    siri: str = "mock"
     tts: str = "mock"
     captions: str = "mock"
     vocab_search: str = "mock"
-    mode: str = "claude_code"
     # Every other section of config.yaml (ui, recognition, language, audio, ...), as dicts.
     sections: dict[str, dict[str, Any]] = field(default_factory=dict)
 
@@ -63,7 +56,7 @@ class Config:
     def all_mocks(self) -> Config:
         """A copy with every component line set to its mock (what `make mock` runs)."""
         mocks = {key: values[0] for key, values in CHOICES.items()}
-        return Config(**mocks, mode=self.mode, sections=self.sections)
+        return Config(**mocks, sections=self.sections)
 
     @staticmethod
     def secret(name: str) -> str | None:
@@ -100,8 +93,5 @@ def load_config(
     for key, value in lines.items():
         if value not in CHOICES[key]:
             raise ValueError(f"config.yaml: {key}: {value!r} is not one of {CHOICES[key]}")
-    mode = str(raw.pop("mode", "claude_code"))
-    if mode not in MODES:
-        raise ValueError(f"config.yaml: mode: {mode!r} is not one of {MODES}")
     sections = {k: v for k, v in raw.items() if isinstance(v, dict)}
-    return Config(**lines, mode=mode, sections=sections)
+    return Config(**lines, sections=sections)
