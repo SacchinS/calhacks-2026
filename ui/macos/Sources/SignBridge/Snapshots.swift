@@ -13,6 +13,8 @@ enum Snapshots {
             host.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
             host.frame = CGRect(origin: .zero, size: size)
             let window = NSWindow(contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+            window.isOpaque = false
+            window.backgroundColor = .clear  // the logo and the overlay keep their transparent corners
             window.contentView = host
             window.appearance = host.appearance
             host.layoutSubtreeIfNeeded()
@@ -44,6 +46,7 @@ enum Snapshots {
             e.speechText = "There's a color problem in Figma."; e.themTalking = true
         }
 
+        save("logo", CGSize(width: 512, height: 512), Logo(size: 512, glow: false))
         save("preview-idle", CGSize(width: 720, height: 820), PreviewView(engine: idle))
         save("preview-signing", CGSize(width: 720, height: 820), PreviewView(engine: signing))
         save("preview-spelling", CGSize(width: 720, height: 820), PreviewView(engine: spelling))
