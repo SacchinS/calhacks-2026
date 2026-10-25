@@ -155,6 +155,11 @@ struct PreviewView: View {
             default:
                 Button { engine.gesture("cancel") } label: { Label("Cancel", systemImage: "hand.thumbsdown") }
             }
+            // NOW: say it right away instead of waiting for the pause (or end the sentence that way).
+            if engine.speechState == "waiting" || (engine.state == "listening" && !engine.glosses.isEmpty) {
+                Button { engine.gesture("now") } label: { Label("Say now", systemImage: "bolt.fill") }
+                    .help("Speak right away, without waiting for a pause (the NOW sign)")
+            }
             Spacer()
             Button(action: showGuide) { Label("Signs", systemImage: "book") }.buttonStyle(.borderless)
             Button(action: showDemo) { Label("Demo", systemImage: "arrow.up.left.and.arrow.down.right") }
@@ -304,9 +309,9 @@ struct StatePill: View {
     }
 }
 
-/// Typed signs for the mock recognizer: `hello nice meet-you`, `#sarah` (fingerspelled), `~pr` (letters
+/// Typed signs for the mock recognizer: `hello nice meet-you`, `#sarah` (fingerspelled), `~p` (letters
 /// one at a time, for autocomplete), face markers
-/// after the signs they cover (`/\`, `[q]`, `[wh]`, `[neg]`, `[nod]`), and `/send /yes /no /clear`.
+/// after the signs they cover (`/\`, `[q]`, `[wh]`, `[neg]`, `[nod]`), and `/send /now /yes /no /clear`.
 struct MockSignBox: View {
     @ObservedObject var engine: EngineClient
     @State private var text = ""
@@ -314,7 +319,7 @@ struct MockSignBox: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "keyboard").foregroundStyle(Brand.accent)
-            TextField("Type signs: hello nice meet-you · #sarah · ~pr (letters) · [q] [wh] [neg] · /send /yes /no /clear", text: $text)
+            TextField("Type signs: ~f /yes color problem /now · #sarah · ~p (letters) · [q] [wh] [neg] · /send /now /yes /no /clear", text: $text)
                 .textFieldStyle(.roundedBorder).focused($focused).onSubmit(submit)
             Button("Sign", action: submit).buttonStyle(.borderedProminent)
         }

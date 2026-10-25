@@ -98,13 +98,13 @@ enum RouteInfo {
 
 /// The Meet demo's draft glosses (MVP.md, docs/asl-demo-script-research.md), in demo order, in
 /// the mock-sign syntax (`#word` = a fingerspelled word). Demo Mode's backup keys 1-3 and
-/// Preview's test phrases. Live, the words are spelled P-R and F-I and autocomplete finishes
-/// them. A Deaf signer must approve them before the demo.
+/// Preview's test phrases (the release check-in in MVP.md). Live, the words are spelled F and
+/// P, one letter each, and autocomplete finishes them. A Deaf signer must approve them before the demo.
 enum DemoScript {
     static let phrases: [[String]] = [
-        ["HELLO,", "#PRANAV,", "NICE", "MEET-YOU"],   // 1 greeting, with the name heard in the call
-        ["#FIGMA"],                                     // 2 "where should we put the feedback?"
-        ["THANK-YOU"],                                  // 3
+        ["#FIGMA", "COLOR", "PROBLEM"],              // 1 "There's a color problem in Figma."
+        ["ME", "MEET", "#PRANAV", "TOMORROW"],        // 2 "I'll meet with Pranav tomorrow."
+        ["HELLO,", "NICE", "MEET", "YOU"],            // 3 a greeting, to open the call
     ]
     static func label(_ phrase: [String]) -> String { phrase.joined(separator: " ") }
 }

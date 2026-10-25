@@ -27,7 +27,9 @@ word; the utterance buffer turns the accepted word into one fingerspelled sign.
 Which way the model expects the hand (as the camera sees it, or mirrored) isn't
 documented, so `letter_orientation: auto` tries both and follows the one that has been
 surer so far (switching every frame would break up a held letter); set it to `as_is` or
-`mirrored` once tools/try_letters.py shows which one your hand reads as.
+`mirrored` once tools/try_letters.py shows which one your hand reads as. `either` takes,
+each frame, whichever view gives an allowed letter: for a small letter_set where one letter
+reads right mirrored and another as seen (our P and F).
 """
 
 from __future__ import annotations
@@ -99,8 +101,16 @@ class LetterModel:
     def predict(self, hand: Sequence[Point]) -> tuple[str, float] | None:
         if len(hand) < 21:
             return None
-        tries = ORIENTATIONS if self.orientation == "auto" else (self.orientation,)
+        tries = ORIENTATIONS if self.orientation in ("auto", "either") else (self.orientation,)
         guesses = {o: self.guess(hand, o == "mirrored") for o in tries}
+        if self.orientation == "either":
+            # Each frame, whichever view gives an allowed letter as its top guess (with a
+            # small letter_set, a letter reads right one way and not at all the other).
+            read = {o: g for o, g in guesses.items() if g is not None}
+            if not read:
+                return None
+            self.last_orientation = max(read, key=lambda o: read[o][1])
+            return read[self.last_orientation]
         if len(guesses) == 1:
             (self.last_orientation,) = guesses
         else:
@@ -167,6 +177,9 @@ class LetterReader:
         self.gap = float(config.get("recognition.letter_gap_seconds", 1.5))
         self.end_after = float(config.get("recognition.letter_end_seconds", 1.5))
         self.hand = str(config.get("recognition.letter_hand", "auto"))
+        # Fingerspelling is done in front of the shoulder; a hand up by the face is signing
+        # (HELLO starts at the forehead with a flat hand that reads as a letter).
+        self.below_mouth = bool(config.get("recognition.letter_below_mouth", True))
         self.switch = float(config.get("recognition.letter_switch_seconds", 0.3))
         self.release = float(config.get("recognition.letter_release_seconds", 0.5))
         self.slide_doubles = bool(config.get("recognition.letter_slide_doubles", True))
@@ -179,6 +192,7 @@ class LetterReader:
         self._seen = 0.0  # when the spelling hand was last seen
         self._now = 0.0
         self.status = ""  # why the last frame did or didn't count (tools/try_letters.py)
+        self._why = ""  # why no spelling hand was found this frame
 
     def end(self) -> None:
         """Spelling is over (a control sign, or the hands went down)."""
@@ -195,6 +209,14 @@ class LetterReader:
             return None
         return run.letter, min(1.0, (self._now - run.start) / self.hold) if self.hold else 1.0
 
+    @property
+    def held_seconds(self) -> float:
+        """How long a demo letter has been held right now (0 if none)."""
+        run = self._run
+        if run is None or not run.confidences:
+            return 0.0
+        return max(0.0, self._now - run.start)
+
     def push(self, frame: LandmarkFrame, space: SigningSpace) -> list[Letter]:
         now = self._now = frame.ts
         if self.spelling and now - self._last_time > self.end_after:
@@ -202,11 +224,15 @@ class LetterReader:
         if self._pending is not None and now - self._pending.ts > self.gap:
             self._pending = None
         hand = self.spelling_hand(frame, space)
+        if hand and self.below_mouth and self.by_the_face(hand, frame.pose):
+            self._run = None
+            self.status = "hand by the face: signing, not spelling"
+            return []
         if not hand:
             if now - self._seen > self.release:  # gone, not a tracking blip
                 self._run = None
                 self._last = None  # the hand dropped: the same letter may come again
-            self.status = "raise one hand into the box"
+            self.status = self._why or "raise one hand into the box"
             return []
         self._seen = now
         guess = self.model.predict(hand)
@@ -214,7 +240,12 @@ class LetterReader:
             self.status = f"unsure ({guess[1]:.0%})" if guess else "not one of the letters"
             return []  # one unsure frame doesn't break a hold
         letter, confidence = guess
-        wrist = (hand[0][0], hand[0][1])
+        # Where the whole hand is (not just the wrist): YES nods at the wrist, so the wrist
+        # barely moves while the fist does.
+        wrist = (
+            float(np.mean([p[0] for p in hand[:21]])),
+            float(np.mean([p[1] for p in hand[:21]])),
+        )
         size = float(np.hypot(hand[9][0] - hand[0][0], hand[9][1] - hand[0][1])) or 1.0
         run = self._run
         if run is not None:
@@ -268,14 +299,37 @@ class LetterReader:
         self.status = f"{letter.letter} held: shows once a second letter comes"
         return []
 
+    @staticmethod
+    def by_the_face(hand: Sequence[Point], pose: Sequence[Point]) -> bool:
+        """The wrist is above the mouth (pose points 9 and 10; y grows downward)."""
+        if len(pose) < 11:
+            return False
+        return hand[0][1] < (pose[9][1] + pose[10][1]) / 2
+
     def spelling_hand(self, frame: LandmarkFrame, space: SigningSpace) -> tuple[Point, ...]:
         """The hand that's spelling: one hand in the signing space (two hands up means a
-        two-handed sign), or the one `letter_hand` names."""
+        two-handed sign), or the one `letter_hand` names. A hand is in the space when its
+        wrist is (letters like P point the fingers down, which pulls its middle low)."""
+
+        def inside(hand: tuple[Point, ...]) -> bool:
+            return bool(hand) and space.contains(hand[:1])
+
         if self.hand in ("left", "right"):
             hand = frame.left_hand if self.hand == "left" else frame.right_hand
-            return hand if space.contains(hand) else ()
-        up = [h for h in (frame.right_hand, frame.left_hand) if space.contains(h)]
-        return up[0] if len(up) == 1 else ()
+            self._why = "" if inside(hand) else "raise your hand into the box"
+            return hand if inside(hand) else ()
+        up = [h for h in (frame.right_hand, frame.left_hand) if inside(h)]
+        seen = sum(1 for h in (frame.right_hand, frame.left_hand) if h)
+        if len(up) == 1:
+            self._why = ""
+            return up[0]
+        if len(up) == 2:
+            self._why = "two hands up: spell with one, the other down"
+        elif seen:
+            self._why = "hand below or outside the box"
+        else:
+            self._why = "no hand seen"
+        return ()
 
 
 def letter_reader(config: Config) -> LetterReader | None:

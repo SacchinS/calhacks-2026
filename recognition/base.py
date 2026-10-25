@@ -134,6 +134,10 @@ class FrameRecognizer(Recognizer):
         self.faces = FaceMarkerDetector(config)
         self.markers = MarkerTally()
         self.letters = None  # the letter reader, once running (the app shows its hold)
+        self.sign_state = "idle"  # idle | signing | detected: the preview's box color
+        # A demo letter held this long makes the raise fingerspelling: no signs in it. Signs
+        # are done well within it; a letter needs letter_hold_seconds to count anyway.
+        self.letter_raise = float(config.get("recognition.letter_raise_seconds", 1.5))
         self._task: asyncio.Task[None] | None = None
 
     @abstractmethod
@@ -176,19 +180,44 @@ class FrameRecognizer(Recognizer):
             frame = self.gate.apply(raw)
             self.bus.publish(frame)
             prediction = None
+            whole = None  # a whole sign from a `direct` classifier: emitted at once
+            new_letters = letters.push(frame, self.gate) if letters is not None else []
+            if letters is not None and (new_letters or letters.held_seconds >= self.letter_raise):
+                for classifier in classifiers:  # this raise is fingerspelling, not a sign
+                    spelled = getattr(classifier, "spelled", None)
+                    if spelled is not None:
+                        spelled()
             if frame.hands_in_signing_space:
                 # Every classifier sees every frame (they keep windows); the first answer wins.
-                answers = [classifier.predict(frame) for classifier in classifiers]
-                prediction = next((a for a in answers if a is not None), None)
+                answers = [(c, c.predict(frame)) for c in classifiers]
+                whole = next((a for c, a in answers if a and getattr(c, "direct", False)), None)
+                prediction = next(
+                    (a for c, a in answers if a and not getattr(c, "direct", False)), None
+                )
                 self.markers.add(self.faces.update(frame))
             else:
                 self.faces.update(frame)  # resting frames teach the neutral face
+                for classifier in classifiers:  # the hands dropped: a last try at the sign
+                    end = getattr(classifier, "end_segment", None)
+                    whole = whole or (end(frame.ts) if end is not None else None)
+            states = [
+                c.state(frame.hands_in_signing_space, frame.ts)
+                for c in classifiers
+                if hasattr(c, "state")
+            ]
+            self.sign_state = next(
+                (s for s in ("detected", "signing") if s in states),
+                "signing" if frame.hands_in_signing_space else "idle",
+            )
             if letters is not None:
-                for letter in letters.push(frame, self.gate):
+                for letter in new_letters:
                     self.bus.publish(letter)
                 if letters.spelling and prediction is not None and not is_control(prediction.gloss):
                     prediction = None  # spelling: a handshape isn't a sign
             event = self.segmenter.push(prediction)
+            if event is None and whole is not None:
+                if letters is None or not letters.spelling or is_control(whole.gloss):
+                    event = make_sign_event(whole.gloss, whole.confidence, whole.kind)
             if event is not None and letters is not None and event.kind == "control":
                 letters.end()  # YES / NO / FINISH: the word is done
             if event is not None:

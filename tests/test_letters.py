@@ -271,3 +271,31 @@ def test_slow_letters_dont_double_from_wobbles_blips_or_flickers():
     assert read(r, [("R", 5.2, 0.5)]) == "R"
     blip(r, 1.0)  # the hand really went down
     assert read(r, [("R", 5.2, 0.5)]) == "R"  # a double R
+
+
+def test_a_hand_up_by_the_face_is_signing_not_spelling():
+    face = [(0.5, 0.3, 0.0)] * 33  # mouth (points 9, 10) at y = 0.3
+    r = reader(letter_start_count=1)
+    up_high = [
+        LandmarkFrame(right_hand=hand("F", y=0.25), pose=tuple(face), ts=i / FPS) for i in range(30)
+    ]
+    assert all(r.push(f, SPACE) == [] for f in up_high)  # HELLO's start, at the forehead
+    assert r.status.startswith("hand by the face")
+    lower = [
+        LandmarkFrame(right_hand=hand("F", y=0.5), pose=tuple(face), ts=1 + i / FPS)
+        for i in range(30)
+    ]
+    assert "".join(letter.letter for f in lower for letter in r.push(f, SPACE)) == "F"
+
+
+def test_either_orientation_takes_the_view_that_reads_an_allowed_letter():
+    classes = [*"0123456789", *"ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
+
+    def run(x):  # as seen: T (not allowed); mirrored: P
+        logits = np.zeros(36, dtype=np.float32)
+        logits[10 + ord("T" if x[0, 3] >= 0 else "P") - 65] = 8
+        return logits[None]
+
+    settings = {"letter_set": "PF", "letter_top_k": 1, "letter_orientation": "either"}
+    model = LetterModel(Config(sections={"recognition": settings}), run, classes)
+    assert model.predict(hand("A"))[0] == "P" and model.last_orientation == "mirrored"

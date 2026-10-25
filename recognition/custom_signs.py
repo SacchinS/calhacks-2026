@@ -6,9 +6,21 @@ learned from a few recorded examples each.
 Each example is a clip of Holistic landmarks saved under models/custom_signs/<GLOSS>/
 (gitignored: it's a teammate's body-tracking data). Matching is nearest-neighbour: a clip
 becomes hand shapes and hand positions relative to the shoulders, resampled to a fixed
-length, and the live window is compared with every example. A sign is reported only when
-it's clearly closer than the threshold learned from the examples themselves, so unknown
-movement falls through to the Kaggle model.
+length, and is compared with every example.
+
+`custom_mode: segment` (the default) matches the way the examples were recorded: one sign
+per raise of the hands. The clip grows from a hand entering the signing space; as soon as
+the whole clip so far clearly matches a sign (and is at least `custom_early_fraction` of
+that sign's recorded length), the sign is out (`direct`: the recognizer emits it at once)
+and nothing more is read until the hands have been down for `custom_end_seconds`. A clip
+that never matched gets one last try when the hands drop (`end_segment`). `state` is idle,
+signing or detected (the preview's gray, yellow and green box).
+
+`window` instead slides over the last frames while signing; it lines up with a whole sign
+only for a frame or two at its end, which the segmenter's min_frames then usually misses.
+
+Either way, a sign is reported only when it's clearly closer than the threshold learned from
+the examples themselves, so unknown movement isn't forced into a sign.
 
 Learn every sign from a Deaf signer or the source videos in docs/asl-demo-script-research.md.
 """
@@ -141,7 +153,23 @@ class CustomSignModel(FrameClassifier):
         self.config = config
         folder = config.path("recognition.custom_signs_dir", "models/custom_signs")
         self.library = library or CustomSignLibrary(folder)
+        # Only the signs in use (recognition.custom_signs; empty = every recorded sign):
+        # fewer signs to tell apart, and recordings stay on disk for later.
+        wanted = config.get("recognition.custom_signs", []) or []
+        flags = {True: "YES", False: "NO"}  # unquoted YES / NO in YAML arrive as booleans
+        wanted = {str(flags.get(w, w) if isinstance(w, bool) else w).upper() for w in wanted}
+        if wanted:
+            for gloss in [g for g in self.library.examples if g not in wanted]:
+                del self.library.examples[gloss]
+                self.library.lengths.pop(gloss, None)
         self.stride = int(config.get("recognition.custom_stride", 3))
+        self.mode = str(config.get("recognition.custom_mode", "segment"))
+        self.end_gap = float(config.get("recognition.custom_end_seconds", 0.35))
+        self.early = float(config.get("recognition.custom_early_fraction", 0.6))
+        self.segment: list[LandmarkFrame] = []  # this sign so far (segment mode)
+        self.locked = False  # a sign came out: wait for the hands to drop
+        self.spelling = False  # this raise of the hands is fingerspelling: not a sign
+        self._last_in = 0.0
         self.gap_seconds = float(config.get("recognition.isolated_gap_seconds", 0.4))
         scale = float(config.get("recognition.custom_threshold_scale", 1.0))
         self.limit = self.library.threshold() * scale
@@ -156,6 +184,21 @@ class CustomSignModel(FrameClassifier):
     def predict(self, frame: LandmarkFrame) -> Prediction | None:
         if not self.library.examples:
             return None
+        if self.mode == "segment":
+            if frame.ts - self._last_in > self.end_gap:  # the hands were down: a new sign
+                self.segment, self.locked, self.spelling = [], False, False
+            self._last_in = frame.ts
+            if self.locked or self.spelling:
+                return None  # one sign per raise of the hands; none while spelling
+            self.segment.append(frame)
+            self._since_run += 1
+            if self._since_run < self.stride:
+                return None
+            self._since_run = 0
+            match = self.early_match(self.segment)
+            if match is not None:
+                self.segment, self.locked = [], True
+            return match
         if self._last_ts is not None and frame.ts - self._last_ts > self.gap_seconds:
             self.frames.clear()
             self.last = None
@@ -166,6 +209,83 @@ class CustomSignModel(FrameClassifier):
             self._since_run = 0
             self.last = self.classify(list(self.frames))
         return self.last
+
+    def end_segment(self, now: float) -> Prediction | None:
+        """Called on frames with the hands out of the signing space: once they've been out
+        for end_gap, the clip since they came in is classified (segment mode)."""
+        if self.mode != "segment" or now - self._last_in < self.end_gap:
+            return None
+        if self.locked or self.spelling:
+            self.locked = self.spelling = False  # the hands are down: ready for the next sign
+            self.segment = []
+            return None
+        if not self.segment:
+            return None
+        frames, self.segment = self.segment, []
+        return self.classify_segment(frames)
+
+    def spelled(self) -> None:
+        """The letter reader sees a letter held: this raise of the hands is fingerspelling,
+        so nothing in it is a sign (a held P read as ME) until the hands drop."""
+        if self.mode == "segment":
+            self.spelling = True
+            self.segment = []
+
+    @property
+    def direct(self) -> bool:
+        """Answers are whole signs, to emit at once (not per-frame guesses for the segmenter)."""
+        return self.mode == "segment"
+
+    def state(self, hands_up: bool, now: float | None = None) -> str:
+        """idle (hands down) | signing (a sign is being made) | detected (one came out). A
+        hand lost for less than end_gap (a tracking blip) still counts as signing."""
+        if self.locked:
+            return "detected"
+        if hands_up:
+            return "signing"
+        recent = now is not None and now - self._last_in < self.end_gap
+        return "signing" if self.segment and recent else "idle"
+
+    def early_match(self, frames: list[LandmarkFrame]) -> Prediction | None:
+        """The clip so far, if it already clearly is a sign (and long enough to be all of it)."""
+        match = self.segment_match(frames)
+        if match is None:
+            return None
+        gloss, near, other = match
+        if len(frames) < self.early * self.library.lengths.get(gloss, 0):
+            return None
+        if near > self.limit or near > 0.8 * other:
+            return None
+        return Prediction(gloss, float(0.99 - 0.39 * near / self.limit), "isolated")
+
+    def classify_segment(self, frames: list[LandmarkFrame]) -> Prediction | None:
+        """One whole sign (hands in to hands out) against the examples."""
+        match = self.segment_match(frames)
+        if match is None:
+            return None
+        gloss, near, other = match
+        if near > self.limit or near > 0.8 * other:
+            return None
+        return Prediction(gloss, float(0.99 - 0.39 * near / self.limit), "isolated")
+
+    def segment_match(self, frames: list[LandmarkFrame]) -> tuple[str, float, float] | None:
+        """(nearest sign, its distance, the runner-up's) for a whole clip (for tools too)."""
+        longest = max(self.library.lengths.values(), default=30)
+        clip = clip_features(frames[-int(longest * 2) :]) if len(frames) >= 4 else None
+        return self.library.match(clip) if clip is not None else None
+
+    def nearest(self, frames: list[LandmarkFrame]) -> list[tuple[str, float, float]]:
+        """For each sign's typical length: (nearest sign, its distance, the runner-up's) for
+        the window's tail at that length (what classify judges; for tools)."""
+        out = []
+        for length in sorted(set(self.library.lengths.values())):
+            if len(frames) < max(4, int(length * 0.7)):
+                continue
+            clip = clip_features(frames[-length:])
+            match = self.library.match(clip) if clip is not None else None
+            if match is not None:
+                out.append(match)
+        return out
 
     def classify(self, frames: list[LandmarkFrame]) -> Prediction | None:
         """Try the window's tail at each sign's typical length; keep the closest match."""
@@ -182,7 +302,9 @@ class CustomSignModel(FrameClassifier):
             _, near, other = match
             if near > self.limit or near > 0.8 * other:
                 continue
-            confidence = float(np.clip(1 - near / (2 * self.limit), 0.5, 0.99))
+            # 0.99 for a perfect match down to 0.6 at the limit: every accepted match clears
+            # the segmenter's confidence_threshold (it used to bottom out at 0.5 and vanish).
+            confidence = float(0.99 - 0.39 * near / self.limit)
             if best is None or confidence > best.confidence:
                 best = Prediction(gloss, confidence, "isolated")
         return best
