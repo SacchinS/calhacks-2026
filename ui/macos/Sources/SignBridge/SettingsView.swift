@@ -30,7 +30,7 @@ struct SettingsView: View {
                 Text("One sign each time you raise your hands: drop them between signs. Sign FINISH to send what you've signed, or NOW to say it right away.")
                     .font(.caption).foregroundStyle(.secondary)
             } header: {
-                Text("Signing")
+                Label("Signing", systemImage: "hand.raised.fill")
             } footer: {
                 HStack {
                     if saved { Label("Saved", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
@@ -47,10 +47,10 @@ struct SettingsView: View {
             Section {
                 TextField("Your name", text: $signerName, prompt: Text("e.g. Sam"))
                 Toggle("Review before speaking", isOn: $review)
-                Text("\"Introduce me\" in a call says: \"Hi, this is \(signerName.isEmpty ? "<name>" : signerName). I'm Deaf and signing through SignBridge, so there may be a short pause before I answer.\" Useful on calls with people who don't know you. With review on, SignBridge waits for you to sign YES (NO drops it) before saying anything.")
+                Text("\"Introduce me\" (the call overlay's replies menu) says: \"Hi, this is \(signerName.isEmpty ? "<name>" : signerName). I'm Deaf and signing through SignBridge, so there may be a short pause before I answer.\" Useful on calls with people who don't know you. With review on, SignBridge waits for you to sign YES (NO drops it) before saying anything.")
                     .font(.caption).foregroundStyle(.secondary)
             } header: {
-                Text("Calls")
+                Label("Calls", systemImage: "video.fill")
             } footer: {
                 HStack {
                     if callSaved { Label("Saved", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
