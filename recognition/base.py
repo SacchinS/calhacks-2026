@@ -183,12 +183,21 @@ class FrameRecognizer(Recognizer):
                 self.markers.add(self.faces.update(frame))
             else:
                 self.faces.update(frame)  # resting frames teach the neutral face
+            # Classifiers that judge a whole sign once the hands drop (custom signs).
+            whole = None
+            if not frame.hands_in_signing_space:
+                for classifier in classifiers:
+                    end = getattr(classifier, "end_segment", None)
+                    whole = whole or (end(frame.ts) if end is not None else None)
             if letters is not None:
                 for letter in letters.push(frame, self.gate):
                     self.bus.publish(letter)
                 if letters.spelling and prediction is not None and not is_control(prediction.gloss):
                     prediction = None  # spelling: a handshape isn't a sign
             event = self.segmenter.push(prediction)
+            if event is None and whole is not None:
+                if letters is None or not letters.spelling or is_control(whole.gloss):
+                    event = make_sign_event(whole.gloss, whole.confidence, whole.kind)
             if event is not None and letters is not None and event.kind == "control":
                 letters.end()  # YES / NO / FINISH: the word is done
             if event is not None:

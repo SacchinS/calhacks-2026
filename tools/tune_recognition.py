@@ -33,7 +33,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from recognition.base import FrameClassifier, Prediction  # noqa: E402
+from recognition.base import FrameClassifier, Prediction, make_sign_event  # noqa: E402
 from recognition.gating import SigningSpace  # noqa: E402
 from recognition.mock import parse_line  # noqa: E402
 from recognition.replay import frame_from_json  # noqa: E402
@@ -198,13 +198,16 @@ def real_classifiers(config: Config) -> tuple[FrameClassifier | None, FrameClass
 def raw_predictions(
     take: Take, config: Config, space: SigningSpace, factory: Factory
 ) -> list[tuple[Prediction | None, Prediction | None] | None]:
-    """Per frame: (custom-sign answer, main model's answer), or None when the hands are down."""
+    """Per frame: (custom-sign answer, main model's answer), or None when the hands are down,
+    or ("whole", prediction) when the hands drop and a whole-sign classifier decides."""
     custom, isolated = factory(config)
-    out: list[tuple[Prediction | None, Prediction | None] | None] = []
+    out: list = []
     for raw in take.frames:
         frame = space.apply(raw)
         if not frame.hands_in_signing_space:
-            out.append(None)
+            end = getattr(custom, "end_segment", None)
+            whole = end(frame.ts) if end is not None else None
+            out.append(("whole", whole) if whole is not None else None)
             continue
         c = custom.predict(frame) if custom is not None else None
         out.append((c, isolated.predict(frame)))
@@ -216,6 +219,10 @@ def segment(raw, floor: float, threshold: float, min_frames: int, control: int) 
     glosses = []
     for answers in raw:
         prediction = None
+        if answers is not None and answers[0] == "whole":  # a whole sign, at the hands' drop
+            segmenter.push(None)
+            glosses.append(make_sign_event(answers[1].gloss, answers[1].confidence).gloss)
+            continue
         if answers is not None:
             custom, isolated = answers
             if custom is not None:

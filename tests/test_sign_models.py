@@ -90,12 +90,29 @@ def test_library_saves_and_reloads_examples(library):
     assert again.lengths["WW"] == 20
 
 
-def test_custom_signs_match_their_own_movement_and_ignore_others(library):
+WINDOW = Config(sections={"recognition": {"custom_mode": "window"}})
+
+
+def test_custom_signs_match_a_whole_sign_when_the_hands_drop(library):
     model = CustomSignModel(Config(), library=library)
+    signed = sweep(0.31, 0.69, 10)
+    assert all(model.predict(f) is None for f in signed)  # nothing until the hands drop
+    assert model.end_segment(signed[-1].ts + 0.1) is None  # a short gap: maybe not done
+    seen = model.end_segment(signed[-1].ts + 0.5)
+    assert seen is not None and seen.gloss == "WW" and seen.confidence >= 0.6
+    assert model.end_segment(signed[-1].ts + 1.0) is None  # once per sign
+
+    for f in sweep(0.7, 0.3, 20, 20, y=0.6, spread=0.0):  # unlike either sign
+        model.predict(f)
+    assert model.end_segment(30) is None
+
+
+def test_custom_signs_in_window_mode_match_while_signing(library):
+    model = CustomSignModel(WINDOW, library=library)
     seen = [model.predict(f) for f in sweep(0.31, 0.69, 10)]
     assert seen[-1] is not None and seen[-1].gloss == "WW"
 
-    model = CustomSignModel(Config(), library=library)
+    model = CustomSignModel(WINDOW, library=library)
     other = [model.predict(f) for f in sweep(0.7, 0.3, 20, y=0.6, spread=0.0)]  # unlike either
     assert all(p is None for p in other)
 
@@ -114,3 +131,31 @@ def test_custom_signs_can_be_limited_to_the_ones_in_use(tmp_path):
     config = Config(sections={"recognition": {"custom_signs": ["WAIT", True]}})  # True = YES
     model = CustomSignModel(config, library=library)
     assert set(model.library.examples) == {"WAIT", "YES"}
+
+
+async def test_the_pipeline_emits_a_custom_sign_when_the_hands_drop(library):
+    import asyncio
+
+    from recognition.base import FrameRecognizer
+    from shared.bus import Bus
+    from shared.events import SignEvent
+
+    rest = [LandmarkFrame(pose=POSE, ts=1.0 + i / 30) for i in range(20)]  # hands down
+
+    class Scripted(FrameRecognizer):
+        name = "scripted"
+
+        async def frames(self):
+            for f in sweep(0.31, 0.69, 0.0) + rest:
+                yield f
+            await asyncio.sleep(0)
+
+        def classifiers(self):
+            return [CustomSignModel(Config(), library=library)]
+
+    bus = Bus()
+    signs = bus.subscribe(SignEvent)
+    recognizer = Scripted(bus, Config())
+    await recognizer.start()
+    await asyncio.wait_for(recognizer._task, 5)
+    assert [signs.get_nowait().gloss for _ in range(signs.queue.qsize())] == ["WW"]

@@ -5,8 +5,11 @@ cutoffs in config.yaml can be set from real signing.
     uv sync --extra camera
     uv run python tools/try_signs.py                  # q quits
 
-Sign inside the green box (the signing space saved in setup), then rest your hands. Each
-time the model runs (every `asl_citizen_stride` frames) the terminal gets a line:
+Sign inside the green box (the signing space saved in setup), then drop your hands below
+it: each sign is judged as a whole when the hands drop, and the terminal shows its nearest
+recorded sign, the distance, the limit and the runner-up. With ASL Citizen on
+(`recognition.sign_models`), each time that model runs (every `asl_citizen_stride`
+frames) the terminal gets a line:
 
     HELLO 0.83 | rank, share of the whole model for each demo sign | top 5 of all 2,731
 
@@ -37,6 +40,7 @@ def main() -> None:
     import numpy as np
 
     from recognition.asl_citizen import ASLCitizenModel, display
+    from recognition.base import make_sign_event
     from recognition.camera import Camera
     from recognition.custom_signs import CustomSignModel
     from recognition.gating import SigningSpace
@@ -91,18 +95,7 @@ def main() -> None:
                     model._since_run + 1 >= model.stride
                     and len(model.frames) + 1 >= model.min_window
                 )
-                if custom._since_run + 1 >= custom.stride and custom.library.examples:
-                    window = list(custom.frames) + [frame]
-                    near = custom.nearest(window)
-                    if near:
-                        g, d, other = min(near, key=lambda m: m[1])
-                        verdict = "ok" if d <= custom.limit and d <= 0.8 * other else "rejected"
-                        print(
-                            f"custom nearest {g:9} {d:.2f} (limit {custom.limit:.2f}, "
-                            f"runner-up {other:.2f}) {verdict}",
-                            flush=True,
-                        )
-                mine = custom.predict(frame)
+                mine = custom.predict(frame)  # segment mode: collects the sign, answers later
                 theirs = model.predict(frame) if model is not None else None
                 prediction = mine or theirs  # the app's order: custom signs first
                 if mine is not None:
@@ -115,6 +108,22 @@ def main() -> None:
                     print(f"{taken:<14} as seen: {explain(frames, False)}", flush=True)
                     print(f"{'':<14} mirrored: {explain(frames, True)}", flush=True)
             event = segmenter.push(prediction)
+            if not frame.hands_in_signing_space and custom.segment:
+                clip = list(custom.segment)
+                whole = custom.end_segment(frame.ts)
+                if not custom.segment:  # the hands dropped: the whole sign was judged
+                    match = custom.segment_match(clip)
+                    if match is not None:
+                        g, d, other = match
+                        verdict = f"-> {whole.gloss}" if whole else "rejected"
+                        print(
+                            f"sign of {len(clip)} frames: nearest {g:9} {d:.2f} "
+                            f"(limit {custom.limit:.2f}, runner-up {other:.2f}) {verdict}",
+                            flush=True,
+                        )
+                    if whole is not None:
+                        event = event or make_sign_event(whole.gloss, whole.confidence)
+                        line = f"custom: {whole.gloss} {whole.confidence:.2f}"
             if event is not None:
                 recognized.append(event.gloss)
                 print(f"==> recognized {event.gloss}", flush=True)
