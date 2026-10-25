@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var windows: [String: NSWindow] = [:]
     private var listening = false
     private var mentionBanner: MentionBanner?
+    private var callOverlay: CallOverlay?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -20,10 +21,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = menu
         engine.start()
         mentionBanner = MentionBanner(engine: engine)
+        callOverlay = CallOverlay(engine: engine, openPreview: { [weak self] in self?.showPreview() })
         // First launch: walk through setup once the engine has reported its config.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
             guard let self else { return }
             if !self.engine.onboarded { self.showSetup() } else { self.showPreview() }
+            // The call overlay comes back if it was up when SignBridge last quit.
+            if self.engine.onboarded, UserDefaults.standard.bool(forKey: CallOverlay.shownKey) { self.callOverlay?.show() }
         }
     }
 
@@ -50,6 +54,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(item(listening ? "Pause SignBridge" : "Start SignBridge", #selector(toggleListening), "s"))
         menu.addItem(item("Show Preview", #selector(showPreview), "p"))
+        let overlay = item("Call Overlay", #selector(toggleCallOverlay), "o")
+        overlay.state = callOverlay?.isShown == true ? .on : .off
+        menu.addItem(overlay)
         menu.addItem(item("Demo Mode", #selector(showDemo), "d"))
         let displays = NSMenu()
         for screen in NSScreen.screens {
@@ -84,6 +91,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func startListening() {
         if !listening { toggleListening() }
     }
+
+    /// The strip over Meet: what you're signing and what your voice is doing, without a second window.
+    @objc func toggleCallOverlay() { callOverlay?.toggle() }
 
     @objc func showPreview() {
         if !listening { startListening() }

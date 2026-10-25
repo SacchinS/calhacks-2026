@@ -32,6 +32,7 @@ Events (stdout):
    "glosses": [...], "intent": {"sentence": ..., "route": "voice"} | null,
    "target": "Google Meet", "log": [...], "fps": ..., "error": null,
    "holding": ["P", 0.4] | null (a fingerspelled letter being held, and how far to counting),
+   "sign_state": "idle|signing|detected" | null (the signing box: gray, yellow, green),
    "components": {...}, "mock": bool, "camera_on": bool,
    "speech": {"state": "idle|waiting|interjecting|speaking", "text": ...},
    "them_talking": bool,
@@ -185,7 +186,7 @@ class EngineServer:
         self.preview_fps = float(self.config.get("ui.preview_fps", 15))
         self._drawing: asyncio.Task[None] | None = None
         self._last_drawn = 0.0
-        self._holding: list[Any] | None = None
+        self._holding: tuple[Any, Any] | None = None
         self._last_status: dict[str, Any] | None = None
         self._tasks: list[asyncio.Task[None]] = []
 
@@ -254,6 +255,7 @@ class EngineServer:
             "target": TARGET,
             "log": list(self.log),
             "holding": self.letter_holding(),
+            "sign_state": getattr(self.app.recognizer, "sign_state", None),
             "fps": float(len(recent)),
             "error": None,
             # The webcam is open (only the camera recognizer opens it; the app always shows this).
@@ -361,8 +363,8 @@ class EngineServer:
         if isinstance(event, LandmarkFrame):
             self.frame = event
             self.frame_times.append(time.monotonic())
-            holding = self.letter_holding()
-            if holding != self._holding:  # the hold bar moves with the frames
+            holding = (self.letter_holding(), getattr(self.app.recognizer, "sign_state", None))
+            if holding != self._holding:  # the hold bar and the box color move with the frames
                 self._holding = holding
                 self.emit_status()
             if self.preview:
