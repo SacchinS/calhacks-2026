@@ -36,16 +36,17 @@ from shared.config import ROOT, load_config  # noqa: E402
 TAKES_DIR = ROOT / "models" / "takes"
 MAX_SECONDS = 15.0  # longest take
 
-# The demo script (ui/macos DemoScript, docs/asl-demo-script-research.md) and the control
-# signs, in the mock-sign syntax. Drafts until a Deaf signer approves them.
+# The Meet demo (MVP.md, docs/asl-demo-script-research.md Moment 3) and the control signs, in
+# the mock-sign syntax. `~pri` is fingerspelled letter by letter, then YES takes the
+# autocomplete's suggestion; the tuner scores only the signs. Drafts until a Deaf signer
+# approves them.
 SCRIPT = [
-    "FOOD STORE /\\ WW MAKE",
-    "YES",
-    "TOMORROW MORNING, YOU-REMIND-ME BUY MILK",
     "HELLO, NICE MEET-YOU",
+    "~pri YES",
     "HOW YOU [wh]",
-    "THANK-YOU",
-    "TITLE /\\ RED",
+    "FINE, THANK-YOU",
+    "~kub YES",
+    "YES",
     "NO",
     "FINISH",
 ]
