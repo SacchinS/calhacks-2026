@@ -19,6 +19,7 @@ import logging
 from typing import Any
 
 from captions.base import CaptionSource
+from captions.mentions import MentionDetector
 from language.base import Translator
 from language.utterance import UtteranceBuffer
 from outputs.call_host import CallHost
@@ -92,6 +93,7 @@ class App:
         )
         self.call_host = CallHost(self.bus, config, self.router)
         self.captions: CaptionSource = self._build("captions", self.bus, config)
+        self.mentions = MentionDetector(self.bus, config)
         self._captions_task: asyncio.Task[None] | None = None
 
     def _voice(self, config: Config) -> Any:
@@ -121,6 +123,7 @@ class App:
         await self.buffer.start()
         await self.router.start()
         await self.call_host.start()
+        await self.mentions.start()
         if isinstance(self.router.tts, TurnTakingOutput):
             await self.router.tts.start()
         try:
@@ -144,6 +147,7 @@ class App:
         with contextlib.suppress(Exception):
             await self.captions.stop()
         await self.call_host.stop()
+        await self.mentions.stop()
         if isinstance(self.router.tts, TurnTakingOutput):
             await self.router.tts.stop()
         await self.router.stop()

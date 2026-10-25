@@ -1,7 +1,8 @@
 # Scripted incoming speech for Meet mode (mock captions). One caption per line.
-Hi! Great to see you.
-Can you hear me okay?
-Thanks for joining the call today.
-How was your weekend?
-Sounds good. Let's get started.
-See you next week. Bye!
+# A sprint check-in. Set your name to Sam (Settings > Calls) to see the mention alerts.
+Hi! Great to see you. Can you hear me okay?
+Let's go through the dashboard work quickly.
+The charts are almost done, but the filters still need an owner.
+Sam, can you take the filters ticket by Friday?
+Great, thanks. I'll put it on the board.
+Anything else before we wrap up?

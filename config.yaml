@@ -92,6 +92,11 @@ meet:
   interjection: "Sorry, can I jump in?"
   yield_seconds: 2.5              # after the interjection, wait this long for them to pause
   barge_in_seconds: 1.0           # talked over this long: stop, and say it again at the pause
+  # Mention alerts: a banner over every window when the captions hear your name (Settings >
+  # Calls sets it). Add nicknames or how captions misspell it; alert_on_questions also
+  # alerts on every question, for 1:1 calls where every question is for you.
+  mention_names: []
+  alert_on_questions: false
   # One-tap replies in the Meet panel, spoken in your voice. Pressing one is the approval
   # (the exact words are on the button). Normal ones wait for a pause like anything else;
   # urgent ones are about how the meeting is going, so they're said right away.

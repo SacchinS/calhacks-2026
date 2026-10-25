@@ -182,6 +182,10 @@ struct MeetPanel: View {
                     .help("Say who's calling and that you sign through SignBridge")
             }
             FloorStatus(engine: engine)
+            if (engine.config["signer_name"] as? String ?? "").isEmpty {
+                Label("Set your name in Settings > Calls to get an alert when someone says it.", systemImage: "bell.badge")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             QuickReplies(engine: engine)
             ScrollViewReader { proxy in
                 ScrollView {

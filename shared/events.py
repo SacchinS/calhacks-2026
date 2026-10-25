@@ -169,6 +169,21 @@ class SpeechStatus:
 
 
 @dataclass(frozen=True)
+class Mention:
+    """Someone on the call said the signer's name (`question`: and asked them something).
+
+    Published once per caption turn as soon as the name is heard, then again with the
+    finished sentence (`final`), so the alert can show the whole question.
+    """
+
+    text: str
+    question: bool
+    final: bool
+    turn: int
+    ts: float = field(default_factory=_now)
+
+
+@dataclass(frozen=True)
 class OutputSent:
     """English was sent to an output (`output` is the Output's name)."""
 
