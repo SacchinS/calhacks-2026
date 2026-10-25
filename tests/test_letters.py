@@ -286,3 +286,16 @@ def test_a_hand_up_by_the_face_is_signing_not_spelling():
         for i in range(30)
     ]
     assert "".join(letter.letter for f in lower for letter in r.push(f, SPACE)) == "F"
+
+
+def test_either_orientation_takes_the_view_that_reads_an_allowed_letter():
+    classes = [*"0123456789", *"ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
+
+    def run(x):  # as seen: T (not allowed); mirrored: P
+        logits = np.zeros(36, dtype=np.float32)
+        logits[10 + ord("T" if x[0, 3] >= 0 else "P") - 65] = 8
+        return logits[None]
+
+    settings = {"letter_set": "PF", "letter_top_k": 1, "letter_orientation": "either"}
+    model = LetterModel(Config(sections={"recognition": settings}), run, classes)
+    assert model.predict(hand("A"))[0] == "P" and model.last_orientation == "mirrored"
