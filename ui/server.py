@@ -15,6 +15,7 @@ it onto our bus. Commands (stdin, one JSON object per line):
   {"cmd": "mock_input", "text": "title /\\ red /send"}      (ours) the mock-sign box
   {"cmd": "introduce"}                                  (ours) say the Meet call intro again
   {"cmd": "quick_reply", "text": "Can you repeat that?"}  (ours) one of meet.quick_replies
+  {"cmd": "voice_preview", "voice_id": "..."}          (ours) say a sample on the Mac's speakers
   {"cmd": "letters", "text": "pr"}                      (ours) fingerspelled letters, typed
   {"cmd": "autocomplete", "action": "accept|dismiss", "index": 0}   (ours) while spelling,
         the suggestion to accept (0 = top). Send / Cancel (buttons, keys) do the same.
@@ -23,7 +24,8 @@ it onto our bus. Commands (stdin, one JSON object per line):
   {"cmd": "quit"}
 
 Events (stdout):
-  {"type": "ready", "config": {...}, "quick_replies": [{"text": ..., "urgent": bool}]}
+  {"type": "ready", "config": {...}, "quick_replies": [{"text": ..., "urgent": bool}],
+   "voices": [{"id", "name", "about"}]}   (config.voice_id is the signer's pick)
   {"type": "status", "state": "idle|listening|thinking|confirming|sending", "mode": ...,
    "glosses": [...], "intent": {"sentence": ..., "route": "voice"} | null,
    "target": "Google Meet", "log": [...], "fps": ..., "error": null,
@@ -59,7 +61,7 @@ import os
 import sys
 import time
 from collections import deque
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO
 
@@ -195,7 +197,23 @@ class EngineServer:
             pass
 
     def send_ready(self) -> None:
-        self.emit({"type": "ready", "config": self.ui_config, "quick_replies": self.quick_replies})
+        self.emit(
+            {
+                "type": "ready",
+                "config": self.ui_config,
+                "quick_replies": self.quick_replies,
+                "voices": self.voices,
+            }
+        )
+
+    @property
+    def voices(self) -> list[dict[str, str]]:
+        """The Cartesia voices setup offers (cartesia.voices in config.yaml)."""
+        out = []
+        for v in self.config.get("cartesia.voices", []) or []:
+            if isinstance(v, dict) and v.get("id"):
+                out.append({k: str(v.get(k, "")) for k in ("id", "name", "about")})
+        return out
 
     @property
     def quick_replies(self) -> list[dict[str, Any]]:
@@ -443,6 +461,8 @@ class EngineServer:
             self.app.call_host.introduce()
         elif cmd == "quick_reply":
             self.quick_reply(str(msg.get("text", "")))
+        elif cmd == "voice_preview":
+            self._background(self.preview_voice(str(msg.get("voice_id", ""))))
         elif cmd == "letters":
             for letter in str(msg.get("text", "")):
                 if letter.isalpha():
@@ -591,6 +611,7 @@ class EngineServer:
             "voice_device": self.config.get("audio.virtual_mic_device", "BlackHole 2ch"),
             "signer_name": self.config.get("meet.signer_name", "") or "",
             "review_before_speaking": bool(self.config.get("meet.review_before_speaking", False)),
+            "voice_id": str(self.config.get("cartesia.voice_id", "") or ""),
         }
         with contextlib.suppress(OSError, ValueError):
             cfg.update(json.loads(self.ui_config_path.read_text()))
@@ -604,6 +625,34 @@ class EngineServer:
             return
         self.log.append(f"quick reply: {text}")
         self._background(self.app.router.quick_reply(reply["text"], urgent=reply["urgent"]))
+
+    async def preview_voice(self, voice_id: str) -> None:
+        """Setup's "Your voice": say a sample in that Cartesia voice on the Mac's own speakers
+        (not into the call's virtual mic), so the signer hears what the call will hear."""
+        known = {v["id"] for v in self.voices}
+        if voice_id not in known:
+            self.emit({"type": "error", "message": f"not one of the voices: {voice_id!r}"})
+            return
+        ok, detail = True, ""
+        try:
+            import sounddevice as sd
+
+            from outputs.tts_cartesia import CartesiaTTSOutput
+
+            speakers = str(sd.query_devices(kind="output")["name"])
+            config = replace(
+                self.config,
+                sections={
+                    **self.config.sections,
+                    "audio": {**self.config.section("audio"), "virtual_mic_device": speakers},
+                    "cartesia": {**self.config.section("cartesia"), "voice_id": voice_id},
+                },
+            )
+            text = str(self.config.get("cartesia.preview_text", "Hi, this is my voice."))
+            await CartesiaTTSOutput(self.bus, config).send(text)
+        except Exception as exc:
+            ok, detail = False, str(exc)
+        self.emit({"type": "voice_previewed", "voice_id": voice_id, "ok": ok, "detail": detail})
 
     def calibrate(self) -> None:
         """Setup's "Save This Position": fit the signing space to where the signer sits."""
@@ -623,6 +672,9 @@ class EngineServer:
         self.app.call_host.name = str(self.ui_config.get("signer_name") or "").strip()
         self.app.mentions.set_name(self.app.call_host.name)
         self.app.router.review_before_speaking = bool(self.ui_config.get("review_before_speaking"))
+        voice = getattr(self.app.router.tts, "inner", self.app.router.tts)  # under turn-taking
+        if self.ui_config.get("voice_id") and hasattr(voice, "voice_id"):
+            voice.voice_id = str(self.ui_config["voice_id"])  # the voice picked in setup
         box = self.ui_config.get("signing_space")
         if isinstance(box, dict):
             with contextlib.suppress(TypeError, ValueError):
