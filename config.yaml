@@ -6,6 +6,7 @@ claude_code: mock       # mock | real                   (Person B)
 siri: mock              # mock | real                   (Person C)
 tts: mock               # mock | say | cartesia         (Person C)
 captions: mock          # mock | cartesia               (Person C)
+vocab_search: mock      # mock | moss    fingerspelling autocomplete's context search
 
 # Starting output mode: claude_code | siri | voice | meet
 mode: claude_code
@@ -109,6 +110,37 @@ meet:
     - {text: "One at a time, please.", urgent: true}
     - {text: "Can you type that in the chat?"}
     - {text: "I agree."}
+
+autocomplete:
+  # Fingerspelling autocomplete (language/autocomplete.py). The memory is a local SQLite file
+  # in ~/Library/Application Support/calhacks-2026/ (vocab.sqlite; vocab-mock.sqlite with the
+  # mock search), one row per time a word was used: the word, a few topic tags, metadata.
+  # Never sentences or captions. `vocab_search: moss` searches it with a Moss session index
+  # built on the Mac at startup (never pushed); needs MOSS_PROJECT_ID / MOSS_PROJECT_KEY.
+  enabled: true
+  db_path: ""                    # empty = Application Support (see above)
+  min_letters: 2                 # suggest from the second letter
+  alternates: 2                  # shown smaller next to the top suggestion
+  # score = letters * letter match + context * conversation fit (scaled across candidates)
+  #       + frequency * log(1 + uses) / log(1 + most uses) + recency * 0.5^(days / half life)
+  weights: {letters: 1.0, context: 1.0, frequency: 0.4, recency: 0.3}
+  half_life_days: 14
+  context_spread: 0.15           # context differences smaller than this count for less
+  # Handshapes that are easy to misread for each other: a letter can stand for another in
+  # its group (each swap costs substitution_penalty of the letter match).
+  similar_handshapes: [MN, UVR, ASTE]
+  substitution_penalty: 0.35
+  max_substitutions: 1
+  context_seconds: 30            # recent conversation (in memory only) to search and tag with
+  search_timeout_ms: 40          # slower than this: rank without context for that letter
+  top_k: 50
+  learn_from_captions: true      # remember names / acronyms / jargon the other side says
+  transcript_weight: 0.5         # a word heard counts half as much as one you spelled
+  transcript_repeat_seconds: 120 # the same word heard again this soon isn't counted again
+  tagger: auto                   # auto (claude with translator: claude) | claude | mock
+  moss_index: signbridge-vocab   # the session's name (it's never pushed under it)
+  moss_model: moss-minilm
+  moss_alpha: 0.6                # 1 = meaning only, 0 = keywords only
 
 cartesia:
   tts_model: sonic-latest        # or pin one, e.g. sonic-3.5

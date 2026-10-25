@@ -16,6 +16,11 @@ it onto our bus. Commands (stdin, one JSON object per line):
   {"cmd": "mock_input", "text": "title /\\ red /send"}      (ours) the mock-sign box
   {"cmd": "introduce"}                                  (ours) say the Meet call intro again
   {"cmd": "quick_reply", "text": "Can you repeat that?"}  (ours) one of meet.quick_replies
+  {"cmd": "letters", "text": "pri"}                     (ours) fingerspelled letters, typed
+  {"cmd": "autocomplete", "action": "accept|dismiss", "index": 0}   (ours) while spelling,
+        the suggestion to accept (0 = top). The confirm / cancel gestures do the same.
+  {"cmd": "vocab_list"}                                 (ours) the remembered words
+  {"cmd": "vocab_delete", "term": "Julian"} | {"cmd": "vocab_delete", "id": "<occurrence>"}
   {"cmd": "quit"}
 
 Events (stdout):
@@ -26,7 +31,12 @@ Events (stdout):
    "output_mode": ..., "components": {...}, "mock": bool,
    "claude_code_working": bool, "camera_on": bool,
    "speech": {"state": "idle|waiting|interjecting|speaking", "text": ...},
-   "them_talking": bool}                                 on change, and every second
+   "them_talking": bool,
+   "autocomplete": {"letters": "JU", "top": {"term", "kind"} | null, "alternates": [...],
+                    "dismissed": bool, "search": "moss|keyword|letters"} | null,
+   "autocomplete_stats": {"accepted", "letters_saved", "last_accept": {"spelled",
+                    "length"} | null, "latency_ms", "search_ms", "search", "words"}}
+                                                         on change, and every second
   {"type": "frame", "seq": n, "jpeg": "<base64>"}   while the preview is on (mirrored, drawn)
   {"type": "check" | "route_tested" | "calibrated" | "config" | "error", ...}
   {"type": "caption", "text": ..., "final": bool}   (ours) a partial caption is replaced
@@ -34,6 +44,8 @@ Events (stdout):
   {"type": "sent", "mode": ..., "output": ..., "text": ...}   (ours) what each output was given
   {"type": "mention", "text": ..., "question": bool, "final": bool, "turn": n}   (ours)
         someone said the signer's name; the same turn comes again with the full sentence
+  {"type": "vocab", "words": [{"term", "term_norm", "kind", "count", "last_used", "tags",
+   "occurrences": [{"id", "source", "used_at", "tags"}]}]}   (ours) after vocab_list / delete
 
 Run by hand to see the protocol: uv run python app.py --mock
 """
@@ -57,10 +69,12 @@ from recognition.gating import SigningSpace, space_from_pose
 from recognition.mock import parse_line
 from shared.events import (
     MODES,
+    AutocompleteUpdate,
     Caption,
     ConfirmRequest,
     ConfirmResult,
     LandmarkFrame,
+    Letter,
     Mention,
     MockInput,
     ModeChanged,
@@ -164,6 +178,7 @@ class EngineServer:
         self.speech = "idle"  # our voice in a call: idle | waiting | interjecting | speaking
         self.speech_text = ""
         self.them_talking = False  # the other side has the floor (Ink turn detection)
+        self.spelling: AutocompleteUpdate | None = None  # a word being fingerspelled
         self.log: deque[str] = deque(["ready: sign, then FINISH"], maxlen=3)
         self.practice = list(PRACTICE)
         self.frame: LandmarkFrame | None = None
@@ -202,7 +217,7 @@ class EngineServer:
             return "sending"
         if self.thinking:
             return "thinking"
-        if self.gloss or self.woke:
+        if self.gloss or self.woke or self.spelling is not None:
             return "listening"
         return "idle"
 
@@ -230,6 +245,8 @@ class EngineServer:
             # Turn-aware speaking in Meet: what our voice is doing, and whether they're talking.
             "speech": {"state": self.speech, "text": self.speech_text},
             "them_talking": self.them_talking,
+            "autocomplete": self._autocomplete(),
+            "autocomplete_stats": self.app.autocomplete.metrics(),
             "components": self.app.chosen,
             "mock": self.app.chosen.get("recognizer") == "mock",
         }
@@ -241,6 +258,19 @@ class EngineServer:
                 "done": [g for g in PRACTICE if g not in self.practice],
             }
         return status
+
+    def _autocomplete(self) -> dict[str, Any] | None:
+        update = self.spelling
+        if update is None:
+            return None
+        words = [{"term": s.term, "kind": s.kind} for s in update.suggestions]
+        return {
+            "letters": update.letters,
+            "top": words[0] if words else None,
+            "alternates": words[1:],
+            "dismissed": update.dismissed,
+            "search": update.search,
+        }
 
     def emit_status(self, force: bool = False) -> None:
         status = self.status()
@@ -284,6 +314,7 @@ class EngineServer:
             SpeechStatus,
             TurnEvent,
             Mention,
+            AutocompleteUpdate,
         )
         frames = self.bus.subscribe(LandmarkFrame, maxsize=2)  # newest frames only
         self._tasks = [
@@ -390,6 +421,8 @@ class EngineServer:
             self.speech, self.speech_text = event.state, event.text
         elif isinstance(event, TurnEvent):
             self.them_talking = event.kind in ("start", "eager_end", "resume")
+        elif isinstance(event, AutocompleteUpdate):
+            self.spelling = event if event.letters else None
         self.emit_status()
 
     # ---- app -> bus ----
@@ -429,6 +462,23 @@ class EngineServer:
             self.app.call_host.introduce()
         elif cmd == "quick_reply":
             self.quick_reply(str(msg.get("text", "")))
+        elif cmd == "letters":
+            for letter in str(msg.get("text", "")):
+                if letter.isalpha():
+                    self.bus.publish(Letter(letter.upper()))
+        elif cmd == "autocomplete":
+            if msg.get("action") == "dismiss":
+                self.app.autocomplete.dismiss()
+            else:
+                self.app.buffer.accept_suggestion(int(msg.get("index", 0) or 0))
+        elif cmd == "vocab_list":
+            self.emit({"type": "vocab", "words": await self.app.autocomplete.words()})
+        elif cmd == "vocab_delete":
+            if msg.get("id"):
+                await self.app.autocomplete.delete_occurrence(str(msg["id"]))
+            elif msg.get("term"):
+                await self.app.autocomplete.delete_word(str(msg["term"]))
+            self.emit({"type": "vocab", "words": await self.app.autocomplete.words()})
         elif cmd == "mock_input":
             if str(msg.get("text", "")).strip():
                 self.bus.publish(MockInput(str(msg["text"])))
@@ -456,6 +506,13 @@ class EngineServer:
                 self.practice.pop(0)
             return
         state = self.state()
+        if state != "confirming" and self.app.autocomplete.active and name != "wake":
+            # Spelling a word: thumbs up takes the suggestion, thumbs down dismisses it.
+            if name == "confirm":
+                self.app.buffer.accept_suggestion()
+            elif name == "cancel":
+                self.app.autocomplete.dismiss()
+            return
         if name == "wake" and state == "idle":
             self.woke = True
             self.log.append("listening: sign, then FINISH")
@@ -485,7 +542,7 @@ class EngineServer:
         if self.state() == "idle":
             self.gesture("wake")
         for event in events:
-            if event.kind != "control":
+            if not isinstance(event, SignEvent) or event.kind != "control":
                 self.bus.publish(event)
         self.control("SEND")
 

@@ -1,7 +1,9 @@
 # Scripted incoming speech for Meet mode (mock captions). One caption per line.
 # A sprint check-in. Set your name to Sam (Settings > Calls) to see the mention alerts.
+# Autocomplete learns Priyanka and Kubernetes from the third caption: then type ~pri.
 Hi! Great to see you. Can you hear me okay?
 Let's go through the dashboard work quickly.
+Priyanka moved the dashboard to Kubernetes last week, so deploys are faster now.
 The charts are almost done, but the filters still need an owner.
 Sam, can you take the filters ticket by Friday?
 Great, thanks. I'll put it on the board.
