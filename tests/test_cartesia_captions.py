@@ -92,16 +92,16 @@ async def test_partial_then_final_captions():
 
 
 async def test_remembered_words_are_sent_as_keyterms():
-    """So Ink writes "Priyanka", not "Prianca", and the mention alert matches."""
+    """So Ink writes "Pranav", not "Pranov", and the mention alert matches."""
     src, _, websocket = source([SimpleNamespace(type="connected")])
-    src.keyterms = ["Sam", "Priyanka", "Figma"]
+    src.keyterms = ["Sam", "Pranav", "Figma"]
     await src.start()
     for _ in range(50):
         if websocket.kwargs is not None:
             break
         await asyncio.sleep(0.01)
     await src.stop()
-    assert websocket.kwargs["keyterm"] == ["Sam", "Priyanka", "Figma"]
+    assert websocket.kwargs["keyterm"] == ["Sam", "Pranav", "Figma"]
 
 
 async def test_no_keyterm_argument_when_nothing_is_remembered():

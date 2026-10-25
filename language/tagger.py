@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 
 SYSTEM = """You label words for a Deaf signer's fingerspelling autocomplete.
 For each word, give its kind (name = a person, place or product name; acronym; term =
-jargon or anything else), its usual written form (e.g. "API", "Kubernetes", "Priyanka"),
+jargon or anything else), its usual written form (e.g. "API", "Kubernetes", "Pranav"),
 and 3 to 5 short lowercase topic tags (1-3 words each) that describe what the conversation
 was about when the word came up, so the word can be suggested in later conversations on the
 same topic. Use the conversation only for topics. Never copy sentences into tags, and don't

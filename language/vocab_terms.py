@@ -1,7 +1,7 @@
 """Words worth remembering from the other side's captions: names, acronyms and jargon.
 
 Heuristics only: an all-caps token (API, PR), a capitalized word that isn't ordinary English
-(Priyanka, Kubernetes), or a long lowercase word that isn't either (kubectl). "Ordinary
+(Pranav, Kubernetes), or a long lowercase word that isn't either (kubectl). "Ordinary
 English" is the lowercase entries of macOS's word list (/usr/share/dict/words), plus a few
 spoken words it lacks. The tagger (language/tagger.py) can correct the kind later.
 

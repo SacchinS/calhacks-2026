@@ -113,7 +113,7 @@ async def test_a_translator_with_nothing_to_warm_does_nothing():
 # uppercase, which is what Utterance.gloss builds when the autocomplete accepts a word.
 LIVE_CASES = {
     # The demo call: the greeting, then the words the autocomplete filled in.
-    "HELLO fs-PRIYANKA NICE MEET-YOU": r"hello,? priyanka.*nice to meet you",
+    "HELLO fs-PRANAV NICE MEET-YOU": r"hello,? pranav.*nice to meet you",
     "HELLO NICE MEET-YOU": r"hello.*nice to meet you",
     "fs-FIGMA": r"^figma\b",
     "HOW YOU [wh-question]": r"how are you\?",
@@ -125,7 +125,7 @@ LIVE_CASES = {
     # Recognition mistakes. CLEAN and NICE are one sign; MEET can come back without the
     # trained MEET-YOU. Both must still read as the greeting, not a new sentence.
     "HELLO CLEAN MEET-YOU": r"nice to meet you",
-    "NICE MEET fs-PRIYANKA": r"(nice to )?meet you,? priyanka|nice to meet you",
+    "NICE MEET fs-PRANAV": r"(nice to )?meet you,? pranav|nice to meet you",
     # Face markers.
     "SETTINGS PAGE /\\ NEXT": r"settings page.*next|next.*settings page",
     "TOMORROW RAIN [yes/no question]": r"rain.*tomorrow.*\?$|tomorrow.*rain.*\?$",
@@ -155,7 +155,7 @@ async def test_live_warm_up_means_the_first_sentence_reads_the_cache():
     t.client.messages.create = spy
     await t.warm()
     started = time.perf_counter()
-    await t.translate(["HELLO", "fs-PRIYANKA", "NICE", "MEET-YOU"])
+    await t.translate(["HELLO", "fs-PRANAV", "NICE", "MEET-YOU"])
     seconds = time.perf_counter() - started
     _, after = usage
     print(

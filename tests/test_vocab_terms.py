@@ -20,8 +20,8 @@ def used(term: str, times: int = 1, days_ago: float = 0, kind: str = "name") -> 
 
 
 def test_the_signers_name_and_nicknames_come_first():
-    occurrences = used("Priyanka", times=5) + used("Figma", times=9, kind="term")
-    assert keyterms(occurrences, ["Sam", "Sammy"]) == ["Sam", "Sammy", "Figma", "Priyanka"]
+    occurrences = used("Pranav", times=5) + used("Figma", times=9, kind="term")
+    assert keyterms(occurrences, ["Sam", "Sammy"]) == ["Sam", "Sammy", "Figma", "Pranav"]
 
 
 def test_remembered_words_are_ranked_by_uses_then_by_last_use():
@@ -38,7 +38,7 @@ def test_remembered_words_are_ranked_by_uses_then_by_last_use():
 
 def test_a_name_already_remembered_is_not_repeated():
     """Case-insensitively: the signer's name is whatever they typed in Settings."""
-    assert keyterms(used("priyanka", times=3), ["PRIYANKA"]) == ["PRIYANKA"]
+    assert keyterms(used("pranav", times=3), ["PRANAV"]) == ["PRANAV"]
 
 
 def test_the_display_form_is_sent():
@@ -48,8 +48,8 @@ def test_the_display_form_is_sent():
 
 def test_ordinary_english_is_left_out():
     """Ink gets these right already, and the limits are better spent on names and jargon."""
-    occurrences = used("Monday", times=9, kind="term") + used("Priyanka")
-    assert keyterms(occurrences) == ["Priyanka"]
+    occurrences = used("Monday", times=9, kind="term") + used("Pranav")
+    assert keyterms(occurrences) == ["Pranav"]
 
 
 def test_it_stops_at_the_term_limit():
@@ -59,15 +59,15 @@ def test_it_stops_at_the_term_limit():
 
 
 def test_it_stops_at_the_character_limit():
-    occurrences = used("Priyanka", times=3) + used("Bartholomew", times=2) + used("Jo")
-    # "Priyanka" (8) + "Bartholomew" (11) is 19; 20 leaves no room for "Jo".
-    assert keyterms(occurrences, max_chars=20) == ["Priyanka", "Bartholomew"]
-    assert keyterms(occurrences, max_chars=8) == ["Priyanka"]
+    occurrences = used("Pranav", times=3) + used("Bartholomew", times=2) + used("Jo")
+    # "Pranav" (6) + "Bartholomew" (11) is 17; 18 leaves no room for "Jo".
+    assert keyterms(occurrences, max_chars=18) == ["Pranav", "Bartholomew"]
+    assert keyterms(occurrences, max_chars=6) == ["Pranav"]
 
 
 def test_a_name_too_long_for_the_budget_doesnt_block_the_rest():
     """The signer's name is added first, so if it doesn't fit nothing else should sneak in."""
-    assert keyterms(used("Priyanka"), ["Bartholomew"], max_chars=5) == []
+    assert keyterms(used("Pranav"), ["Bartholomew"], max_chars=5) == []
 
 
 def test_no_words_and_no_names_is_empty():

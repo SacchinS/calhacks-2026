@@ -91,7 +91,7 @@ make mock                         # builds and opens the Mac app on mocks: no we
 
 The app is SignBridge's SwiftUI app (`ui/macos`); it starts the Python engine (`app.py`) itself and lives in the menu bar (the hand icon).
 - **First launch** opens the setup wizard. Click through it ("Skip for now" is fine with mocks); after that the app opens the **Preview** window.
-- **Preview:** the camera with tracking, the signs, the English, and the call: your words and the other side's captions, quick replies, and "Introduce me". With the mock recognizer, type signs in the box at the bottom (or in the terminal): `hello nice meet-you`, then `/send`. `#word` is a fingerspelled word, `~pri` spells letters one at a time (the autocomplete suggests the word; `/yes` takes it), `/clear` starts over. With review on (Settings > Calls), `/yes` or `/no` decides whether it's spoken. Face markers go after the signs they cover: `title /\ red` (raised brows, topic), `tomorrow rain [q]` (yes/no question), `[wh]`, `[neg]`, `[nod]`. The Send / Cancel buttons do the same as signing YES / NO.
+- **Preview:** the camera with tracking, the signs, the English, and the call: your words and the other side's captions, quick replies, and "Introduce me". With the mock recognizer, type signs in the box at the bottom (or in the terminal): `hello nice meet-you`, then `/send`. `#word` is a fingerspelled word, `~pr` spells letters one at a time (the autocomplete suggests the word; `/yes` takes it), `/clear` starts over. With review on (Settings > Calls), `/yes` or `/no` decides whether it's spoken. Face markers go after the signs they cover: `title /\ red` (raised brows, topic), `tomorrow rain [q]` (yes/no question), `[wh]`, `[neg]`, `[nod]`. The Send / Cancel buttons do the same as signing YES / NO.
 - **Demo Mode** (Preview > Demo, or the menu bar) is the fullscreen stage for the second display. Menu bar > Demo Mode On picks the display; it remembers it. Esc leaves it. Backup keys: W start, C send (YES), X cancel (NO), 1–3 the demo script's phrases in order (the same list is under Preview > Test phrases).
 - Quit from the menu bar. Engine logs go to the terminal under `make mock`, and to `~/Library/Logs/calhacks-2026/engine.log` in the packaged app.
 
@@ -187,7 +187,7 @@ ids, with no document or query text.
 **How it learns.**
 - Every word the signer spells and keeps.
 - Likely names, acronyms and jargon in the other side's captions: capitalized words that aren't
-  ordinary English, all-caps tokens, and unusual long words. So "Priyanka" or "Figma",
+  ordinary English, all-caps tokens, and unusual long words. So "Pranav" or "Figma",
   heard in a meeting, can be suggested before the signer has ever spelled them.
 
 **How ranking works.** On each letter:
@@ -214,7 +214,7 @@ latency is logged.
 - `make seed-vocab` loads Julian, Jupyter, June and a few more.
 - In `make mock`, type `tennis partner ~ju` in the mock-sign box: `~ju` spells J, U one letter
   at a time.
-- The mock captions are the demo call: Priyanka mentions Figma, so `~pr` suggests Priyanka and
+- The mock captions are the demo call: Pranav mentions Figma, so `~pr` suggests Pranav and
   `~fi` suggests Figma.
 - With the camera, fingerspell to it: hold each letter until it counts (5 s in the slow
   settings for people new to ASL, with a progress bar in the app; 0.25 s at fluent speed). `uv run python tools/try_letters.py` shows what the letter model
@@ -223,7 +223,7 @@ latency is logged.
 
 ## How we use Claude
 
-- **Translation.** Claude (Haiku 5.5, for speed) turns ASL gloss into English with the prompt in `language/prompts/gloss_to_english.md`: ASL grammar (topic first, time first, no articles), fingerspelled words (`fs-PRIYANKA` → Priyanka), our custom signs, and facial grammar tags (`[yes/no question]`, `[negation]`), written the way a person would say it in a meeting. Claude only ever sees the recognized sign words, as text: never video.
+- **Translation.** Claude (Haiku 5.5, for speed) turns ASL gloss into English with the prompt in `language/prompts/gloss_to_english.md`: ASL grammar (topic first, time first, no articles), fingerspelled words (`fs-PRANAV` → Pranav), our custom signs, and facial grammar tags (`[yes/no question]`, `[negation]`), written the way a person would say it in a meeting. Claude only ever sees the recognized sign words, as text: never video.
 - **Topic tags for autocomplete.** When a word is remembered, Claude (Haiku, structured JSON output) gives it 3 to 5 topic tags from the last ~30 seconds of conversation, and fixes how it's written (API, Kubernetes). Only the tags are kept. It runs in the background, so suggestions never wait for it.
 - **Where it can go wrong, and what we do about it.** A mistranslation is spoken in a Deaf person's name. The signer always sees the English on screen as it's spoken, and "Review before speaking" makes it wait for a signed YES (NO discards it). Quick replies are fixed phrases, so the most urgent things ("Can you repeat that?") never go through translation. If the translator fails, the app says so and falls back instead of guessing.
 
@@ -231,7 +231,7 @@ latency is logged.
 
 - **Sonic text-to-speech** (`outputs/tts_cartesia.py`): the signer's English is spoken in a Cartesia voice, streamed over the SSE endpoint as raw PCM and played into the virtual microphone (BlackHole 2ch) as it arrives, so the others in the Meet call hear it with little delay. It also speaks the call intro and the "One moment, I'm signing." cue. If Cartesia fails, the app warns and uses macOS `say`.
 - **Ink speech-to-text** (`captions/cartesia_stt.py`): the other side's call audio, captured from a separate device (BlackHole 16ch), is streamed to Cartesia's realtime STT websocket with turn detection; partial transcripts update the caption live and the end of each turn finalizes it.
-- **Ink keyterms** (`language/vocab_terms.py`): the names and jargon the autocomplete already remembers, plus your own name, are sent as Ink keyterms when captions start, so the captions spell "Priyanka" and "Figma" the way you do and the mention alerts match. Ink takes them as the connection opens and they can't change mid-stream, so a word learned during a call reaches it the next time captions start.
+- **Ink keyterms** (`language/vocab_terms.py`): the names and jargon the autocomplete already remembers, plus your own name, are sent as Ink keyterms when captions start, so the captions spell "Pranav" and "Figma" the way you do and the mention alerts match. Ink takes them as the connection opens and they can't change mid-stream, so a word learned during a call reaches it the next time captions start.
 - **Ink turn detection for turn-taking** (`outputs/turn_taking.py`): Ink's `turn.start`, `turn.eager_end`, `turn.resume`, and `turn.end` events tell our voice whether the other person has the floor. The signer's approved sentence waits for the end of their turn and is spoken the moment it comes; if they keep talking for 8 seconds, SignBridge says "Sorry, can I jump in?" first; if someone talks over our voice for more than a second, it stops and says the sentence again at the next pause. It changes when the words are spoken, never what they are.
 - Only the English to speak and the other side's call audio go to Cartesia; nothing is saved.
 
