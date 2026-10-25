@@ -314,3 +314,24 @@ async def test_say_now_sends_the_sentence_marked_urgent(engine):
     await engine.handle_command({"cmd": "gesture", "name": "now"})  # the Say now button
     translation = await asyncio.wait_for(translations.get(), 5)
     assert translation.urgent and translation.gloss == ["WAIT", "COLOR", "PROBLEM"]
+
+
+async def test_setup_offers_voices_and_the_pick_is_the_calls_voice(engine):
+    engine.send_ready()
+    ready = messages(engine, "ready")[-1]
+    names = [v["name"] for v in ready["voices"]]
+    assert len(names) >= 3 and "Skylar" in names
+    daniel = next(v["id"] for v in ready["voices"] if v["name"] == "Daniel")
+
+    class Voice:
+        voice_id = ""
+
+    engine.app.router.tts = Voice()
+    await engine.handle_command({"cmd": "config", "values": {"voice_id": daniel}})
+    assert engine.app.router.tts.voice_id == daniel
+
+
+async def test_only_offered_voices_can_be_previewed(engine):
+    await engine.handle_command({"cmd": "voice_preview", "voice_id": "not-a-voice"})
+    await until(lambda: messages(engine, "error"))
+    assert "not one of the voices" in messages(engine, "error")[-1]["message"]

@@ -170,6 +170,15 @@ cartesia:
   tts_model: sonic-latest        # or pin one, e.g. sonic-3.5
   stt_model: ink-2
   voice_id: db6b0ed5-d5d3-463d-ae85-518a07d3c2b4   # "Skylar"; any Sonic voice ID (play.cartesia.ai)
+  # The voices setup offers ("Your voice"); the signer's pick is saved in the app's settings
+  # (ui.json voice_id) and replaces voice_id above.
+  voices:
+    - {id: db6b0ed5-d5d3-463d-ae85-518a07d3c2b4, name: Skylar, about: "Approachable American female"}
+    - {id: 47c38ca4-5f35-497b-b1a3-415245fb35e1, name: Daniel, about: "Clear, crisp male"}
+    - {id: 62ae83ad-4f6a-430b-af41-a9bede9286ca, name: Gemma, about: "Confident British female"}
+    - {id: ef191366-f52f-447a-a398-ed8c0f2943a1, name: Archie, about: "Warm, conversational British male"}
+    - {id: 630ed21c-2c5c-41cf-9d82-10a7fd668370, name: Corey, about: "Cheerful young adult male"}
+  preview_text: "Hi, this is my voice in the call. How does it sound?"
   sample_rate: 44100
   # Optional Ink turn-detection tuning, passed to the STT websocket when set:
   # turn_start_threshold, turn_end_threshold, turn_eager_end_threshold, turn_end_timeout_ms
