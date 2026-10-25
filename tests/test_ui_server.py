@@ -335,3 +335,19 @@ async def test_only_offered_voices_can_be_previewed(engine):
     await engine.handle_command({"cmd": "voice_preview", "voice_id": "not-a-voice"})
     await until(lambda: messages(engine, "error"))
     assert "not one of the voices" in messages(engine, "error")[-1]["message"]
+
+
+async def test_reset_starts_over(engine, tmp_path):
+    values = {"onboarded": True, "signer_name": "Sam", "review_before_speaking": True}
+    await engine.handle_command({"cmd": "config", "values": values})
+    engine.bus.publish(Caption("Pranav redesigned the charts in Figma."))
+    await until(lambda: len(engine.app.vocab.all()) >= 2)
+
+    await engine.handle_command({"cmd": "reset"})  # settings only
+    config = messages(engine, "config")[-1]["config"]
+    assert config["onboarded"] is False and config["signer_name"] == ""
+    assert not engine.app.router.review_before_speaking and engine.app.call_host.name == ""
+    assert len(engine.app.vocab.all()) >= 2  # remembered words kept
+
+    await engine.handle_command({"cmd": "reset", "forget_words": True})
+    assert engine.app.vocab.all() == [] and messages(engine, "vocab")[-1]["words"] == []
