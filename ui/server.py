@@ -67,6 +67,7 @@ from dataclasses import asdict, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO
 
+from language.tickets import TicketUpdate
 from recognition.gating import SigningSpace, space_from_pose
 from recognition.mock import parse_line
 from shared.events import (
@@ -176,6 +177,7 @@ class EngineServer:
         self.speech_text = ""
         self.them_talking = False  # the other side has the floor (Ink turn detection)
         self.spelling: AutocompleteUpdate | None = None  # a word being fingerspelled
+        self.ticket: TicketUpdate | None = None
         self.log: deque[str] = deque(["ready: sign, then FINISH"], maxlen=3)
         self.frame: LandmarkFrame | None = None
         self.frame_times: deque[float] = deque(maxlen=60)
@@ -263,6 +265,7 @@ class EngineServer:
             "them_talking": self.them_talking,
             "autocomplete": self._autocomplete(),
             "autocomplete_stats": self.app.autocomplete.metrics(),
+            "ticket": self.ticket.public() if self.ticket and self.ticket.state != "none" else None,
             "components": self.app.chosen,
             "mock": self.app.chosen.get("recognizer") == "mock",
         }
@@ -330,6 +333,7 @@ class EngineServer:
             TurnEvent,
             Mention,
             AutocompleteUpdate,
+            TicketUpdate,
         )
         frames = self.bus.subscribe(LandmarkFrame, maxsize=2)  # newest frames only
         self._tasks = [
@@ -411,6 +415,9 @@ class EngineServer:
             self.them_talking = event.kind in ("start", "eager_end", "resume")
         elif isinstance(event, AutocompleteUpdate):
             self.spelling = event if event.letters else None
+        elif isinstance(event, TicketUpdate):
+            self.ticket = event if event.state != "none" else None
+            self.emit({"type": "ticket", **event.public()})
         self.emit_status()
 
     def _draw(self, frame: LandmarkFrame) -> None:
@@ -476,6 +483,20 @@ class EngineServer:
                 self.app.autocomplete.dismiss()
             else:
                 self.app.buffer.accept_suggestion(int(msg.get("index", 0) or 0))
+        elif cmd == "ticket":
+            action = str(msg.get("action", ""))
+            if action == "draft":
+                self._background(self.app.tickets.draft_now())
+            elif action == "approve":
+                self._background(
+                    self.app.tickets.approve(
+                        int(msg.get("version", 0) or 0), str(msg.get("via", "button"))
+                    )
+                )
+            elif action == "dismiss":
+                self.app.tickets.dismiss()
+            elif action == "clear_notes":
+                self.app.tickets.clear_notes()
         elif cmd == "vocab_list":
             self.emit({"type": "vocab", "words": await self.app.autocomplete.words()})
         elif cmd == "vocab_delete":
@@ -522,11 +543,19 @@ class EngineServer:
         elif name == "confirm":
             if state == "confirming":
                 self.control("YES")
+            elif (
+                state == "idle"
+                and self.app.tickets.update.state == "tentative"
+                and self.app.tickets.update.ready
+            ):
+                self._background(self.app.tickets.approve(self.app.tickets.update.version, "key"))
             elif state == "listening" and self.gloss:
                 self.control("SEND")  # thumbs up while signing also means "done signing"
         elif name == "cancel":
             if state == "confirming":
                 self.control("NO")
+            elif state == "idle" and self.app.tickets.update.state == "tentative":
+                self.app.tickets.dismiss()
             elif state == "listening":
                 self.woke = False
                 self.control("CLEAR")
