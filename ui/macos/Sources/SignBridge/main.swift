@@ -99,7 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !listening { startListening() }
         engine.setPreview(true)
         open("preview", title: "SignBridge", size: NSSize(width: 720, height: 820),
-             view: PreviewView(engine: engine, showDemo: { [weak self] in self?.showDemo() }), seamless: true) { [weak self] in self?.engine.setPreview(false) }
+             view: PreviewView(engine: engine), seamless: true) { [weak self] in self?.engine.setPreview(false) }
         windows["preview"]?.appearance = NSAppearance(named: .darkAqua)
     }
 
