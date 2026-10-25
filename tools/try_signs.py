@@ -50,13 +50,15 @@ def main() -> None:
         space = SigningSpace(**json.loads(UI_CONFIG.read_text())["signing_space"])
     except (OSError, KeyError, TypeError, ValueError):
         pass
-    model = ASLCitizenModel(config)
+    uses_asl = "asl_citizen" in (config.get("recognition.sign_models", []) or [])
+    model = ASLCitizenModel(config) if uses_asl else None  # off: custom signs only
     custom = CustomSignModel(config)
     print(f"Custom signs: {', '.join(sorted(custom.library.examples)) or '(none recorded)'}")
     segmenter = Segmenter.from_config(config)
-    demo = sorted({display(model.glosses[i]) for i in model.allowed})
-    print(f"Demo signs: {', '.join(demo)}")
-    print(f"Cutoffs: top {model.top_k}, min_prob {model.min_prob}, floor {model.floor}\n")
+    if model is not None:
+        demo = sorted({display(model.glosses[i]) for i in model.allowed})
+        print(f"ASL Citizen signs: {', '.join(demo)}")
+        print(f"Cutoffs: top {model.top_k}, min_prob {model.min_prob}, floor {model.floor}\n")
 
     def explain(frames, mirrored: bool) -> str:
         probs = model.scores(frames, mirrored)
@@ -85,12 +87,23 @@ def main() -> None:
             frame = space.apply(frame)
             prediction = None
             if frame.hands_in_signing_space:
-                ran = (
+                ran = model is not None and (
                     model._since_run + 1 >= model.stride
                     and len(model.frames) + 1 >= model.min_window
                 )
+                if custom._since_run + 1 >= custom.stride and custom.library.examples:
+                    window = list(custom.frames) + [frame]
+                    near = custom.nearest(window)
+                    if near:
+                        g, d, other = min(near, key=lambda m: m[1])
+                        verdict = "ok" if d <= custom.limit and d <= 0.8 * other else "rejected"
+                        print(
+                            f"custom nearest {g:9} {d:.2f} (limit {custom.limit:.2f}, "
+                            f"runner-up {other:.2f}) {verdict}",
+                            flush=True,
+                        )
                 mine = custom.predict(frame)
-                theirs = model.predict(frame)
+                theirs = model.predict(frame) if model is not None else None
                 prediction = mine or theirs  # the app's order: custom signs first
                 if mine is not None:
                     line = f"custom: {mine.gloss} {mine.confidence:.2f}"
