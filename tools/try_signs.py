@@ -5,9 +5,11 @@ cutoffs in config.yaml can be set from real signing.
     uv sync --extra camera
     uv run python tools/try_signs.py                  # q quits
 
-Sign inside the green box (the signing space saved in setup), then drop your hands below
-it: each sign is judged as a whole when the hands drop, and the terminal shows its nearest
-recorded sign, the distance, the limit and the runner-up. With ASL Citizen on
+One sign per raise of the hands, as in the app. The box (the signing space saved in setup)
+is gray with your hands down, yellow while you sign, and green once the sign is recognized;
+then drop your hands until it's gray before the next sign. The terminal shows each sign
+that came out, or for one that didn't, its nearest recorded sign, the distance, the limit
+and the runner-up when you drop your hands. With ASL Citizen on
 (`recognition.sign_models`), each time that model runs (every `asl_citizen_stride`
 frames) the terminal gets a line:
 
@@ -46,7 +48,7 @@ def main() -> None:
     from recognition.gating import SigningSpace
     from recognition.segmenter import Segmenter
     from tools.try_letters import draw
-    from ui.server import UI_CONFIG
+    from ui.server import BOX_BGR, UI_CONFIG
 
     config = load_config()
     space = SigningSpace.from_config(config)
@@ -89,17 +91,24 @@ def main() -> None:
             if frame is None:
                 continue
             frame = space.apply(frame)
-            prediction = None
+            prediction = mine = None
             if frame.hands_in_signing_space:
                 ran = model is not None and (
                     model._since_run + 1 >= model.stride
                     and len(model.frames) + 1 >= model.min_window
                 )
-                mine = custom.predict(frame)  # segment mode: collects the sign, answers later
+                clip = list(custom.segment) + [frame]
+                mine = custom.predict(frame)  # a whole sign, as soon as it clearly matches
                 theirs = model.predict(frame) if model is not None else None
-                prediction = mine or theirs  # the app's order: custom signs first
+                prediction = theirs if mine is None else None
                 if mine is not None:
-                    line = f"custom: {mine.gloss} {mine.confidence:.2f}"
+                    g, d, other = custom.segment_match(clip)
+                    print(
+                        f"sign of {len(clip)} frames -> {mine.gloss} (distance {d:.2f}, limit "
+                        f"{custom.limit:.2f}, runner-up {other:.2f})",
+                        flush=True,
+                    )
+                    line = f"{mine.gloss} {mine.confidence:.2f}: drop your hands for the next sign"
                 if ran:
                     frames = list(model.frames)
                     taken = f"{theirs.gloss} {theirs.confidence:.2f}" if theirs else "nothing"
@@ -108,26 +117,32 @@ def main() -> None:
                     print(f"{taken:<14} as seen: {explain(frames, False)}", flush=True)
                     print(f"{'':<14} mirrored: {explain(frames, True)}", flush=True)
             event = segmenter.push(prediction)
-            if not frame.hands_in_signing_space and custom.segment:
+            if frame.hands_in_signing_space and mine is not None:
+                event = make_sign_event(mine.gloss, mine.confidence)
+            if not frame.hands_in_signing_space:
                 clip = list(custom.segment)
                 whole = custom.end_segment(frame.ts)
-                if not custom.segment:  # the hands dropped: the whole sign was judged
+                if clip and not custom.segment:  # dropped without a match: the last try
                     match = custom.segment_match(clip)
                     if match is not None:
                         g, d, other = match
-                        verdict = f"-> {whole.gloss}" if whole else "rejected"
+                        verdict = f"-> {whole.gloss}" if whole else "no sign"
                         print(
-                            f"sign of {len(clip)} frames: nearest {g:9} {d:.2f} "
+                            f"sign of {len(clip)} frames, hands down: nearest {g:9} {d:.2f} "
                             f"(limit {custom.limit:.2f}, runner-up {other:.2f}) {verdict}",
                             flush=True,
                         )
                     if whole is not None:
                         event = event or make_sign_event(whole.gloss, whole.confidence)
-                        line = f"custom: {whole.gloss} {whole.confidence:.2f}"
+                state = custom.state(False)
+                if state == "idle":
+                    line = "sign inside the box"
             if event is not None:
                 recognized.append(event.gloss)
                 print(f"==> recognized {event.gloss}", flush=True)
-            if not draw(cv2, frame, space, [line, "", " ".join(recognized[-6:]) or "-"]):
+            state = custom.state(frame.hands_in_signing_space)
+            box = BOX_BGR[state]
+            if not draw(cv2, frame, space, [line, "", " ".join(recognized[-6:]) or "-"], box):
                 break
     finally:
         camera.close()

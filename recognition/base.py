@@ -134,6 +134,7 @@ class FrameRecognizer(Recognizer):
         self.faces = FaceMarkerDetector(config)
         self.markers = MarkerTally()
         self.letters = None  # the letter reader, once running (the app shows its hold)
+        self.sign_state = "idle"  # idle | signing | detected: the preview's box color
         self._task: asyncio.Task[None] | None = None
 
     @abstractmethod
@@ -176,19 +177,27 @@ class FrameRecognizer(Recognizer):
             frame = self.gate.apply(raw)
             self.bus.publish(frame)
             prediction = None
+            whole = None  # a whole sign from a `direct` classifier: emitted at once
             if frame.hands_in_signing_space:
                 # Every classifier sees every frame (they keep windows); the first answer wins.
-                answers = [classifier.predict(frame) for classifier in classifiers]
-                prediction = next((a for a in answers if a is not None), None)
+                answers = [(c, c.predict(frame)) for c in classifiers]
+                whole = next((a for c, a in answers if a and getattr(c, "direct", False)), None)
+                prediction = next(
+                    (a for c, a in answers if a and not getattr(c, "direct", False)), None
+                )
                 self.markers.add(self.faces.update(frame))
             else:
                 self.faces.update(frame)  # resting frames teach the neutral face
-            # Classifiers that judge a whole sign once the hands drop (custom signs).
-            whole = None
-            if not frame.hands_in_signing_space:
-                for classifier in classifiers:
+                for classifier in classifiers:  # the hands dropped: a last try at the sign
                     end = getattr(classifier, "end_segment", None)
                     whole = whole or (end(frame.ts) if end is not None else None)
+            states = [
+                c.state(frame.hands_in_signing_space) for c in classifiers if hasattr(c, "state")
+            ]
+            self.sign_state = next(
+                (s for s in ("detected", "signing") if s in states),
+                "signing" if frame.hands_in_signing_space else "idle",
+            )
             if letters is not None:
                 for letter in letters.push(frame, self.gate):
                     self.bus.publish(letter)
