@@ -93,17 +93,35 @@ def test_library_saves_and_reloads_examples(library):
 WINDOW = Config(sections={"recognition": {"custom_mode": "window"}})
 
 
-def test_custom_signs_match_a_whole_sign_when_the_hands_drop(library):
+def test_one_sign_per_raise_of_the_hands(library):
     model = CustomSignModel(Config(), library=library)
+    assert model.state(hands_up=False) == "idle"
     signed = sweep(0.31, 0.69, 10)
-    assert all(model.predict(f) is None for f in signed)  # nothing until the hands drop
-    assert model.end_segment(signed[-1].ts + 0.1) is None  # a short gap: maybe not done
+    out = [model.predict(f) for f in signed]
+    found = [p for p in out if p is not None]
+    assert [p.gloss for p in found] == ["WW"]  # once, while the hands are still up
+    assert found[0].confidence >= 0.6 and model.state(hands_up=True) == "detected"
+    more = sweep(0.31, 0.69, signed[-1].ts + 1 / 30)  # signing on, hands still up
+    assert all(model.predict(f) is None for f in more)  # locked: no more
+    end = more[-1].ts
+    assert model.end_segment(end + 0.1) is None and model.state(hands_up=False) == "detected"
+    assert model.end_segment(end + 0.5) is None  # down long enough: unlocked
+    assert model.state(hands_up=False) == "idle"
+    again = [model.predict(f) for f in sweep(0.31, 0.69, end + 1)]
+    assert [p.gloss for p in again if p] == ["WW"]  # the next raise is a new sign
+
+
+def test_a_sign_that_never_matched_gets_a_last_try_when_the_hands_drop(library):
+    model = CustomSignModel(
+        Config(sections={"recognition": {"custom_early_fraction": 5}}), library=library
+    )
+    signed = sweep(0.31, 0.69, 10)  # early matches need 5x the length: none happen
+    assert all(model.predict(f) is None for f in signed)
     seen = model.end_segment(signed[-1].ts + 0.5)
-    assert seen is not None and seen.gloss == "WW" and seen.confidence >= 0.6
-    assert model.end_segment(signed[-1].ts + 1.0) is None  # once per sign
+    assert seen is not None and seen.gloss == "WW"
 
     for f in sweep(0.7, 0.3, 20, 20, y=0.6, spread=0.0):  # unlike either sign
-        model.predict(f)
+        assert model.predict(f) is None
     assert model.end_segment(30) is None
 
 

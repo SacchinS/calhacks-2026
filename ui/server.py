@@ -109,7 +109,14 @@ async def stdin_reader() -> asyncio.StreamReader:
     return reader
 
 
-def render_preview(frame: LandmarkFrame, space: SigningSpace, mirror: bool) -> bytes | None:
+# The signing space's color: gray with the hands down, yellow while a sign is being made,
+# green once it's recognized (then nothing more is read until the hands drop).
+BOX_BGR = {"idle": (120, 120, 120), "signing": (0, 210, 255), "detected": (80, 220, 80)}
+
+
+def render_preview(
+    frame: LandmarkFrame, space: SigningSpace, mirror: bool, state: str | None = None
+) -> bytes | None:
     """The preview JPEG: the camera image (or a dark canvas in replay) with the tracking drawn
     on it, mirrored like a mirror. None without OpenCV (the camera extra)."""
     try:
@@ -122,13 +129,14 @@ def render_preview(frame: LandmarkFrame, space: SigningSpace, mirror: bool) -> b
     else:
         canvas = np.full((480, 640, 3), 18, dtype=np.uint8)
     h, w = canvas.shape[:2]
-    box_color = (80, 220, 80) if frame.hands_in_signing_space else (120, 120, 120)
+    state = state or ("signing" if frame.hands_in_signing_space else "idle")
+    box_color = BOX_BGR.get(state, BOX_BGR["idle"])
     cv2.rectangle(
         canvas,
         (int(space.x_min * w), int(space.y_min * h)),
         (int(space.x_max * w), int(space.y_max * h)),
         box_color,
-        3 if frame.hands_in_signing_space else 1,
+        1 if state == "idle" else 3,
     )
     for points in (frame.pose, frame.left_hand, frame.right_hand):
         for p in points:
@@ -333,7 +341,8 @@ class EngineServer:
                 self._holding = holding
                 self.emit_status()
             if self.preview:
-                jpeg = render_preview(event, self.space, self.mirror)
+                state = getattr(self.app.recognizer, "sign_state", None)
+                jpeg = render_preview(event, self.space, self.mirror, state)
                 if jpeg:
                     self.frame_seq += 1
                     self.emit(

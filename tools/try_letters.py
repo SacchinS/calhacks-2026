@@ -108,8 +108,9 @@ def main() -> None:
     print(f"Counted: {spelled or '(nothing)'}")
 
 
-def draw(cv2, frame, space, lines: list[str]) -> bool:
-    """The mirrored camera, the signing space, and three lines. False if q was pressed."""
+def draw(cv2, frame, space, lines: list[str], box=(80, 220, 80)) -> bool:
+    """The mirrored camera, the signing space (`box`, BGR), and three lines. False if q was
+    pressed."""
     from ui.server import JOINT_BGR
 
     image = cv2.cvtColor(frame.image, cv2.COLOR_RGB2BGR)
@@ -118,7 +119,7 @@ def draw(cv2, frame, space, lines: list[str]) -> bool:
         for p in points:
             cv2.circle(image, (int(p[0] * w), int(p[1] * h)), 3, JOINT_BGR, -1)
     corner = (int(space.x_min * w), int(space.y_min * h))
-    cv2.rectangle(image, corner, (int(space.x_max * w), int(space.y_max * h)), (80, 220, 80), 2)
+    cv2.rectangle(image, corner, (int(space.x_max * w), int(space.y_max * h)), box, 2)
     image = cv2.flip(image, 1)
     for i, text in enumerate(lines):
         y, size = 50 + 50 * i, 1.4 if i == 2 else 0.9

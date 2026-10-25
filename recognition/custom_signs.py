@@ -8,14 +8,19 @@ Each example is a clip of Holistic landmarks saved under models/custom_signs/<GL
 becomes hand shapes and hand positions relative to the shoulders, resampled to a fixed
 length, and is compared with every example.
 
-`custom_mode: segment` (the default) matches the way the examples were recorded: the frames
-from a hand entering the signing space until the hands leave it (for `custom_end_seconds`)
-are one clip, classified when the hands drop (`end_segment`; the recognizer emits it
-straight away). So rest your hands between signs. `window` instead slides over the last
-frames while signing; it lines up with a whole sign only for a frame or two at its end,
-which the segmenter's min_frames then usually misses. A sign is reported only when
-it's clearly closer than the threshold learned from the examples themselves, so unknown
-movement falls through to the Kaggle model.
+`custom_mode: segment` (the default) matches the way the examples were recorded: one sign
+per raise of the hands. The clip grows from a hand entering the signing space; as soon as
+the whole clip so far clearly matches a sign (and is at least `custom_early_fraction` of
+that sign's recorded length), the sign is out (`direct`: the recognizer emits it at once)
+and nothing more is read until the hands have been down for `custom_end_seconds`. A clip
+that never matched gets one last try when the hands drop (`end_segment`). `state` is idle,
+signing or detected (the preview's gray, yellow and green box).
+
+`window` instead slides over the last frames while signing; it lines up with a whole sign
+only for a frame or two at its end, which the segmenter's min_frames then usually misses.
+
+Either way, a sign is reported only when it's clearly closer than the threshold learned from
+the examples themselves, so unknown movement isn't forced into a sign.
 
 Learn every sign from a Deaf signer or the source videos in docs/asl-demo-script-research.md.
 """
@@ -160,7 +165,9 @@ class CustomSignModel(FrameClassifier):
         self.stride = int(config.get("recognition.custom_stride", 3))
         self.mode = str(config.get("recognition.custom_mode", "segment"))
         self.end_gap = float(config.get("recognition.custom_end_seconds", 0.35))
+        self.early = float(config.get("recognition.custom_early_fraction", 0.6))
         self.segment: list[LandmarkFrame] = []  # this sign so far (segment mode)
+        self.locked = False  # a sign came out: wait for the hands to drop
         self._last_in = 0.0
         self.gap_seconds = float(config.get("recognition.isolated_gap_seconds", 0.4))
         scale = float(config.get("recognition.custom_threshold_scale", 1.0))
@@ -177,11 +184,20 @@ class CustomSignModel(FrameClassifier):
         if not self.library.examples:
             return None
         if self.mode == "segment":
-            if self.segment and frame.ts - self._last_in > self.end_gap:
-                self.segment = []  # a stale clip (end_segment wasn't called): start over
-            self.segment.append(frame)
+            if frame.ts - self._last_in > self.end_gap:  # the hands were down: a new sign
+                self.segment, self.locked = [], False
             self._last_in = frame.ts
-            return None  # the answer comes when the hands drop (end_segment)
+            if self.locked:
+                return None  # one sign per raise of the hands
+            self.segment.append(frame)
+            self._since_run += 1
+            if self._since_run < self.stride:
+                return None
+            self._since_run = 0
+            match = self.early_match(self.segment)
+            if match is not None:
+                self.segment, self.locked = [], True
+            return match
         if self._last_ts is not None and frame.ts - self._last_ts > self.gap_seconds:
             self.frames.clear()
             self.last = None
@@ -196,10 +212,38 @@ class CustomSignModel(FrameClassifier):
     def end_segment(self, now: float) -> Prediction | None:
         """Called on frames with the hands out of the signing space: once they've been out
         for end_gap, the clip since they came in is classified (segment mode)."""
-        if self.mode != "segment" or not self.segment or now - self._last_in < self.end_gap:
+        if self.mode != "segment" or now - self._last_in < self.end_gap:
+            return None
+        if self.locked:
+            self.locked = False  # the hands are down: ready for the next sign
+            return None
+        if not self.segment:
             return None
         frames, self.segment = self.segment, []
         return self.classify_segment(frames)
+
+    @property
+    def direct(self) -> bool:
+        """Answers are whole signs, to emit at once (not per-frame guesses for the segmenter)."""
+        return self.mode == "segment"
+
+    def state(self, hands_up: bool) -> str:
+        """idle (hands down) | signing (a sign is being made) | detected (one came out)."""
+        if self.locked:
+            return "detected"
+        return "signing" if hands_up else "idle"
+
+    def early_match(self, frames: list[LandmarkFrame]) -> Prediction | None:
+        """The clip so far, if it already clearly is a sign (and long enough to be all of it)."""
+        match = self.segment_match(frames)
+        if match is None:
+            return None
+        gloss, near, other = match
+        if len(frames) < self.early * self.library.lengths.get(gloss, 0):
+            return None
+        if near > self.limit or near > 0.8 * other:
+            return None
+        return Prediction(gloss, float(0.99 - 0.39 * near / self.limit), "isolated")
 
     def classify_segment(self, frames: list[LandmarkFrame]) -> Prediction | None:
         """One whole sign (hands in to hands out) against the examples."""
