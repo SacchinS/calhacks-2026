@@ -345,6 +345,46 @@ async def test_a_sign_after_letters_keeps_them_as_spelled(config):
     await ac.stop()
 
 
+def test_closing_the_store_while_a_background_write_runs_is_safe(tmp_path):
+    """The engine records a word, then tags it, in worker threads that outlive the task that
+    started them, so close() can land mid-write. It must wait, not close under the write."""
+    import threading
+
+    store = VocabStore(tmp_path / "vocab.sqlite")
+    stop = threading.Event()
+    failures: list[BaseException] = []
+
+    def write() -> None:
+        try:
+            while not stop.is_set():
+                occ = Occurrence("Priyanka", "name", "fingerspelled")
+                store.add([occ])
+                store.set_tags(occ.id, ("design", "mockups"), "name")
+                store.all()
+        except BaseException as exc:  # noqa: BLE001
+            failures.append(exc)
+
+    writer = threading.Thread(target=write)
+    writer.start()
+    time.sleep(0.05)
+    store.close()
+    stop.set()
+    writer.join(5)
+    assert not failures, failures
+
+    # After close every call is a no-op, so shutdown never raises or crashes.
+    occ = Occurrence("Figma", "term", "fingerspelled")
+    store.add([occ])
+    store.set_tags(occ.id, ("design",))
+    store.delete([occ.id])
+    assert store.all() == []
+    assert store.for_term("FIGMA") == []
+    assert store.get(occ.id) is None
+    assert store.delete_term("FIGMA") == []
+    assert store.letters_saved() == (0, 0)
+    store.close()
+
+
 def _translator(config):
     from language.mock import MockTranslator
 
