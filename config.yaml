@@ -24,6 +24,20 @@ recognition:
   # doesn't send. 0 = twice min_frames.
   control_min_frames: 0
   confidence_threshold: 0.6
+  # Sign models, tried in this order (the first answer wins): custom | asl_citizen | kaggle.
+  sign_models: [custom, asl_citizen]
+  # ASL Citizen (recognition/asl_citizen.py; set up with tools/setup_asl_citizen.py): 2,731
+  # signs, limited to these. A sign counts if it's among the model's top_k of all 2,731,
+  # has min_prob of its whole probability, and floor among the signs below.
+  asl_citizen_dir: models/asl_citizen
+  asl_citizen_signs: [HELLO, NICE, MEET, "YES", "NO", FINISH, THANKYOU]   # quote YES / NO (YAML)
+  asl_citizen_window: 60
+  asl_citizen_min_frames: 15
+  asl_citizen_stride: 4
+  asl_citizen_floor: 0.5
+  asl_citizen_top_k: 10
+  asl_citizen_min_prob: 0.1
+  asl_citizen_mirror: "false"   # "false" (as the camera sees) | "true" | auto (tries both)
   # Kaggle ISLR model (downloaded here on first use): a rolling window of frames, run every
   # `isolated_stride` frames; predictions under `isolated_floor` count as nothing.
   isolated_model_dir: models/islr

@@ -4,16 +4,18 @@
     uv run python tools/tune_recognition.py --details      # what each take came out as
     uv run python tools/tune_recognition.py --quick        # a smaller sweep
 
-Each take is replayed through the real classifiers (custom signs, then the Kaggle model)
+Each take is replayed through the real classifiers (custom signs, then the main sign model:
+ASL Citizen when `recognition.sign_models` has it and it's set up, else the Kaggle model)
 and the segmenter, the way the camera recognizer runs them, for every combination of:
 
-    isolated_window, isolated_stride      (the Kaggle model's window: re-runs the model)
-    isolated_floor, confidence_threshold, min_frames, control_min_frames   (cheap)
+    <model>_window, <model>_stride        (the model's window: re-runs the model)
+    <model>_floor, confidence_threshold, min_frames, control_min_frames   (cheap)
 
-and the signs each take produced are compared with the glosses it should give (an edit
-distance: a missing, extra or wrong sign is one error). Signs no model can know yet (not
-in the Kaggle 250 and not recorded as a custom sign) are listed and left out of the score:
-record them with tools/record_signs.py. The best settings are printed as config.yaml lines.
+(<model> is asl_citizen or isolated), and the signs each take produced are compared with
+the glosses it should give (an edit distance: a missing, extra or wrong sign is one error).
+Signs no model can know (not in the model's signs and not recorded as a custom sign) are
+listed and left out of the score: record them with tools/record_signs.py. Fingerspelled
+letters in a take aren't scored. The best settings are printed as config.yaml lines.
 
 Uses the signing space saved in setup (Save This Position), like the app.
 """
@@ -45,6 +47,7 @@ EQUIVALENT: dict[str, set[str]] = {
     "THANK-YOU": {"THANKYOU"},
     "MY": {"MINEMY"},
     "SEND": {"FINISH"},
+    "MEET-YOU": {"MEET"},  # ASL Citizen has the plain form
 }
 PARAMS = ("window", "stride", "floor", "threshold", "min_frames", "control_min_frames")
 FULL = {
@@ -55,6 +58,9 @@ FULL = {
     "min_frames": [3, 5, 8],
     "control_min_frames": [0, 8, 15],
 }
+# ASL Citizen's training clips are whole one-sign videos (~2-4 s): longer windows.
+ASL_CITIZEN = {"window": [45, 60, 90], "stride": [4], "floor": [0.4, 0.5, 0.6, 0.7]}
+ASL_CITIZEN_QUICK = {"window": [60], "stride": [4], "floor": [0.4, 0.5, 0.6]}
 QUICK = {
     "window": [48],
     "stride": [4],
@@ -143,23 +149,46 @@ def with_recognition(config: Config, **values: Any) -> Config:
     return replace(config, sections={**config.sections, "recognition": section})
 
 
-# A factory gives (custom-sign classifier, Kaggle classifier) for a config; the Kaggle one
+def main_model(config: Config) -> str:
+    """The config prefix of the main sign model: asl_citizen (if used and set up) or isolated."""
+    models = config.get("recognition.sign_models", ["custom", "kaggle"]) or []
+    folder = config.path("recognition.asl_citizen_dir", "models/asl_citizen")
+    return (
+        "asl_citizen"
+        if "asl_citizen" in models and (folder / "stgcn.onnx").exists()
+        else "isolated"
+    )
+
+
+def model_values(config: Config, window: int, stride: int, floor: float) -> dict[str, Any]:
+    prefix = main_model(config)
+    return {f"{prefix}_window": window, f"{prefix}_stride": stride, f"{prefix}_floor": floor}
+
+
+# A factory gives (custom-sign classifier, main classifier) for a config; the main one
 # must report every prediction (floor 0), so the floor can be swept afterwards.
 Factory = Callable[[Config], tuple[FrameClassifier | None, FrameClassifier]]
 
 
 def real_classifiers(config: Config) -> tuple[FrameClassifier | None, FrameClassifier]:
     from recognition.custom_signs import CustomSignModel
-    from recognition.isolated import IsolatedSignModel
 
     custom = CustomSignModel(config)
-    return (custom if custom.library.examples else None), IsolatedSignModel(config)
+    if main_model(config) == "asl_citizen":
+        from recognition.asl_citizen import ASLCitizenModel
+
+        model: FrameClassifier = ASLCitizenModel(config)
+    else:
+        from recognition.isolated import IsolatedSignModel
+
+        model = IsolatedSignModel(config)
+    return (custom if custom.library.examples else None), model
 
 
 def raw_predictions(
     take: Take, config: Config, space: SigningSpace, factory: Factory
 ) -> list[tuple[Prediction | None, Prediction | None] | None]:
-    """Per frame: (custom-sign answer, Kaggle answer), or None when the hands are down."""
+    """Per frame: (custom-sign answer, main model's answer), or None when the hands are down."""
     custom, isolated = factory(config)
     out: list[tuple[Prediction | None, Prediction | None] | None] = []
     for raw in take.frames:
@@ -202,9 +231,7 @@ def sweep(
     results = []
     for window, stride in itertools.product(grid["window"], grid["stride"]):
         progress(f"window {window}, stride {stride}")
-        model_config = with_recognition(
-            config, isolated_window=window, isolated_stride=stride, isolated_floor=0.0
-        )
+        model_config = with_recognition(config, **model_values(config, window, stride, 0.0))
         raw = {t.name: raw_predictions(t, model_config, space, factory) for t in takes}
         for floor, threshold, min_frames, control in itertools.product(
             grid["floor"], grid["threshold"], grid["min_frames"], grid["control_min_frames"]
@@ -227,10 +254,12 @@ def sweep(
 
 def current_params(config: Config) -> dict[str, Any]:
     get = lambda key, default: config.get(f"recognition.{key}", default)  # noqa: E731
+    prefix = main_model(config)
+    defaults = (60, 4, 0.5) if prefix == "asl_citizen" else (48, 4, 0.3)
     return {
-        "window": int(get("isolated_window", 48)),
-        "stride": int(get("isolated_stride", 4)),
-        "floor": float(get("isolated_floor", 0.3)),
+        "window": int(get(f"{prefix}_window", defaults[0])),
+        "stride": int(get(f"{prefix}_stride", defaults[1])),
+        "floor": float(get(f"{prefix}_floor", defaults[2])),
         "threshold": float(get("confidence_threshold", 0.6)),
         "min_frames": int(get("min_frames", 5)),
         "control_min_frames": int(get("control_min_frames", 0)),
@@ -242,23 +271,34 @@ def changed(params: dict[str, Any], current: dict[str, Any]) -> int:
 
 
 def vocabulary(config: Config) -> set[str]:
-    """Every gloss a model can produce: the Kaggle 250, the custom signs, the controls."""
+    """Every gloss the models can produce: the main model's signs, the custom signs, the
+    controls."""
     from recognition.custom_signs import CustomSignLibrary
 
-    path = config.path("recognition.isolated_model_dir", "models/islr")
-    index = path / "sign_to_prediction_index_map.json"
-    words = {w.upper() for w in json.loads(index.read_text())} if index.exists() else set()
+    if main_model(config) == "asl_citizen":
+        from recognition.asl_citizen import DEMO_SIGNS, display
+
+        folder = config.path("recognition.asl_citizen_dir", "models/asl_citizen")
+        known = {display(g) for g in (folder / "glosses.txt").read_text().split()}
+        wanted = config.get("recognition.asl_citizen_signs", DEMO_SIGNS) or known
+        flags = {True: "YES", False: "NO"}
+        words = {display(flags.get(w, w) if isinstance(w, bool) else str(w)) for w in wanted}
+        words &= known
+    else:
+        path = config.path("recognition.isolated_model_dir", "models/islr")
+        index = path / "sign_to_prediction_index_map.json"
+        words = {w.upper() for w in json.loads(index.read_text())} if index.exists() else set()
     custom = CustomSignLibrary(config.path("recognition.custom_signs_dir", "models/custom_signs"))
     return words | set(custom.examples) | {"SEND", "YES", "NO"}
 
 
-def config_lines(params: dict[str, Any]) -> str:
+def config_lines(params: dict[str, Any], prefix: str = "isolated") -> str:
     return "\n".join(
         [
             "recognition:",
-            f"  isolated_window: {params['window']}",
-            f"  isolated_stride: {params['stride']}",
-            f"  isolated_floor: {params['floor']}",
+            f"  {prefix}_window: {params['window']}",
+            f"  {prefix}_stride: {params['stride']}",
+            f"  {prefix}_floor: {params['floor']}",
             f"  confidence_threshold: {params['threshold']}",
             f"  min_frames: {params['min_frames']}",
             f"  control_min_frames: {params['control_min_frames']}",
@@ -267,7 +307,7 @@ def config_lines(params: dict[str, Any]) -> str:
 
 
 def seen(raw: Iterable, top: int = 6) -> str:
-    """The Kaggle model's most confident guesses during a take (for spotting confusions)."""
+    """The models' most confident guesses during a take (for spotting confusions)."""
     best: dict[str, float] = {}
     for answers in raw:
         if answers is None:
@@ -302,6 +342,9 @@ def main() -> None:
     if unknown:
         print(f"No model knows yet (record with tools/record_signs.py): {', '.join(unknown)}")
     grid = QUICK if args.quick else FULL
+    if main_model(config) == "asl_citizen":
+        grid = {**grid, **(ASL_CITIZEN_QUICK if args.quick else ASL_CITIZEN)}
+    print(f"Main sign model: {main_model(config)}")
     results = sweep(takes, config, grid, vocab, progress=lambda s: print(f"  running {s}"))
     total = sum(len([g for g in t.expected if knowable(g, vocab)]) for t in takes)
     current = current_params(config)
@@ -319,14 +362,12 @@ def main() -> None:
     if now is not None:
         print(f"  current config.yaml: {now.errors} errors, {now.perfect}/{len(takes)} right")
     best = results[0]
-    print("\nIn config.yaml:\n" + config_lines(best.params))
+    print("\nIn config.yaml:\n" + config_lines(best.params, main_model(config)))
 
     if args.details:
+        p = best.params
         model_config = with_recognition(
-            config,
-            isolated_window=best.params["window"],
-            isolated_stride=best.params["stride"],
-            isolated_floor=0.0,
+            config, **model_values(config, p["window"], p["stride"], 0.0)
         )
         space = signing_space(config)
         print("\nEach take with the best settings:")

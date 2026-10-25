@@ -39,7 +39,7 @@ flowchart LR
 
 | Feature | Status |
 |---|---|
-| Sign recognition (Kaggle model + custom signs) | Built; needs tuning on a live webcam |
+| Sign recognition (ASL Citizen or Kaggle model + custom signs) | Built; needs tuning on a live webcam |
 | Gloss to English with Claude | Works (live tests pass, under 1 s) |
 | Google Meet: Cartesia voice out, captions in, "One moment, I'm signing." cue | Works on a loopback; a real two-laptop call is next |
 | Call intro: says who's calling ("Introduce me"; automatic only with `meet.intro_on_start`, for calls with strangers) | Built |
@@ -101,6 +101,7 @@ To use the real pieces:
 brew install blackhole-2ch blackhole-16ch   # then restart, or log out and back in
 cp .env.example .env                        # fill in ANTHROPIC_API_KEY, CARTESIA_API_KEY (and MOSS_*)
 uv sync --extra camera                      # MediaPipe + OpenCV for the webcam (Person A)
+uv run --extra camera --with torch --with onnx python tools/setup_asl_citizen.py --accept-license
 ```
 
 For the live demo, `make demo` runs every real component (`config.demo.yaml` on top of `config.yaml`). To pick components one at a time, set them in `config.yaml` (every default is the mock, and `main` keeps it that way), then `make run`:
@@ -136,6 +137,7 @@ The packaged app reads its keys from `~/Library/Application Support/calhacks-202
 
 ## Models and data
 
+- [ASL Citizen](https://www.microsoft.com/en-us/research/project/asl-citizen/) ST-GCN model (Microsoft; [code and weights](https://github.com/microsoft/ASL-citizen-code), MIT): isolated sign recognition, 2,731 signs from 52 signers, on the same MediaPipe Holistic points we track. We limit it to the demo's signs (`recognition.asl_citizen_signs`). Set up once with `uv run --extra camera --with torch --with onnx python tools/setup_asl_citizen.py --accept-license`, which downloads the weights, exports them to ONNX for ONNX Runtime (~20 ms per window), and reads the word list out of the dataset. The dataset is under the Microsoft Research License Terms (research and non-commercial use only; the data, word list included, can't be shared), so it stays in the gitignored `models/asl_citizen/`. Without it, the Kaggle model stands in.
 - [Kaggle ISLR 2023 1st-place model](https://huggingface.co/sign/kaggle-asl-signs-1st-place) (MIT license): isolated sign recognition, 250 signs. Downloaded to `models/islr/` the first time the camera runs; run with LiteRT.
 - [MediaPipe Holistic Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/holistic_landmarker): hand, pose, and face landmarks.
 - [ASL Landmark MLP](https://huggingface.co/nocontextdoruk/asl-landmark-mlp) by Doruk Doğular (CC BY-NC 4.0: non-commercial use only), trained on the [ASL-HG dataset](https://doi.org/10.17632/j4y5w2c8w9.1) (Pranto et al., 2026): fingerspelled letters from the 21 hand landmarks. Downloaded to `models/letters/` the first time the camera runs; run with ONNX Runtime (~0.05 ms per frame). Its reported 100% accuracy is on held-out photos of the same 10 people it was trained on, so expect less on a new signer.
