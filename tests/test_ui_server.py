@@ -303,3 +303,14 @@ async def test_a_held_letter_shows_as_the_hold_bar(engine):
     Holding.holding = None
     engine.on_event(LandmarkFrame())
     assert last_status(engine)["holding"] is None
+
+
+async def test_say_now_sends_the_sentence_marked_urgent(engine):
+    from shared.events import Translation
+
+    translations = engine.bus.subscribe(Translation)
+    engine.bus.publish(MockInput("wait color problem"))
+    await until(lambda: last_status(engine)["glosses"] == ["WAIT", "COLOR", "PROBLEM"])
+    await engine.handle_command({"cmd": "gesture", "name": "now"})  # the Say now button
+    translation = await asyncio.wait_for(translations.get(), 5)
+    assert translation.urgent and translation.gloss == ["WAIT", "COLOR", "PROBLEM"]

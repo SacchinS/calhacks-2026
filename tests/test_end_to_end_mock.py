@@ -132,3 +132,11 @@ async def test_users_words_never_reach_info_logs(app, caplog):
     await next_of(events, OutputSent)
     logged = " ".join(r.getMessage() for r in caplog.records).lower()
     assert "zebra" not in logged and "purple" not in logged
+
+
+async def test_now_ends_a_sentence_and_marks_it_urgent(app):
+    events = app.bus.subscribe()
+    await app.start()
+    app.bus.publish(MockInput("wait ~fi /yes color problem /now"))
+    translation = await next_of(events, Translation)
+    assert translation.urgent and translation.gloss[0] == "WAIT"
