@@ -7,7 +7,10 @@ word; the utterance buffer turns the accepted word into one fingerspelled sign.
   Dogular, trained on the ASL-HG dataset; CC BY-NC 4.0, so non-commercial use only).
   Downloaded to `models/letters/` on first use and run with ONNX Runtime (~1 ms). It
   knows A-Z and 0-9; only the letters are used. J and Z are drawn in the air, so a still
-  handshape can't show them: keep them out of demo words.
+  handshape can't show them: keep them out of demo words. `letter_set` limits the letters
+  to the ones the demo spells (the best of those wins, but only if it's also among the
+  model's `letter_top_k` likeliest letters, so a handshape that's clearly another letter,
+  or no letter, isn't forced into one).
 - `LetterReader`: turns per-frame guesses into letters. A letter counts once its
   handshape is held still for `letter_hold_seconds`. The same letter again needs the hand
   to move or drop first (a double letter is signed with a small slide). Spelling starts
@@ -81,6 +84,10 @@ class LetterModel:
         self.run = run
         self.classes = list(classes or [])
         self.letter_index = [i for i, c in enumerate(self.classes) if c.upper() in LETTERS]
+        allowed = str(config.get("recognition.letter_set", "") or "").upper()
+        names = [self.classes[i].upper() for i in self.letter_index]
+        self.allowed = [k for k, name in enumerate(names) if not allowed or name in allowed]
+        self.top_k = int(config.get("recognition.letter_top_k", 3))
         self.last_orientation = ""
         self.scores = dict.fromkeys(ORIENTATIONS, 0.0)  # auto: how sure each has been
 
@@ -92,20 +99,26 @@ class LetterModel:
         if len(guesses) == 1:
             (self.last_orientation,) = guesses
         else:
-            for o, (_, p) in guesses.items():
-                if p >= 0.5:
-                    self.scores[o] += p
+            for o, g in guesses.items():
+                if g is not None and g[1] >= 0.5:
+                    self.scores[o] += g[1]
             if any(self.scores.values()):
                 self.last_orientation = max(self.scores, key=self.scores.__getitem__)
             else:
-                self.last_orientation = max(guesses, key=lambda o: guesses[o][1])
+                self.last_orientation = max(guesses, key=lambda o: (guesses[o] or ("", 0))[1])
         return guesses[self.last_orientation]
 
-    def guess(self, hand: Sequence[Point], mirrored: bool) -> tuple[str, float]:
-        logits = np.asarray(self.run(normalize(hand, mirrored)))
-        probs = softmax(logits.reshape(-1)[self.letter_index])
+    def guess(self, hand: Sequence[Point], mirrored: bool) -> tuple[str, float] | None:
+        """The likeliest allowed letter and its probability among the allowed letters, or
+        None when no allowed letter is among the model's top_k."""
+        logits = np.asarray(self.run(normalize(hand, mirrored))).reshape(-1)[self.letter_index]
+        if len(self.allowed) < len(self.letter_index):
+            top = set(np.argsort(logits)[::-1][: self.top_k].tolist())
+            if not top & set(self.allowed):
+                return None
+        probs = softmax(logits[self.allowed])
         i = int(probs.argmax())
-        return self.classes[self.letter_index[i]].upper(), float(probs[i])
+        return self.classes[self.letter_index[self.allowed[i]]].upper(), float(probs[i])
 
 
 def onnx_runner(path: Path):
@@ -167,7 +180,7 @@ class LetterReader:
             return []
         guess = self.model.predict(hand)
         if guess is None or guess[1] < self.threshold:
-            self.status = f"unsure ({guess[1]:.0%})" if guess else "can't see the fingers"
+            self.status = f"unsure ({guess[1]:.0%})" if guess else "not one of the letters"
             return []  # one unsure frame doesn't break a hold
         letter, confidence = guess
         wrist = (hand[0][0], hand[0][1])

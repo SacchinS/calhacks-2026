@@ -8,7 +8,8 @@ app would count, so you can check the model and settle `recognition.letter_orien
 Keep one hand inside the green box (the signing space you saved in setup). Hold each
 letter still for a moment, then move to the next; slide a little for a double letter.
 
-- Line 1: the model's guess this frame, as the camera sees the hand and mirrored.
+- Line 1: the model's guess this frame, as the camera sees the hand and mirrored. Only the
+  letters in `recognition.letter_set` are read (PRIKUB for the demo; empty = A-Z).
 - Line 2: why it is or isn't counted: unsure (under `letter_threshold`), holding (not yet
   `letter_hold_seconds`), counted, or waiting for a second letter (a word's first letter
   shows only once the second is held, so a sign's handshape isn't read as a letter).

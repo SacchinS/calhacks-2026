@@ -37,6 +37,8 @@ recognition:
   # starts at the second letter within letter_gap_seconds. Check with tools/try_letters.py.
   letters: true
   letter_model_dir: models/letters
+  letter_set: PRIKUB              # only these letters (the demo's P-R-I, K-U-B); empty = A-Z
+  letter_top_k: 3                 # ...and only if it's among the model's 3 likeliest of A-Z
   letter_threshold: 0.6           # the model's probability among the letters
   letter_hold_seconds: 0.25
   letter_min_frames: 3
