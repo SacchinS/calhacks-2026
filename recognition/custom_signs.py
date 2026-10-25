@@ -176,6 +176,19 @@ class CustomSignModel(FrameClassifier):
             self.last = self.classify(list(self.frames))
         return self.last
 
+    def nearest(self, frames: list[LandmarkFrame]) -> list[tuple[str, float, float]]:
+        """For each sign's typical length: (nearest sign, its distance, the runner-up's) for
+        the window's tail at that length (what classify judges; for tools)."""
+        out = []
+        for length in sorted(set(self.library.lengths.values())):
+            if len(frames) < max(4, int(length * 0.7)):
+                continue
+            clip = clip_features(frames[-length:])
+            match = self.library.match(clip) if clip is not None else None
+            if match is not None:
+                out.append(match)
+        return out
+
     def classify(self, frames: list[LandmarkFrame]) -> Prediction | None:
         """Try the window's tail at each sign's typical length; keep the closest match."""
         best: Prediction | None = None
@@ -191,7 +204,9 @@ class CustomSignModel(FrameClassifier):
             _, near, other = match
             if near > self.limit or near > 0.8 * other:
                 continue
-            confidence = float(np.clip(1 - near / (2 * self.limit), 0.5, 0.99))
+            # 0.99 for a perfect match down to 0.6 at the limit: every accepted match clears
+            # the segmenter's confidence_threshold (it used to bottom out at 0.5 and vanish).
+            confidence = float(0.99 - 0.39 * near / self.limit)
             if best is None or confidence > best.confidence:
                 best = Prediction(gloss, confidence, "isolated")
         return best
