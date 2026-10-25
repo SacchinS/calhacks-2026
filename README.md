@@ -48,6 +48,7 @@ flowchart LR
 | Call intro: says who's calling ("Introduce me"; automatic only with `meet.intro_on_start`, for calls with strangers) | Built |
 | Turn-aware speaking: waits for the other person to finish, or politely jumps in | Works (tested with Cartesia Ink on a loopback) |
 | Quick replies in calls ("Can you repeat that?", "Please slow down a little.", "Yes."...) | Built; urgent ones are said right away |
+| Mention alerts: a flashing banner over every window when someone says your name or asks you something | Built |
 | Video stays on the laptop, camera-on indicator | Built |
 | Review the English before it's spoken in Meet | Built (off by default) |
 | Signing-area gating, fitted to the signer in setup | Built |

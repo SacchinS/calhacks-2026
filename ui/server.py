@@ -32,6 +32,8 @@ Events (stdout):
   {"type": "caption", "text": ..., "final": bool}   (ours) a partial caption is replaced
   {"type": "reply", "text": ..., "done": bool}       (ours) Claude Code's streamed reply
   {"type": "sent", "mode": ..., "output": ..., "text": ...}   (ours) what each output was given
+  {"type": "mention", "text": ..., "question": bool, "final": bool, "turn": n}   (ours)
+        someone said the signer's name; the same turn comes again with the full sentence
 
 Run by hand to see the protocol: uv run python app.py --mock
 """
@@ -59,6 +61,7 @@ from shared.events import (
     ConfirmRequest,
     ConfirmResult,
     LandmarkFrame,
+    Mention,
     MockInput,
     ModeChanged,
     Notice,
@@ -280,6 +283,7 @@ class EngineServer:
             Notice,
             SpeechStatus,
             TurnEvent,
+            Mention,
         )
         frames = self.bus.subscribe(LandmarkFrame, maxsize=2)  # newest frames only
         self._tasks = [
@@ -379,6 +383,9 @@ class EngineServer:
             self.emit({"type": "caption", "text": event.text, "final": event.is_final})
         elif isinstance(event, Notice):
             self.log.append(event.message)
+        elif isinstance(event, Mention):
+            mention = {"text": event.text, "question": event.question, "final": event.final}
+            self.emit({"type": "mention", "turn": event.turn, **mention})
         elif isinstance(event, SpeechStatus):
             self.speech, self.speech_text = event.state, event.text
         elif isinstance(event, TurnEvent):
@@ -586,6 +593,7 @@ class EngineServer:
     def _apply_settings(self) -> None:
         """Settings the app's Settings window changes that the engine uses."""
         self.app.call_host.name = str(self.ui_config.get("signer_name") or "").strip()
+        self.app.mentions.set_name(self.app.call_host.name)
         self.app.router.review_before_speaking = bool(self.ui_config.get("review_before_speaking"))
         box = self.ui_config.get("signing_space")
         if isinstance(box, dict):

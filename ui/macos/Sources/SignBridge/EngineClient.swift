@@ -45,6 +45,9 @@ final class EngineClient: ObservableObject {
     @Published var themTalking = false
     /// One-tap replies for calls (meet.quick_replies); urgent ones are said without waiting.
     @Published var quickReplies: [(text: String, urgent: Bool)] = []
+    /// Someone on the call said your name (MentionBanner shows it over every window).
+    struct MentionAlert: Equatable { let text: String; let question: Bool; let final: Bool; let turn: Int }
+    @Published var mention: MentionAlert?
     /// The Meet call so far: what the signer said ("you") and the other side's captions ("them").
     @Published var meetLog: [(who: String, text: String)] = []
     private var captionPartial = false
@@ -298,6 +301,9 @@ final class EngineClient: ObservableObject {
             if e["mode"] as? String == "meet" {
                 meetLog = Array((meetLog + [("you", e["text"] as? String ?? "")]).suffix(60))
             }
+        case "mention":
+            mention = MentionAlert(text: e["text"] as? String ?? "", question: e["question"] as? Bool ?? false,
+                                   final: e["final"] as? Bool ?? true, turn: e["turn"] as? Int ?? 0)
         case "error":
             engineError = e["message"] as? String
         default:

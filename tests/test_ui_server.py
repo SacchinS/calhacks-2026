@@ -360,3 +360,11 @@ async def test_only_configured_quick_replies_can_be_spoken(engine):
     assert "not a quick reply" in messages(engine, "error")[-1]["message"]
     await asyncio.sleep(0.05)
     assert not any(m["text"] == "I quit." for m in messages(engine, "sent"))
+
+
+async def test_mentions_reach_the_app_using_the_name_from_settings(engine):
+    await engine.handle_command({"cmd": "config", "values": {"signer_name": "Sam"}})
+    engine.bus.publish(Caption("Sam, can you take the dashboard ticket?"))
+    await until(lambda: messages(engine, "mention"))
+    mention = messages(engine, "mention")[-1]
+    assert mention["question"] and mention["final"] and "dashboard" in mention["text"]
