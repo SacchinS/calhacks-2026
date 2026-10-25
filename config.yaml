@@ -72,6 +72,8 @@ recognition:
   letter_orientation: auto        # auto (tries both) | as_is | mirrored
   # Custom signs recorded with tools/record_signs.py (tried before the Kaggle model).
   custom_signs_dir: models/custom_signs
+  # Only these recorded signs are matched (the demo's); empty = all. Quote YES / NO (YAML).
+  custom_signs: [WAIT, COLOR, PROBLEM, ME, MEET, TOMORROW, "YES", FINISH, NOW]
   custom_threshold_scale: 1.0    # lower = stricter matching
   # Facial grammar (brows, head shake / nod) set on each sign as markers. Off until a Deaf
   # signer has checked it: a wrong [negation] flips the meaning.

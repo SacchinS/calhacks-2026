@@ -141,6 +141,15 @@ class CustomSignModel(FrameClassifier):
         self.config = config
         folder = config.path("recognition.custom_signs_dir", "models/custom_signs")
         self.library = library or CustomSignLibrary(folder)
+        # Only the signs in use (recognition.custom_signs; empty = every recorded sign):
+        # fewer signs to tell apart, and recordings stay on disk for later.
+        wanted = config.get("recognition.custom_signs", []) or []
+        flags = {True: "YES", False: "NO"}  # unquoted YES / NO in YAML arrive as booleans
+        wanted = {str(flags.get(w, w) if isinstance(w, bool) else w).upper() for w in wanted}
+        if wanted:
+            for gloss in [g for g in self.library.examples if g not in wanted]:
+                del self.library.examples[gloss]
+                self.library.lengths.pop(gloss, None)
         self.stride = int(config.get("recognition.custom_stride", 3))
         self.gap_seconds = float(config.get("recognition.isolated_gap_seconds", 0.4))
         scale = float(config.get("recognition.custom_threshold_scale", 1.0))

@@ -102,3 +102,15 @@ def test_custom_signs_match_their_own_movement_and_ignore_others(library):
 
 def test_features_need_a_body():
     assert frame_features(LandmarkFrame(right_hand=hand(0.5, 0.5))) is None
+
+
+def test_custom_signs_can_be_limited_to_the_ones_in_use(tmp_path):
+    from recognition.custom_signs import CustomSignLibrary, CustomSignModel
+    from shared.config import Config
+
+    library = CustomSignLibrary(tmp_path)
+    library.examples = {g: [np.zeros((24, 90))] for g in ("HELLO", "WAIT", "YES")}
+    library.lengths = dict.fromkeys(library.examples, 20)
+    config = Config(sections={"recognition": {"custom_signs": ["WAIT", True]}})  # True = YES
+    model = CustomSignModel(config, library=library)
+    assert set(model.library.examples) == {"WAIT", "YES"}
